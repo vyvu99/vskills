@@ -1,0 +1,259 @@
+{
+  "ts-no-any-unknown": {
+    "category": "typescript", "severity": "error", "confidence": "high",
+    "message": "`any`/`unknown`/`@ts-ignore`/`@ts-expect-error` bị cấm — fix type tại root cause"
+  },
+  "ts-no-nonnull-assertion": {
+    "category": "typescript", "severity": "error", "confidence": "high",
+    "message": "Non-null assertion `!` hoặc `?.x!` combo bị cấm"
+  },
+  "ts-no-unsafe-type-cast": {
+    "category": "typescript", "severity": "error", "confidence": "medium",
+    "message": "`as X` type cast bị cấm (trừ 3rd-party boundary có comment)"
+  },
+  "ts-zod-forbidden-patterns": {
+    "category": "typescript", "severity": "error", "confidence": "high",
+    "message": "Zod loose types hoặc deprecated API — dùng typed schema cụ thể"
+  },
+  "ts-zod-schema-in-route-file": {
+    "category": "typescript", "severity": "error", "confidence": "medium",
+    "message": "Zod schema định nghĩa trong route/handler file — đặt trong domain schema file"
+  },
+  "ts-zod-parse-not-safe-in-service-repo": {
+    "category": "typescript", "severity": "warning", "confidence": "medium",
+    "message": "`schema.parse()` trên data từ DB nên dùng `.safeParse()` + fallback"
+  },
+  "ts-process-env-direct-access": {
+    "category": "typescript", "severity": "error", "confidence": "high",
+    "message": "`process.env.X` direct access — validate qua config object tập trung"
+  },
+  "ts-no-index-ts": {
+    "category": "convention", "severity": "error", "confidence": "high",
+    "message": "Tạo `index.ts` bị cấm"
+  },
+  "ts-inline-type-in-service-route-repo": {
+    "category": "typescript", "severity": "warning", "confidence": "medium",
+    "message": "`type`/`interface` inline trong service/route/repository — đặt trong shared schemas"
+  },
+  "ts-hardcode-role-status-string": {
+    "category": "typescript", "severity": "warning", "confidence": "medium",
+    "message": "Hardcode role/status string literals trong comparison — dùng `as const` constants"
+  },
+  "ts-component-missing-props-type": {
+    "category": "typescript", "severity": "warning", "confidence": "medium",
+    "message": "React component destructure props không có type annotation"
+  },
+  "ts-query-key-inline": {
+    "category": "typescript", "severity": "warning", "confidence": "medium",
+    "message": "Query key string inline trong hook — dùng query key factory ở file chung"
+  },
+  "ts-use-effect-derived-state": {
+    "category": "typescript", "severity": "warning", "confidence": "medium",
+    "message": "`useEffect + setState` để tính derived state — compute inline hoặc `useMemo`"
+  },
+  "ts-import-next-navigation-use-router": {
+    "category": "convention", "severity": "error", "confidence": "high",
+    "message": "`useRouter` từ `next/navigation` bị cấm — dùng `nextjs-toploader/app`"
+  },
+  "ts-null-coalescing-null": {
+    "category": "typescript", "severity": "warning", "confidence": "medium",
+    "message": "`?? null` khi `undefined` là đủ — return `T | undefined`"
+  },
+  "jsx-raw-html-elements": {
+    "category": "ui", "severity": "error", "confidence": "medium",
+    "message": "Raw HTML element — dùng component library thay thế"
+  },
+  "jsx-raw-img-anchor": {
+    "category": "ui", "severity": "error", "confidence": "high",
+    "message": "`<img>` / `<a href>` bị cấm — dùng `<Image>` / `<Link>`"
+  },
+  "jsx-key-is-index": {
+    "category": "react", "severity": "warning", "confidence": "medium",
+    "message": "`key={index}` không stable — dùng unique ID"
+  },
+  "jsx-inline-style": {
+    "category": "styling", "severity": "error", "confidence": "high",
+    "message": "`style=` prop / `<style>` tag bị cấm — dùng Tailwind"
+  },
+  "jsx-hardcode-color": {
+    "category": "styling", "severity": "error", "confidence": "high",
+    "message": "Hardcode hex/rgb color trong className — dùng design token hoặc Tailwind palette"
+  },
+  "server-no-console-log": {
+    "category": "logging", "severity": "error", "confidence": "high",
+    "message": "`console.*` trong server code — dùng Pino logger"
+  },
+  "frontend-no-console-log": {
+    "category": "logging", "severity": "error", "confidence": "high",
+    "message": "`console.log` debug còn lại trong production component code"
+  },
+  "service-no-raw-throw": {
+    "category": "backend", "severity": "error", "confidence": "high",
+    "message": "`throw new Error` / `throw new HTTPException` trong service — chỉ dùng AppError subclass"
+  },
+  "orm-join-without-comment": {
+    "category": "backend", "severity": "warning", "confidence": "high",
+    "message": "JOIN operation — cần comment WHY không dùng sequential queries"
+  },
+  "lib-no-container-resolve": {
+    "category": "backend", "severity": "error", "confidence": "high",
+    "message": "`container.resolve()` trong lib file — nhận dependency qua parameter"
+  },
+  "dev-bypass-no-prod-guard": {
+    "category": "security", "severity": "error", "confidence": "medium",
+    "message": "Dev-bypass flag `SKIP_*`/`USE_LOCAL_*` không có `NODE_ENV !== 'production'` guard"
+  },
+  "frontend-api-client-in-component-body": {
+    "category": "react", "severity": "warning", "confidence": "medium",
+    "scope": "/(components|hooks|app|pages|features)/",
+    "message": "HTTP/API client khởi tạo trong component/function body — chuyển lên module level (singleton)"
+  },
+  "frontend-invalidate-queries-no-key": {
+    "category": "react", "severity": "error", "confidence": "high",
+    "message": "`invalidateQueries()` không có query key — phải scope đến key cụ thể"
+  },
+  "frontend-direct-fetch-bypass": {
+    "category": "react", "severity": "warning", "confidence": "medium",
+    "message": "Raw `fetch(` / `axios.` bypass API client layer"
+  },
+  "test-case-not-english": {
+    "category": "convention", "severity": "warning", "confidence": "medium",
+    "message": "Test case label/description phải viết bằng English"
+  },
+  "misc-eslint-disable-no-reason": {
+    "category": "convention", "severity": "warning", "confidence": "high",
+    "message": "`eslint-disable` không có comment WHY"
+  },
+
+  "backend-db-query-in-route-candidate": {
+    "category": "architecture", "severity": "warning", "confidence": "candidate",
+    "message": "DB query trực tiếp trong route/handler — business logic phải ở service layer"
+  },
+  "backend-n-plus-one-candidate": {
+    "category": "backend", "severity": "error", "confidence": "candidate",
+    "message": "Potential N+1: await DB call bên trong .map(async/.forEach(async"
+  },
+  "frontend-usequery-no-loading-state-candidate": {
+    "category": "frontend", "severity": "warning", "confidence": "candidate",
+    "message": "useQuery/useSuspenseQuery không có loading/error/empty state handling gần đó"
+  },
+  "frontend-mutation-on-success-no-form-reset-candidate": {
+    "category": "frontend", "severity": "warning", "confidence": "candidate",
+    "message": "useMutation onSuccess không có form.reset() — form reopen sẽ có stale data"
+  },
+  "backend-upsert-insert-no-returning-candidate": {
+    "category": "backend", "severity": "warning", "confidence": "candidate",
+    "message": "INSERT/UPDATE/upsert không có RETURNING clause — re-query cần thiết"
+  },
+  "backend-sequential-await-candidate": {
+    "category": "backend", "severity": "warning", "confidence": "candidate",
+    "message": "2 await DB calls liên tiếp — verify độc lập thì dùng Promise.all"
+  },
+  "backend-soft-delete-no-filter-candidate": {
+    "category": "backend", "severity": "error", "confidence": "candidate",
+    "message": "SELECT query không có deletedAt filter — entity có thể có soft-delete"
+  },
+  "ts-dead-guard-candidate": {
+    "category": "typescript", "severity": "warning", "confidence": "candidate",
+    "message": "if (!x) return/throw — verify x có được dùng sau guard, nếu không thì xóa"
+  },
+  "ts-arrow-explicit-promise-return-candidate": {
+    "category": "typescript", "severity": "warning", "confidence": "candidate",
+    "message": "Explicit `: Promise<T>` trên arrow function — TS thường infer được, xóa annotation trừ khi cần thu hẹp type"
+  },
+  "backend-repository-throws-candidate": {
+    "category": "architecture", "severity": "warning", "confidence": "candidate",
+    "message": "`throw` trong repository layer — repository phải trả null/undefined, không throw; service layer throw AppError"
+  },
+  "jsx-raw-form-field-boilerplate": {
+    "category": "ui", "severity": "warning", "confidence": "high",
+    "message": "Raw `<FormField><FormControl>` boilerplate — dùng `Form*` wrapper từ @etaro/ui"
+  },
+  "backend-logger-error-wrapped-candidate": {
+    "category": "logging", "severity": "warning", "confidence": "candidate",
+    "message": "`logger.error({ error: err })` wrap mất stack trace — truyền Error object trực tiếp"
+  },
+  "backend-trycatch-in-route-candidate": {
+    "category": "architecture", "severity": "warning", "confidence": "candidate",
+    "message": "`try/catch` trong route/handler — không cần thiết, global error handler xử lý mọi exception"
+  },
+  "jsx-missing-alt-text-candidate": {
+    "category": "accessibility", "severity": "warning", "confidence": "candidate",
+    "message": "`<Image>` / `<img>` không có `alt` prop — accessibility violation"
+  },
+
+  "ts-zod-status-type-should-enum": {
+    "category": "typescript", "severity": "warning", "confidence": "medium",
+    "scope": "(-schema|schemas?|Schema)\\.ts$",
+    "message": "`z.string()` cho field status/type/role/kind/state — dùng `z.enum([...])` để type-safe"
+  },
+  "backend-fire-forget-no-catch": {
+    "category": "backend", "severity": "warning", "confidence": "candidate",
+    "scope": "-(service|route|handler|controller)\\.ts$",
+    "message": "Fire-and-forget call không có `.catch(logAsyncFailure)` — silent failure, HIPAA audit gap"
+  },
+  "backend-email-header-template-injection": {
+    "category": "security", "severity": "error", "confidence": "medium",
+    "scope": "(mail|email|notification|mailer)\\.(service|handler|util)\\.ts$",
+    "message": "Template literal trong email header field — CRLF injection risk qua user-controlled input"
+  },
+
+  "frontend-fetch-no-ok-check": {
+    "category": "frontend", "severity": "error", "confidence": "medium",
+    "message": "`fetch()` không check `res.ok` — non-2xx response trả HTML error page, không throw; user nhận file rỗng hoặc HTML"
+  },
+  "frontend-void-async-call": {
+    "category": "frontend", "severity": "warning", "confidence": "medium",
+    "message": "`void asyncFn()` floating promise — exception bị nuốt hoàn toàn, status không được set failed; dùng `.catch()` thay thế"
+  },
+  "ts-jsonb-field-as-cast": {
+    "category": "typescript", "severity": "error", "confidence": "high",
+    "message": "`as` cast trên JSONB field đã có `.$type<T>()` — mask union branches, professional users nhận empty data silently"
+  },
+  "jsx-key-non-unique-field": {
+    "category": "react", "severity": "warning", "confidence": "high",
+    "message": "React `key` từ field không unique (icon, emoji, color, label) — duplicate key → items bị drop silently trong render"
+  },
+  "backend-db-update-no-catch-in-catch": {
+    "category": "backend", "severity": "warning", "confidence": "candidate",
+    "scope": "(service|handler|consumer|worker|job|repository|repo)\\.(ts|tsx)$",
+    "message": "DB `.update()` trong catch block không có `.catch()` — nếu update lỗi, record kẹt state cũ vĩnh viễn"
+  },
+  "backend-env-url-empty-default": {
+    "category": "backend", "severity": "warning", "confidence": "high",
+    "scope": "(^|/)env\\.(ts|mjs|js)$",
+    "message": "URL/host env var với `default('')` — empty string là invalid URL, gây silent failure; dùng `z.string().url()` hoặc `.min(1)`"
+  },
+  "be-delete-no-org-scope": {
+    "category": "backend", "severity": "error", "confidence": "high",
+    "scope": "repository\\.(ts|tsx)$",
+    "message": "`.delete().where(eq(table.id, ...))` không có org scope filter — multi-tenant IDOR: bất kỳ org nào có thể xóa record của org khác"
+  },
+  "be-orgrole-empty-string-fallback": {
+    "category": "backend", "severity": "error", "confidence": "high",
+    "scope": "route\\.(ts|tsx)$",
+    "message": "`c.get('orgRole') ?? ''` empty string fallback bypass auth — empty string không match role nào nhưng không throw, request tiếp tục với role rỗng"
+  },
+  "fe-duplicate-query-key-factory": {
+    "category": "frontend", "severity": "error", "confidence": "high",
+    "message": "Local `*_KEYS` constant định nghĩa ngoài `lib/query-client.ts` — cache invalidation miss cross-component; import `queryKeys` từ query-client.ts"
+  },
+  "fe-alert-dialog-action-no-disabled": {
+    "category": "frontend", "severity": "warning", "confidence": "high",
+    "scope": "\\.tsx$",
+    "message": "`<AlertDialogAction onClick=...>` không có `disabled` prop — double-submit risk trong async mutation; thêm `disabled={isPending}`"
+  },
+  "fe-mutation-fn-side-effect": {
+    "category": "frontend", "severity": "warning", "confidence": "medium",
+    "message": "`setState` trong `mutationFn` body — side effects kẹt khi retry/unmount; move sang `onMutate`/`onSettled`"
+  },
+  "be-ip-header-no-format-validate": {
+    "category": "backend", "severity": "warning", "confidence": "medium",
+    "scope": "(route|service)\\.(ts|tsx)$",
+    "message": "`x-forwarded-for` header đọc không validate IP format — audit log IP có thể bị spoof; validate regex trước khi trust"
+  },
+  "fe-dialog-finally-close": {
+    "category": "frontend", "severity": "warning", "confidence": "high",
+    "message": "`setOpen(false)` trong `finally` block — dialog đóng kể cả khi lỗi, user mất input; move sang `onSuccess` callback"
+  }
+}
