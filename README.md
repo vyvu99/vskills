@@ -1,11 +1,11 @@
-# my-skills
+# vskills
 
 Personal Claude Code skills + scripts. Clone & run `./install.sh` to set up.
 
 ## Structure
 
 ```
-my-skills/
+vskills/
 ├── install.sh          # copy files to ~/.claude
 ├── skills/
 │   └── <skill-name>/
@@ -18,8 +18,8 @@ my-skills/
 ## Install
 
 ```bash
-git clone git@github.com:vyvu99/my-skills.git
-cd my-skills
+git clone git@github.com:vyvu99/vskills.git
+cd vskills
 chmod +x install.sh
 ./install.sh
 ```
