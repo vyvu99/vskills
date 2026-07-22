@@ -1,5 +1,7 @@
 # vskills
 
+🌐 English | [Tiếng Việt](README.vi.md)
+
 Personal Claude Code skills — opinionated checklists layered on top of everyday coding tasks: plan, implement, review, fix, ship.
 
 ## Skills
@@ -68,12 +70,13 @@ Full detail lives in each `skills/<name>/SKILL.md`.
 ```bash
 git clone git@github.com:vyvu99/vskills.git
 cd vskills
-./install.sh                       # symlink skills/ → ~/.claude/skills
+./install.sh                       # symlink skills/ → ~/.claude/skills (English)
+./install.sh --lang=vi             # same, but installs the Vietnamese SKILL.vi.md variant
 ./install.sh --with-scripts        # + symlink scripts/lint-rules (personal, opt-in)
 ./install.sh --dry-run             # preview only
 ```
 
-Skills are symlinked, not copied — editing a `SKILL.md` in `~/.claude/skills/` or in this repo is the same file. `scripts/lint-rules/` is skipped by default: those are rules harvested from `vreview` on the author's own projects and may not fit yours.
+Skills are symlinked, not copied — editing a `SKILL.md` in `~/.claude/skills/` or in this repo is the same file. `scripts/lint-rules/` is skipped by default: those are rules harvested from `vreview` on the author's own projects and may not fit yours. Every skill has a Vietnamese translation (`SKILL.vi.md` next to `SKILL.md`) — pick the language once at install time with `--lang`, both can't be active at once.
 
 ## How to use
 
