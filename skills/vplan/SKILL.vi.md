@@ -76,6 +76,13 @@ Tuân theo đúng cấu trúc `plan.md` tổng quan + `phase-XX-*.md` chi tiết
 
 Sau khi hoàn tất plan.md + phase files: tiếp tục đúng Post-Plan Handoff của skill `plan` gốc — dùng `AskUserQuestion` để đề xuất chạy validate/red-team gate của `plan`, implement ngay với `vcook <plan-path>`, hoặc kết thúc session.
 
+## Bước tiếp theo
+
+Khi plan đã viết xong, báo user hướng đi phù hợp với tình huống:
+- Plan ổn, không còn câu hỏi mở → đề xuất `/vcook <plan-path>` để implement.
+- Plan đụng vùng rủi ro/quan trọng, đáng có thêm 1 lượt kiểm tra → đề xuất chạy validate/red-team gate của skill `plan` trước khi implement.
+- Specs còn khoảng trống không suy ra được từ code → đề xuất `/vspecs` để bổ sung trước khi plan tiếp.
+
 ---
 
 ## Hard rules

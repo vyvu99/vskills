@@ -139,3 +139,10 @@ When a new file is needed:
 - Always pair a problem with a proposed solution, don't just state the issue
 - No recap, no explaining the change after updating the file
 - No timestamps, no version numbers in the specs content
+
+## Next steps
+
+Once the specs file is done (no open edge cases left), tell the user what fits the situation:
+- Specs are for a feature that still needs building → suggest `/vplan <specs-file>` to turn it into an implementation plan.
+- User only wanted documentation, nothing to build right now → just confirm the file is saved, nothing further needed.
+- New edge cases come up later → re-run `/vspecs` on the same file to keep iterating.

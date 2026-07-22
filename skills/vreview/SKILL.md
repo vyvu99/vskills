@@ -690,3 +690,12 @@ GENERAL RULES
    - Writes the result into .code-review/{GROUP_NAME}.txt with header: [REVIEWED BY: MAIN AGENT — subagent failed]
    - Writes into REPORT.md's CONFIDENCE NOTES section: "Group X reviewed by main agent — lower confidence than subagent review"
 7. Phase 5 (Lint Harvest) does NOT block merge — runs after Phase 4, its failure does not affect the main review result.
+
+═══════════════════════════════════════════════════════
+NEXT STEPS
+═══════════════════════════════════════════════════════
+
+Once REPORT.md is written, tell the user what fits the outcome:
+- CRITICAL or WARNING issues found → suggest `/vfix` to address them in priority order.
+- Only SUGGESTIONs, no CRITICAL/WARNING → mention `/vfix` is optional, mainly to walk through the suggestions.
+- Zero issues found → the branch/PR looks clean, ready for human review or merge.

@@ -76,6 +76,13 @@ Follow the exact structure of the overview `plan.md` + detailed `phase-XX-*.md` 
 
 After finishing plan.md + phase files: continue with the exact Post-Plan Handoff of the underlying `plan` skill — use `AskUserQuestion` to offer running the validate/red-team gate of `plan`, implementing right away with `vcook <plan-path>`, or ending the session.
 
+## Next steps
+
+Once the plan is written, tell the user what fits the situation:
+- Plan looks solid, no open questions → suggest `/vcook <plan-path>` to implement it.
+- Plan touches a risky/critical area worth a second pair of eyes first → suggest the `plan` skill's validate/red-team gate before implementing.
+- Specs had gaps you couldn't resolve from code → suggest `/vspecs` to fill them in before planning further.
+
 ---
 
 ## Hard rules

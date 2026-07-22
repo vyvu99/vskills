@@ -117,3 +117,12 @@ HARD RULES
 - Do NOT commit issues individually within a batch that has interdependencies — commit per batch.
 - ALWAYS use `AskUserQuestion` when a STOP-GATE condition (a/b/c) matches — never decide on the user's behalf.
 - ALWAYS ask for confirmation before deleting `.code-review/` or the report dir that was used.
+
+═══════════════════════════════════════════════════════
+NEXT STEPS
+═══════════════════════════════════════════════════════
+
+Once everything applicable is fixed, tell the user what fits the situation:
+- The fixes touched enough code to be worth re-checking → suggest re-running `/vreview` to confirm the fixes are clean.
+- Fixes were small/contained → the report is resolved, ready to merge.
+- Some SUGGESTIONs were declined → note they were skipped intentionally, no action needed unless revisited later.

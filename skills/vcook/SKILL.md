@@ -125,3 +125,11 @@ STEP 9: COMMIT + CREATE PR
 - **Scope** → stick strictly to the plan/description's scope; further improvements → propose them, don't expand scope unilaterally
 - **PR description** → in Vietnamese, non-technical, following `.github/pull_request_template.md` exactly if it exists
 - **Test-first** → mandatory for API/backend logic, not mandatory for pure UI (must state the reason clearly when skipped)
+
+## Next steps
+
+Once the PR is open, tell the user what fits the situation:
+- Typecheck/build wasn't run for this change yet → suggest `/vcheck` before requesting review.
+- The diff is large or touches sensitive logic → suggest `/vreview` to self-review before a human does.
+- There's a related plan/issue not yet tracked on GitHub → suggest `/vissues <plan-path>`.
+- None of the above apply → the PR is ready as-is, no further skill needed.

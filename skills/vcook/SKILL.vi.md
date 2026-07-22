@@ -125,3 +125,11 @@ BƯỚC 9: COMMIT + TẠO PR
 - **Scope** → bám sát chặt scope của plan/mô tả; improvement thêm → đề xuất, không tự ý mở rộng scope
 - **PR description** → tiếng Việt, không thuật ngữ kỹ thuật, theo đúng `.github/pull_request_template.md` nếu có
 - **Test-first** → bắt buộc với API/backend logic, không bắt buộc với pure UI (phải ghi rõ lý do khi bỏ qua)
+
+## Bước tiếp theo
+
+Khi PR đã mở, báo user hướng đi phù hợp với tình huống:
+- Chưa chạy typecheck/build cho thay đổi này → đề xuất `/vcheck` trước khi xin review.
+- Diff lớn hoặc đụng logic nhạy cảm → đề xuất `/vreview` để tự review trước khi người khác review.
+- Có plan/issue liên quan chưa track trên GitHub → đề xuất `/vissues <plan-path>`.
+- Không rơi vào trường hợp nào ở trên → PR đã sẵn sàng, không cần thêm skill nào nữa.

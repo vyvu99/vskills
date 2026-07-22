@@ -690,3 +690,12 @@ QUY TẮC CHUNG
    - Ghi kết quả vào .code-review/{GROUP_NAME}.txt với header: [REVIEWED BY: MAIN AGENT — subagent failed]
    - Ghi vào phần CONFIDENCE NOTES của REPORT.md: "Group X reviewed by main agent — lower confidence than subagent review"
 7. Phase 5 (Lint Harvest) KHÔNG block merge — chạy sau Phase 4, việc nó fail không ảnh hưởng đến kết quả review chính.
+
+═══════════════════════════════════════════════════════
+BƯỚC TIẾP THEO
+═══════════════════════════════════════════════════════
+
+Khi REPORT.md đã viết xong, báo user hướng đi phù hợp với kết quả:
+- Có issue CRITICAL hoặc WARNING → đề xuất `/vfix` để xử lý theo thứ tự ưu tiên.
+- Chỉ có SUGGESTION, không có CRITICAL/WARNING → nói rõ `/vfix` là tuỳ chọn, chủ yếu để đi qua các suggestion.
+- Không có issue nào → branch/PR đã sạch, sẵn sàng cho review/merge.

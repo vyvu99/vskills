@@ -117,3 +117,12 @@ QUY TẮC CỨNG
 - KHÔNG được commit từng issue riêng lẻ trong một batch có tính phụ thuộc lẫn nhau — commit theo batch.
 - LUÔN dùng `AskUserQuestion` khi khớp điều kiện STOP-GATE (a/b/c) — không bao giờ tự quyết định thay user.
 - LUÔN hỏi xác nhận trước khi xoá `.code-review/` hoặc report dir đã dùng.
+
+═══════════════════════════════════════════════════════
+BƯỚC TIẾP THEO
+═══════════════════════════════════════════════════════
+
+Khi đã fix xong mọi thứ áp dụng được, báo user hướng đi phù hợp với tình huống:
+- Fix đụng đủ nhiều code để đáng kiểm tra lại → đề xuất chạy lại `/vreview` để xác nhận fix sạch.
+- Fix nhỏ/gọn → report đã resolved, sẵn sàng merge.
+- Có SUGGESTION bị từ chối → ghi nhận là bỏ qua có chủ đích, không cần làm gì thêm trừ khi quay lại sau.

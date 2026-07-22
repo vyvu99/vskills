@@ -140,3 +140,10 @@ Khi cần tạo file mới:
 - Luôn đi kèm proposal xử lý với mỗi vấn đề, không chỉ nêu vấn đề suông
 - Không recap, không giải thích thay đổi sau khi cập nhật file
 - Không ghi timestamp, không ghi version number trong nội dung specs
+
+## Bước tiếp theo
+
+Khi file specs đã xong (hết edge case cần bàn), báo user hướng đi phù hợp với tình huống:
+- Specs cho feature còn cần build → đề xuất `/vplan <specs-file>` để biến thành implementation plan.
+- User chỉ cần tài liệu, chưa cần build ngay → xác nhận file đã lưu, không cần làm gì thêm.
+- Sau này phát sinh edge case mới → chạy lại `/vspecs` trên cùng file để tiếp tục bổ sung.
