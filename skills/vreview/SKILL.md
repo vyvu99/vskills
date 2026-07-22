@@ -1,201 +1,220 @@
 ---
 name: vreview
-description: "Senior code reviewer theo 4-phase: thu thập context + regression mapping → subagent review song song (Pass 0: test spec, Pass 1-3: logic/rules/self-check) → tổng hợp cross-check → adversarial subagent (attack input/flow + phản bác summary). KHÔNG skip phase nào."
-argument-hint: "[branch1 [branch2 ...] | --since <duration> | --path dir1 dir2 ...] [--base <base_branch>] [--exclude path1 path2 ...]"
+description: "Senior code reviewer following a 4-phase process: context gathering + regression mapping → parallel subagent review (Pass 0: test spec, Pass 1-3: logic/rules/self-check) → cross-check synthesis → adversarial subagent (attack input/flow + rebut the summary). Do NOT skip any phase."
+argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
+user-invocable: true
+when_to_use: "Invoke to review current branch diff or specific branches/paths with 4-phase subagent review."
+extends: code-review
 metadata:
   author: vyvu
   version: "1.1.0"
 ---
 
-/ck:code-review
-
-Bạn là senior code reviewer. Thực hiện review theo 6 phase. KHÔNG skip phase nào.
+Extends the underlying `code-review` skill. You are a senior code reviewer, executing the review through the 6 phases below (built on top of the underlying process). Do NOT skip any phase.
 
 ═══════════════════════════════════════════════════════
-PHASE 0: SCRIPT SCAN (Spawn subagent SAU KHI có file list)
+PHASE 0: SCRIPT SCAN (Spawn subagent AFTER the file list is ready)
 ═══════════════════════════════════════════════════════
 
-Mục đích: Chạy automated lint scripts để detect violations chính xác → giảm token semantic review.
+Purpose: Run automated lint scripts to detect violations precisely → reduce token spend on semantic review.
 
-**THỨ TỰ BẮT BUỘC:**
-1. Main agent chạy Phase 1.1 TRƯỚC để lấy file list thực tế
-2. Sau khi có file list → spawn Phase 0 subagent với file list đã điền
-3. Main agent tiếp tục Phase 1.2–1.5 SONG SONG với Phase 0 subagent
+**MANDATORY ORDER:**
+1. Main agent runs Phase 1.1 FIRST to get the actual file list
+2. Once the file list is ready → spawn the Phase 0 subagent with the file list filled in
+3. Main agent continues Phase 1.2–1.5 IN PARALLEL with the Phase 0 subagent
 
-⚠️ KHÔNG spawn Phase 0 trước Phase 1.1 — subagent sẽ nhận placeholder chưa fill → scan 0 file → kết quả sai hoàn toàn.
+⚠️ Do NOT spawn Phase 0 before Phase 1.1 — the subagent would receive an unfilled placeholder → scan 0 files → completely wrong results.
 
 ──────────────────────────────────────────────────────
-PROMPT CHO PHASE 0 SUBAGENT (điền file list thực tế trước khi spawn):
+PROMPT FOR THE PHASE 0 SUBAGENT (fill in the actual file list before spawning):
 ──────────────────────────────────────────────────────
 
-Bạn là script scan agent. Nhiệm vụ: chạy automated lint script và ghi kết quả vào file.
+You are the script scan agent. Task: run the automated lint script.
 
-FILE LIST (danh sách file cần scan — main agent đã cung cấp):
+FILE LIST (files to scan — provided by the main agent):
 {space_separated_file_list}
 
-THỰC HIỆN:
+EXECUTE:
 1. mkdir -p .code-review
 2. SCRIPT_SCAN_OUTPUT=.code-review/SCRIPT_SCAN.json bash ~/.claude/scripts/lint-rules/run.sh {space_separated_file_list}
-   - Dùng env var SCRIPT_SCAN_OUTPUT để run.sh ghi thẳng vào .code-review/ — tránh tạo SCRIPT_SCAN.json thừa tại CWD
-   - Nếu script không tồn tại hoặc lỗi → tạo file: echo '{"error":"script unavailable"}' > .code-review/SCRIPT_SCAN.json
-3. Parse SCRIPT_SCAN.json và viết .code-review/PHASE0.txt với format:
+   - Use the SCRIPT_SCAN_OUTPUT env var so run.sh writes directly to .code-review/SCRIPT_SCAN.json
+   - If the script doesn't exist or errors → create the file: echo '{"error":"script unavailable"}' > .code-review/SCRIPT_SCAN.json
 
-SCRIPT SCAN (automated — chạy trước semantic review):
-────────────────────────────────────────
-Total violations: {N}  |  Rules violated: {X}  |  Rules passed: {Y}
-
-CONFIRMED VIOLATIONS (confidence=high/medium):
-  {rule-id} [{severity}]: {count} violation(s)
-    - {file}:{line} — {match_excerpt}
-
-CANDIDATES (confidence=candidate — cần semantic verify):
-  {rule-id}: {count} location(s)
-    - {file}:{line} — {match_excerpt}
-
-CONFIRMED PASS (subagents KHÔNG cần re-check):
-  {rule-id-1}, {rule-id-2}, ...
-
-Ghi xong file là hoàn thành. KHÔNG cần làm thêm gì.
 ──────────────────────────────────────────────────────
 
-Sau khi Phase 1.2–1.5 xong, main agent đọc .code-review/PHASE0.txt (chờ nếu cần) và append vào CONTEXT.txt.
-
 
 ═══════════════════════════════════════════════════════
-PHASE 1: THU THẬP CONTEXT (Main agent tự làm, KHÔNG review)
+PHASE 1: CONTEXT GATHERING (Main agent does this itself, NO reviewing)
 ═══════════════════════════════════════════════════════
 
-**FLOW THỰC HIỆN:**
-  Phase 1.1 (collect file list) → spawn Phase 0 subagent → Phase 1.2–1.5 song song với Phase 0
+**EXECUTION FLOW:**
+  Phase 1.1 (collect file list) → spawn Phase 0 subagent → Phase 1.2–1.5 in parallel with Phase 0
 
-1.1 Xác định thay đổi
+1.1 Determine the changes
 
-Parse args theo thứ tự ưu tiên:
+Parse args in priority order:
 
 FLAGS:
-- `--path dir1 dir2 ...` → review TOÀN BỘ files trong thư mục chỉ định (KHÔNG dùng git diff)
-  Ví dụ: `--path apps/api/src/services apps/portal/src/components/notes`
-  Dùng khi: muốn review một domain/feature area toàn bộ, không chỉ diff
-- `--since <duration>` → dùng `git log --since="<duration>"` thay vì git diff
-  Ví dụ: `--since 2h`, `--since 1d`, `--since "3 hours ago"`
-- `--base <base_branch>` → override base branch để so sánh (mặc định: auto-detect)
-  Không áp dụng khi dùng `--path`
-- `--exclude path1 path2 ...` → danh sách path patterns loại trừ thủ công
-  Ví dụ: `--exclude career-passport therapist`
+- `--path dir1 dir2 ...` → review ALL files in the specified directories (do NOT use git diff)
+  Example: `--path apps/api/src/services apps/portal/src/components/notes`
+  Use when: you want to review an entire domain/feature area, not just the diff
+- `--since <duration>` → use `git log --since="<duration>"` instead of git diff
+  Example: `--since 2h`, `--since 1d`, `--since "3 hours ago"`
+- `--base <base_branch>` → override the base branch for comparison (default: auto-detect)
+  Not applicable when using `--path`
+- `--exclude path1 path2 ...` → list of path patterns to manually exclude
+  Example: `--exclude career-passport therapist`
 
-POSITIONAL ARGS (arguments không phải flag):
-- Tất cả arguments không phải flag = danh sách branches/features cần review
-- Ví dụ: `feat/auth feat/billing` → review cả 2 branches
-- Ví dụ: `feat/auth` → review 1 branch (tương đương behavior cũ khi truyền branch_base)
-- Nếu KHÔNG truyền positional arg → review current branch (HEAD)
+POSITIONAL ARGS (non-flag arguments):
+- All non-flag arguments = list of branches/PR refs to review
+- Supported forms:
+  a. Branch name:       `feat/auth` → used directly
+  b. GitHub PR URL:     `https://github.com/org/repo/pull/123` → resolve → branch/commit
+  c. PR shorthand:      `#947` or `PR#947` → resolve → branch/commit
+- Example: `feat/auth feat/billing` → review both branches
+- Example: `#947 #955` → review 2 PRs
+- Example: `https://github.com/org/repo/pull/947` → review 1 PR
+- If NO positional arg is passed → review the current branch (HEAD)
 
-PHÂN BIỆT `branch_list` vs `base_branch`:
-- `branch_list` = danh sách branches CẦN review (positional args)
-- `base_branch` = branch gốc để so sánh (từ `--base` flag, hoặc auto-detect)
-- Ví dụ: `vreview feat/auth feat/billing --base develop` → review 2 branches, so sánh với develop
-- Ví dụ: `vreview feat/auth` → review feat/auth so với auto-detected base (main/master)
-- Ví dụ: `vreview` → review HEAD so với auto-detected base
+RESOLVE PR REFS → BRANCH/COMMIT (do this before building branch_list):
 
-Auto-detect `base_branch` khi không có `--base` (không áp dụng với `--path`):
-  1. Thử: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'`
-  2. Nếu trống → thử `git rev-parse --verify main 2>/dev/null` → dùng `main`
-  3. Nếu không có `main` → dùng `master`
+  For EACH positional arg, detect its form:
+    - Matches `https?://github\.com/[^/]+/[^/]+/pull/(\d+)` → PR URL → extract PR number
+    - Matches `^#?PR?(\d+)$` (case-insensitive) → PR shorthand → extract PR number
+    - Otherwise → treat as a branch name, use directly
 
-Lấy danh sách file:
+  For EACH extracted PR number:
+    ```bash
+    gh pr view {pr_number} --json headRefName,state,mergeCommit,baseRefName \
+      --jq '{branch: .headRefName, state: .state, sha: .mergeCommit.oid, base: .baseRefName}'
+    ```
 
-  MODE 1 — `--path` (review theo domain/directory):
-    Với MỖI path trong `--path`:
+  Handle by state:
+    OPEN:
+      - Use headRefName as the branch
+      - Fetch if not present locally: `git fetch origin {headRefName} 2>/dev/null`
+      - Resolve: `git rev-parse --verify origin/{headRefName}` (prefer remote over local)
+
+    MERGED:
+      - Try if the branch still exists: `git rev-parse --verify origin/{headRefName} 2>/dev/null`
+      - If it still exists → use it as a branch like OPEN
+      - If it no longer exists (deleted after merge) → use mergeCommit.sha:
+          `git diff --name-status {base_branch}...{mergeCommit.sha}`
+        Note in CONTEXT.txt: `[PR #{n} — branch deleted, using merge commit {sha[:8]}]`
+
+    CLOSED (not merged):
+      - Warn: `⚠️ PR #{n} is CLOSED (not merged) — skipping`
+      - Do not add it to branch_list
+
+DISTINGUISH `branch_list` FROM `base_branch`:
+- `branch_list` = list of branches/commit SHAs TO review (after resolving PR refs)
+- `base_branch` = base branch used for comparison (from the `--base` flag, or auto-detected)
+- Example: `vreview feat/auth feat/billing --base develop` → review 2 branches, compare against develop
+- Example: `vreview #947 #955` → resolve 2 PRs → review, auto-detect base from PR.baseRefName
+- Example: `vreview` → review HEAD against the auto-detected base
+
+Auto-detect `base_branch` when `--base` is absent (not applicable with `--path`):
+  1. If all args are PR refs → take baseRefName from gh pr view (usually main/master)
+  2. Try: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'`
+  3. If empty → try `git rev-parse --verify main 2>/dev/null` → use `main`
+  4. If `main` doesn't exist → use `master`
+
+Get the file list:
+
+  MODE 1 — `--path` (review by domain/directory):
+    For EACH path in `--path`:
       `find {path} -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \)`
-    Union tất cả results → loại trừ `--exclude` patterns
-    Ghi nhận STATUS tất cả files là [EXISTING] (không phân biệt M/A/D)
-    Header CONTEXT.txt: `PATH REVIEW: {paths}  (không dùng git diff)`
+    Union all results → exclude `--exclude` patterns
+    Mark the STATUS of all files as [EXISTING] (no distinction between M/A/D)
+    CONTEXT.txt header: `PATH REVIEW: {paths}  (not using git diff)`
 
-  MODE 2 — `--since` (review theo thời gian):
+  MODE 2 — `--since` (review by time window):
     `git log --since="{duration}" --name-status --diff-filter=AMDR --pretty=format: | sort -u`
 
-  MODE 3 — branch diff (mặc định):
-    - Nếu có nhiều branches: với MỖI branch trong `branch_list`:
-        `git diff --name-status {base_branch}...{branch}`
-      Sau đó **union** tất cả file lists (loại bỏ duplicate, giữ status mới nhất nếu conflict)
-    - Nếu có 1 branch: `git diff --name-status {base_branch}...{branch}`
-    - Nếu không có branch arg: `git diff --name-status {base_branch}...HEAD`
+  MODE 3 — branch/commit diff (default):
+    - If there are multiple entries: for EACH entry in `branch_list` (branch name or commit SHA):
+        `git diff --name-status {base_branch}...{entry}`
+      Then **union** all file lists (remove duplicates, keep the latest status on conflict)
+    - If there's 1 entry: `git diff --name-status {base_branch}...{entry}`
+    - If no arg: `git diff --name-status {base_branch}...HEAD`
 
-Khi union nhiều branches, ghi rõ file đến từ branch nào:
+When unioning multiple branches, note which branch each file came from:
   [M] path/file.ts  (+45 -12)  [branches: feat/auth, feat/billing]
   [A] path/file2.ts (+120 -0)  [branch: feat/auth]
 
-- Loại trừ (thủ công): mọi file có path chứa bất kỳ pattern nào trong danh sách `--exclude`.
-- Ghi lại: file path, status (A/M/D/R), số dòng thay đổi.
+- Manual exclusion: any file whose path contains any pattern from the `--exclude` list.
+- Record: file path, status (A/M/D/R), number of changed lines.
 
-1.2 Đọc rules
+1.2 Read the rules
 
-Đọc TOÀN BỘ ~/.claude/CLAUDE.md. Trích xuất MỖI rule thành danh sách đánh số.
+Read the ENTIRE ~/.claude/CLAUDE.md. Extract EVERY rule into a numbered list.
 
-1.3 Xây dựng dependency graph
+1.3 Build the dependency graph
 
-Với MỖI file thay đổi, xác định:
-- Upstream: file mà nó import (kể cả type imports)
-- Downstream: file import nó
-- Test file: test tương ứng nếu có
-- Type definitions: interfaces/types mà nó define hoặc consume
+For EACH changed file, determine:
+- Upstream: files it imports (including type imports)
+- Downstream: files that import it
+- Test file: the corresponding test if one exists
+- Type definitions: interfaces/types it defines or consumes
 
-Cách làm:
-- grep -r "from.*{filename}" --include="*.ts" --include="*.tsx" để tìm downstream
-- Đọc import section của mỗi file changed để tìm upstream
-- Grep tên exported symbols để tìm usage
+How to do this:
+- grep -r "from.*{filename}" --include="*.ts" --include="*.tsx" to find downstream
+- Read the import section of every changed file to find upstream
+- Grep exported symbol names to find usage
 
 1.3d Regression risk mapping
 
-Với MỖI file thay đổi, chỉ xác định test file tương ứng — KHÔNG đọc nội dung (Pass 0 trong Phase 2 sẽ đọc chi tiết):
-- Dùng find/glob để locate: `{filename}.test.ts`, `{filename}.spec.ts`, `__tests__/{filename}.ts`
-- Ghi vào CONTEXT.txt phần "REGRESSION RISKS" — chỉ mapping tên file:
+For EACH changed file, only identify the corresponding test file — do NOT read its content (Pass 0 in Phase 2 will read it in detail):
+- Use find/glob to locate: `{filename}.test.ts`, `{filename}.spec.ts`, `__tests__/{filename}.ts`
+- Write into the CONTEXT.txt "REGRESSION RISKS" section — file name mapping only:
 
   REGRESSION RISKS:
     path/file.ts → path/file.test.ts
     path/file2.ts → (no test file found)
 
-1.3b Lọc boilerplate (tự động, trước khi phân nhóm)
+1.3b Filter boilerplate (automatic, before grouping)
 
-Loại trừ tự động các file khớp pattern sau — KHÔNG cần review:
+Automatically exclude files matching the following patterns — do NOT review them:
   - `**/*.generated.ts`, `**/*.generated.tsx`, `**/*.generated.js` — auto-generated code
   - `**/migrations/**` — database migration files
   - `openapi.json`, `openapi.yaml`, `openapi.yml` — OpenAPI spec files
-  - `**/__generated__/**`, `**/generated/**` — thư mục generated bất kỳ
+  - `**/__generated__/**`, `**/generated/**` — any generated directory
   - `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lockb` — lockfiles
   - `**/*.sql` — raw SQL dumps
   - `**/*.min.js`, `**/*.bundle.js` — minified/bundled output
 
-Ghi vào CONTEXT.txt phần "BOILERPLATE SKIPPED" danh sách file bị loại trừ tự động (để transparency).
+Write the list of auto-excluded files into the CONTEXT.txt "BOILERPLATE SKIPPED" section (for transparency).
 
-1.4 Phân nhóm
+1.4 Group the files
 
-Gom file thành nhóm theo nguyên tắc:
-- File liên quan logic → cùng nhóm
-- Mỗi nhóm tối đa 5 file changed + dependency liên quan
-- File cô lập (chỉ đổi config, type, constant) → nhóm riêng
+Group files based on the following principles:
+- Logically related files → same group
+- Each group has a maximum of 5 changed files plus related dependencies
+- Isolated files (only config, type, or constant changes) → their own group
 
-1.5 Output Phase 1
+1.5 Phase 1 output
 
-Viết vào .code-review/CONTEXT.txt:
+Write into .code-review/CONTEXT.txt:
 
 ────────────────────────────────────────
 CONTEXT
 ────────────────────────────────────────
 
 BRANCHES REVIEWED: {branch1}, {branch2}, ...  →  BASE: {base_branch}
-  [hoặc: SINCE: {duration}  |  hoặc: HEAD → {base_branch}]
+  [or: PR #{n} (OPEN|MERGED via {sha[:8]}), PR #{m} ...  →  BASE: {base_branch}]
+  [or: SINCE: {duration}  |  or: HEAD → {base_branch}]
 TOTAL CHANGED FILES: {count} (user-excluded: {excluded_patterns_or_none})
 
 BOILERPLATE SKIPPED (auto):
-  {danh sách file bị lọc tự động, hoặc "none"}
+  {list of auto-filtered files, or "none"}
 
 RULES (from CLAUDE.md):
   1. {rule_1}
   2. {rule_2}
-  ... (TẤT CẢ rules, không bỏ sót)
+  ... (ALL rules, none omitted)
 
 ────────────────────────────────────────
-GROUP A: {tên nhóm mô tả logic}
+GROUP A: {descriptive logical group name}
 ────────────────────────────────────────
 
 CHANGED FILES:
@@ -214,192 +233,193 @@ GROUP B: ...
 
 
 ═══════════════════════════════════════════════════════
-PHASE 2: SUBAGENT REVIEW (Song song, mỗi subagent = 1 group)
+PHASE 2: SUBAGENT REVIEW (In parallel, each subagent = 1 group)
 ═══════════════════════════════════════════════════════
 
-Tạo subagent cho MỖI group. Mỗi subagent nhận prompt sau (điền tên group):
+Create a subagent for EACH group. Each subagent receives the following prompt (fill in the group name):
 
 ──────────────────────────────────────────────────────
-PROMPT CHO SUBAGENT:
+PROMPT FOR THE SUBAGENT:
 ──────────────────────────────────────────────────────
 
-Bạn là senior code reviewer, đang review nhóm "{GROUP_NAME}".
+You are a senior code reviewer, reviewing group "{GROUP_NAME}".
 
-CONTEXT & DEPENDENCIES đã được chuẩn bị sẵn bên dưới. PHẢI đọc hết trước khi review.
+CONTEXT & DEPENDENCIES have already been prepared below. You MUST read all of them before reviewing.
 
-RULES (từ CLAUDE.md):
-{paste toàn bộ rules từ CONTEXT.txt}
+RULES (from CLAUDE.md):
+{paste all rules from CONTEXT.txt}
 
 FILES ASSIGNED:
-{paste danh sách changed files của group này}
+{paste this group's list of changed files}
 
-DEPENDENCIES BẠN PHẢI ĐỌC:
-{paste danh sách dependencies của group này}
+DEPENDENCIES YOU MUST READ:
+{paste this group's list of dependencies}
 
 ────────────────────────────────────────
-QUY TRÌNH REVIEW
+REVIEW PROCESS
 ────────────────────────────────────────
 
-PASS 0 — Đọc test files như behavioral spec (NẾU có trong dependencies)
-  1. Đọc MỖI test file được liệt kê trong DEPENDENCIES
-  2. Với mỗi test case, ghi nhận: "behavior X đang được bảo vệ bởi test Y"
-  3. Đánh dấu: behavior nào CÓ test bảo vệ, behavior nào KHÔNG có test
-  4. Issues phát hiện trong vùng KHÔNG có test → tăng severity lên 1 mức
+PASS 0 — Read test files as a behavioral spec (IF present in dependencies)
+  1. Read EVERY test file listed in DEPENDENCIES
+  2. For each test case, note: "behavior X is being protected by test Y"
+  3. Mark: which behaviors ARE protected by a test, which are NOT
+  4. Issues found in areas with NO test coverage → bump severity up one level
 
-PASS 1 — Đọc & hiểu
-  1. Đọc MỖI dependency trong bảng ở trên (upstream, downstream, types, test)
-  2. Đọc MỖI file changed — TOÀN BỘ nội dung, không chỉ diff
-  3. Ghi nhận: file này export gì, ai consume, flow data như thế nào
-  4. Đối chiếu với behaviors đã ghi nhận ở Pass 0: logic mới có break behavior nào không?
+PASS 1 — Read & understand
+  1. Read EVERY dependency in the table above (upstream, downstream, types, test)
+  2. Read EVERY changed file — the ENTIRE content, not just the diff
+  3. Note: what this file exports, who consumes it, how data flows
+  4. Cross-check against the behaviors noted in Pass 0: does the new logic break any behavior?
 
-PASS 2 — Tìm vấn đề (theo thứ tự ưu tiên)
+PASS 2 — Find issues (in priority order)
 
-  2a. Bug & Logic:
-    - Có bug logic, race condition, null/undefined không handle?
-    - Có edge case thiếu (empty array, empty string, null, 0, negative, concurrent)?
-    - Có execution path nào return undefined mà caller không expect?
-    - Có side effect không rõ ràng?
-    - Giả vờ bạn là caller: bạn truyền argument gì sẽ break function này?
+  2a. Bugs & Logic:
+    - Any logic bugs, race conditions, unhandled null/undefined?
+    - Any missing edge cases (empty array, empty string, null, 0, negative, concurrent)?
+    - Any execution path that returns undefined when the caller doesn't expect it?
+    - Any unclear side effects?
+    - Pretend you're the caller: what argument would you pass to break this function?
 
   2b. Rules compliance:
-    - Check TỪNG rule trong danh sách rules
-    - Mỗi rule: ghi rõ PASS hoặc FAIL
+    - Check EACH rule in the rules list
+    - For each rule: mark clearly PASS or FAIL
 
   2c. Architecture & Consistency:
-    - Có vi phạm pattern đang dùng trong codebase không?
-    - Có duplicate logic lẽ ra nên extract?
-    - Naming convention có nhất quán?
-    - Có export/type nào public mà lẽ ra nên private?
+    - Does it violate a pattern already used in the codebase?
+    - Any duplicate logic that should be extracted?
+    - Is naming convention consistent?
+    - Any export/type that's public but should be private?
 
   2d. Final sanity check:
-    - "Component này render ở đâu? Có prop nào required mà parent không truyền?"
-    - "API này có handle error response đúng không?"
-    - "Có file nào trong dependencies mà tôi chưa đọc nhưng nên đọc?"
-    - "Tôi có đang miss edge case vì không biết business context?"
-    Nếu phát hiện thêm issue → thêm vào kết quả.
+    - "Where does this component render? Is there a required prop the parent doesn't pass?"
+    - "Does this API handle the error response correctly?"
+    - "Is there any file in the dependencies I haven't read but should?"
+    - "Am I missing an edge case because I don't know the business context?"
+    If you find an additional issue → add it to the results.
 
 ────────────────────────────────────────
-OUTPUT FORMAT (BẮT BUỘC)
+OUTPUT FORMAT (MANDATORY)
 ────────────────────────────────────────
 
-Viết vào .code-review/{GROUP_NAME}.txt theo đúng format sau:
+Write into .code-review/{GROUP_NAME}.txt using exactly this format:
 
 ────────────────────────────────────────
 REVIEW: {GROUP_NAME}
 ────────────────────────────────────────
 
-THỐNG KÊ:
+STATS:
   Files reviewed: X
   Dependencies read: Y
   Issues: Z (Critical: A, Warning: B, Suggestion: C)
 
 ────────────────────────────────────────
-[CRITICAL] Tiêu đề
+[CRITICAL] Title
 ────────────────────────────────────────
   File: path/file.ts:45-52
   Blame: {username}, {YYYY-MM-DD}  ← git blame -L 45,52 path/file.ts --porcelain | grep -E "^(author |author-time )"
-  Rule violated: {tên rule từ CLAUDE.md}
-  Code hiện tại:
-    {paste chính xác code có vấn đề, kèm line number}
-  Vấn đề: {mô tả cụ thể, giải thích tại sao là bug}
-  Impact: {ai bị ảnh hưởng, flow nào bị break}
-  Fix gợi ý:
-    {paste code fix cụ thể}
+  Rule violated: {rule name from CLAUDE.md}
+  Current code:
+    {paste the exact problematic code, with line numbers}
+  Issue: {specific description, explain why it's a bug}
+  Impact: {who's affected, which flow breaks}
+  Suggested fix:
+    {paste specific fix code}
 
 ────────────────────────────────────────
-[WARNING] Tiêu đề
+[WARNING] Title
 ────────────────────────────────────────
   File: path/file.ts:XX-YY
   Blame: {username}, {YYYY-MM-DD}  ← git blame -L XX,YY path/file.ts --porcelain | grep -E "^(author |author-time )"
-  (... format tương tự ...)
+  (... same format ...)
 
 ────────────────────────────────────────
-[SUGGESTION] Tiêu đề
+[SUGGESTION] Title
 ────────────────────────────────────────
-  (... format tương tự, không bắt buộc code fix ...)
+  (... same format, fix code not required ...)
 
 ────────────────────────────────────────
-CHECKLIST RULES (đã check TẤT CẢ rules từ CLAUDE.md — chỉ liệt kê FAIL)
+RULES CHECKLIST (ALL rules from CLAUDE.md checked — only list FAILs)
 ────────────────────────────────────────
-  {N}. {rule} — FAIL — file:line — lý do + fix
+  {N}. {rule} — FAIL — file:line — reason + fix
   ...
-  (Rule nào không xuất hiện ở đây = PASS)
+  (Any rule not listed here = PASS)
 
 ────────────────────────────────────────
 DEPENDENCIES ANALYSIS
 ────────────────────────────────────────
-  upstream/dep.ts — ĐÃ ĐỌC — export useX, TypeY
-  downstream/consumer.ts — ĐÃ ĐỌC — gọi hook với args a, b
+  upstream/dep.ts — READ — exports useX, TypeY
+  downstream/consumer.ts — READ — calls the hook with args a, b
   ...
 
 
 
 ────────────────────────────────────────
-TUYỆT ĐỐI KHÔNG:
+ABSOLUTELY DO NOT:
 ────────────────────────────────────────
-- Viết "looks good", "generally fine", "no issues found" mà không có dẫn chứng
-- Đánh giá mà không có file:line + code snippet
-- Skip bất kỳ dependency nào trong bảng
-- Review chỉ dựa trên diff mà không đọc full file
-- Tự tạo rule không có trong CLAUDE.md
+- Write "looks good", "generally fine", "no issues found" without evidence
+- Give an assessment without file:line + code snippet
+- Skip any dependency in the table
+- Review based only on the diff without reading the full file
+- Invent a rule that isn't in CLAUDE.md
 
 
 ═══════════════════════════════════════════════════════
-PHASE 3: TỔNG HỢP & CROSS-CHECK (Main agent, 1 lần duy nhất)
+PHASE 3: SYNTHESIS & CROSS-CHECK (Main agent, exactly once)
 ═══════════════════════════════════════════════════════
 
-Sau khi TẤT CẢ subagent hoàn thành:
+After ALL subagents have completed:
 
-3.1 Đọc tất cả output
+3.1 Read all outputs
 
-  Đọc MỖI file .code-review/{GROUP}.txt.
+  Read EVERY .code-review/{GROUP}.txt file.
 
 3.2 Cross-check
 
-  Kiểm tra:
-  - Conflict: cùng file bị 2 subagent review khác nhau → xác nhận lại, giữ issue đúng
-  - Duplicate: cùng issue xuất hiện ở nhiều group → gộp thành 1, ghi nguồn
-  - Missed files: file changed nào không thuộc group nào → review bổ sung
-  - Cross-group issues: vấn đề liên quan nhiều nhóm (ví dụ: Group A thay đổi type, Group B dùng type đó mà không update) → thêm vào section riêng
+  Verify:
+  - Conflicts: the same file reviewed differently by 2 subagents → re-confirm, keep the correct issue
+  - Duplicates: the same issue appears in multiple groups → merge into one, note the sources
+  - Missed files: any changed file that doesn't belong to any group → review it separately
+  - Cross-group issues: issues spanning multiple groups (e.g. Group A changes a type, Group B uses that type without updating) → add to a dedicated section
 
-3.3 Đọc bổ sung (nếu cần)
+3.3 Additional reading (if needed)
 
-  Nếu phát hiện cross-group issue, đọc file liên quan để confirm.
-  KHÔNG loop lại — chỉ đọc thêm khi Phase 3 phát hiện gap cụ thể.
+  If a cross-group issue is found, read the related file to confirm it.
+  Do NOT loop back — only read more when Phase 3 finds a specific gap.
 
-3.4 Output cuối cùng
+3.4 Final output
 
-  Viết vào .code-review/SUMMARY.txt:
+  Write into .code-review/REPORT.md:
 
 ────────────────────────────────────────
 CODE REVIEW SUMMARY
 ────────────────────────────────────────
 
 BRANCHES REVIEWED: {branch1}, {branch2}, ...  →  BASE: {base}
-  [hoặc: SINCE: {duration}  |  hoặc: HEAD → {base}]
+  [or: PR #{n} (OPEN|MERGED via {sha[:8]}), PR #{m} ...  →  BASE: {base}]
+  [or: SINCE: {duration}  |  or: HEAD → {base}]
 FILES CHANGED: X (excluded: {excluded_patterns_or_none})
 GROUPS REVIEWED: N
 TOTAL ISSUES: M (Critical: A, Warning: B, Suggestion: C)
-REVIEW CONFIDENCE: {HIGH/MEDIUM/LOW} — {lý do}
+REVIEW CONFIDENCE: {HIGH/MEDIUM/LOW} — {reason}
 
 ────────────────────────────────────────
-CRITICAL ISSUES (fix trước khi merge)
+CRITICAL ISSUES (fix before merge)
 ────────────────────────────────────────
 
-  1. [CRITICAL] {Tiêu đề}
+  1. [CRITICAL] {Title}
      File: path/file.ts:45-52
      Source: Group A
-     Vấn đề: {mô tả}
+     Issue: {description}
      Fix:
        {code}
-     Conflict check: {Không conflict / Conflict với Group B — đã confirm issue này đúng vì...}
+     Conflict check: {No conflict / Conflicts with Group B — confirmed this issue is correct because...}
 
 ────────────────────────────────────────
-WARNING ISSUES (nên fix)
+WARNING ISSUES (should fix)
 ────────────────────────────────────────
 
   1. [WARNING] ...
-     (... format tương tự ...)
+     (... same format ...)
 
 ────────────────────────────────────────
 SUGGESTIONS (nice to have)
@@ -411,176 +431,196 @@ SUGGESTIONS (nice to have)
 CROSS-GROUP ISSUES
 ────────────────────────────────────────
 
-  {Tiêu đề}
-    Nhóm liên quan: Group A + Group B
-    Vấn đề: {mô tả vấn đề giữa 2 nhóm}
+  {Title}
+    Related groups: Group A + Group B
+    Issue: {description of the issue between the 2 groups}
     File: fileA.ts:10 ↔ fileB.ts:25
 
 ────────────────────────────────────────
-RULES COMPLIANCE SUMMARY (tổng hợp từ FAIL reports của subagents — rule không xuất hiện = ALL PASS)
+RULES COMPLIANCE SUMMARY (aggregated from subagents' FAIL reports — a rule not listed = ALL PASS)
 ────────────────────────────────────────
 
   {N}. {rule} — FAIL — Group {X} — file.ts:30
   ...
-  (Toàn bộ rules từ CLAUDE.md đã được check — chỉ FAIL được liệt kê ở đây)
+  (All rules from CLAUDE.md have been checked — only FAILs are listed here)
 
 ────────────────────────────────────────
 FILES NOT REVIEWED
 ────────────────────────────────────────
   Boilerplate (auto-skipped):
-    {danh sách file bị lọc tự động theo boilerplate patterns, hoặc "none"}
+    {list of files auto-filtered by boilerplate patterns, or "none"}
   User-excluded (--exclude):
-    {danh sách file bị loại trừ theo --exclude patterns do user truyền vào, hoặc "none"}
+    {list of files excluded via user-supplied --exclude patterns, or "none"}
 
 ────────────────────────────────────────
 CONFIDENCE NOTES
 ────────────────────────────────────────
-  {Ghi chú nếu có file nào subagent không đọc được, dependency nào missing, hoặc scope nào chưa cover}
+  {Note any file a subagent couldn't read, any missing dependency, or any scope not covered}
 
 
 ═══════════════════════════════════════════════════════
-PHASE 4: ADVERSARIAL PASS (1 subagent duy nhất, sau Phase 3)
+PHASE 4: ADVERSARIAL PASS (a single subagent, after Phase 3)
 ═══════════════════════════════════════════════════════
 
-Spawn 1 subagent với prompt sau:
+Spawn 1 subagent with the following prompt:
 
 ──────────────────────────────────────────────────────
-PROMPT CHO ADVERSARIAL SUBAGENT:
+PROMPT FOR THE ADVERSARIAL SUBAGENT:
 ──────────────────────────────────────────────────────
 
-Bạn là security/reliability adversary. Nhiệm vụ: tìm BẤT CỨ điều gì
-Phase 2 và Phase 3 có thể đã bỏ qua. KHÔNG lặp lại issues đã có trong SUMMARY.txt.
+You are a security/reliability adversary. Task: find ANYTHING
+Phase 2 and Phase 3 may have missed. Do NOT repeat issues already in REPORT.md.
 
-Đọc trước: .code-review/SUMMARY.txt — ghi nhớ toàn bộ issues đã được tìm.
-Đọc tiếp: toàn bộ file changed (danh sách trong CONTEXT.txt).
-
-────────────────────────────────────────
-A. TẤN CÔNG INPUT
-────────────────────────────────────────
-Với MỖI exported function/handler:
-  - Truyền null, undefined, "", 0, -1, NaN, [], {} → function có crash?
-  - Truyền value đúng type nhưng sai semantic (userId của người khác, orgId chéo)
-  - Truyền giá trị cực lớn / cực dài / ký tự đặc biệt
+Read first: .code-review/REPORT.md — remember all issues already found.
+Then read: all changed files (listed in CONTEXT.txt).
 
 ────────────────────────────────────────
-B. TẤN CÔNG FLOW
+A. ATTACK THE INPUT
 ────────────────────────────────────────
-  - Có thể gọi endpoint/function này khi chưa auth không?
-  - Có thể bypass authorization bằng cách manipulate params?
-  - Nếu gọi 2 request đồng thời → race condition? state không nhất quán?
-  - Operation thứ 2 fail sau operation thứ 1 thành công → rollback đúng không?
-  - Có path nào return sensitive data mà caller không cần?
+For EVERY exported function/handler:
+  - Pass null, undefined, "", 0, -1, NaN, [], {} → does the function crash?
+  - Pass a value of the correct type but wrong semantics (another user's userId, cross-org orgId)
+  - Pass extremely large / extremely long / special-character values
 
 ────────────────────────────────────────
-C. PHẢN BÁC SUMMARY
+B. ATTACK THE FLOW
 ────────────────────────────────────────
-Với MỖI issue được đánh dấu PASS hoặc "đã fix" trong SUMMARY.txt:
-  - Xác nhận fix thực sự giải quyết root cause
-  - Kiểm tra fix đó có tạo ra vấn đề mới không
+  - Can this endpoint/function be called without auth?
+  - Can authorization be bypassed by manipulating params?
+  - If called with 2 concurrent requests → race condition? inconsistent state?
+  - The second operation fails after the first succeeded → does it roll back correctly?
+  - Is there any path that returns sensitive data the caller doesn't need?
 
 ────────────────────────────────────────
-OUTPUT FORMAT (BẮT BUỘC)
+C. REBUT THE SUMMARY
 ────────────────────────────────────────
-Viết vào .code-review/ADVERSARIAL.txt:
+For EVERY issue marked PASS or "fixed" in REPORT.md:
+  - Confirm the fix actually addresses the root cause
+  - Check whether that fix introduces a new problem
+
+────────────────────────────────────────
+OUTPUT FORMAT (MANDATORY)
+────────────────────────────────────────
+Write into .code-review/ADVERSARIAL.txt:
 
 ────────────────────────────────────────
 ADVERSARIAL REVIEW
 ────────────────────────────────────────
 
-NEW ISSUES FOUND: X (không tính issues đã có trong SUMMARY)
+NEW ISSUES FOUND: X (not counting issues already in SUMMARY)
 
-[CRITICAL/WARNING/SUGGESTION] Tiêu đề
+[CRITICAL/WARNING/SUGGESTION] Title
   File: path/file.ts:line
-  Attack vector: {input tấn công / flow khai thác}
-  Kết quả: {crash / data leak / state corruption / bypass auth}
-  Fix gợi ý:
-    {code cụ thể}
+  Attack vector: {attacking input / exploited flow}
+  Result: {crash / data leak / state corruption / auth bypass}
+  Suggested fix:
+    {specific code}
 
 SUMMARY REBUTTALS:
-  Issue "{tên issue trong SUMMARY}" — CONFIRMED / REBUTTED
-  Lý do: {giải thích ngắn}
+  Issue "{issue title in SUMMARY}" — CONFIRMED / REBUTTED
+  Reason: {brief explanation}
 
 ────────────────────────────────────────
-TUYỆT ĐỐI KHÔNG:
+ABSOLUTELY DO NOT:
 ────────────────────────────────────────
-- Lặp lại issues đã có trong SUMMARY.txt
-- Viết "no new issues" mà không thực hiện đủ A + B + C
+- Repeat issues already in REPORT.md
+- Write "no new issues" without actually performing A + B + C
 
 
 ═══════════════════════════════════════════════════════
-PHASE 5: LINT HARVEST (1 subagent, sau Phase 4)
+PHASE 5: LINT HARVEST (1 subagent, after Phase 4)
 ═══════════════════════════════════════════════════════
 
-Mục đích: extract violations grep-detectable + generic từ review vừa xong → stage thành candidate lint rules để auto-detect trong các review sau.
+Purpose: extract grep-detectable + generic violations from the review just completed → create/update lint rules to auto-detect them in future reviews.
 
-Spawn 1 subagent sau khi Phase 4 hoàn thành:
+**Default**: SKIP all of Phase 5. Write into REPORT.md:
+```
+## Lint Harvest
+Skipped (use --harvest to enable)
+```
+Then finish. Do NOT spawn a subagent.
+
+**IF the user passes `--harvest`**: Spawn 1 subagent after Phase 4 completes:
 
 ──────────────────────────────────────────────────────
-PROMPT CHO LINT HARVEST SUBAGENT:
+PROMPT FOR THE LINT HARVEST SUBAGENT:
 ──────────────────────────────────────────────────────
 
-Bạn là Lint Harvester. Nhiệm vụ: đọc kết quả review (semantic + script scan), extract issues có thể automate thành lint rule — bao gồm cả cải thiện rules hiện có.
+You are the Lint Harvester. Task: read the review results (semantic + script scan), extract issues that can be automated into a lint rule — including improvements to existing rules.
 
-THỰC HIỆN:
+EXECUTE:
 
-1. Đọc .code-review/SUMMARY.txt và .code-review/ADVERSARIAL.txt
-2. Đọc .code-review/PHASE0.txt (script scan results — violations bắt được bởi rules hiện có)
-3. List tất cả sources:
-   a. Semantic findings: issues từ SUMMARY.txt + ADVERSARIAL.txt
-   b. Script violations: violations confirmed bởi PHASE0.txt (group by rule_id)
-4. Với MỖI semantic finding, đánh giá 2 tiêu chí:
-   A. grep-detectable: Có detect được bằng grep/regex trên source files KHÔNG cần hiểu business logic?
-   B. generic: Violation này có thể xảy ra trong BẤT KỲ TypeScript/Node project (không gắn với domain nghiệp vụ cụ thể)?
+1. Read .code-review/REPORT.md and .code-review/ADVERSARIAL.txt
+2. Read .code-review/SCRIPT_SCAN.json (script scan results — violations caught by existing rules)
+3. List all sources:
+   a. Semantic findings: issues from REPORT.md + ADVERSARIAL.txt
+   b. Script violations: violations confirmed by SCRIPT_SCAN.json (grouped by rule_id)
+4. For EACH semantic finding, evaluate against 2 criteria:
+   A. grep-detectable: Can it be detected via grep/regex on source files WITHOUT needing to understand business logic?
+   B. generic: Could this violation occur in ANY TypeScript/Node project (not tied to a specific business domain)?
 
-CHỈ tạo lint rule khi CẢ HAI = YES.
+Only create a lint rule when BOTH = YES.
 
-EXAMPLES phân loại:
-✅ grep-detectable + generic → tạo rule:
-  - logger.error({ error: e }) → bọc Error trong object → mất stack trace
-  - update query thiếu WHERE deletedAt IS NULL cho soft-delete entity
-  - z.string() cho field tên status/type/role/state/kind
-  - Schema.enum.VALUE vs string literal hardcode
+CLASSIFICATION EXAMPLES:
+✅ grep-detectable + generic → create a rule:
+  - logger.error({ error: e }) → wraps Error in an object → loses the stack trace
+  - update query missing WHERE deletedAt IS NULL for a soft-delete entity
+  - z.string() for a status/type/role/state/kind field
+  - Schema.enum.VALUE vs hardcoded string literal
 
-❌ KHÔNG đủ điều kiện → skip:
-  - Race condition trong findThenUpdate flow → cần hiểu logic, không grep-detectable
-  - Thiếu unique DB constraint cho domain-specific column combo → project-specific
-  - Business logic sai hoàn toàn → không generic
+❌ Not eligible → skip:
+  - Race condition in a findThenUpdate flow → requires understanding logic, not grep-detectable
+  - Missing unique DB constraint for a domain-specific column combo → project-specific
+  - Business logic that's entirely wrong → not generic
 
-ĐÁNH GIÁ TỪNG ISSUE — 3 khả năng:
+BEFORE deciding A/B/C/D — YOU MUST CHECK FOR AN UPDATE FIRST:
+1. Determine the violation's domain prefix (ts-, fe-, be-, backend-, jsx-, ...)
+2. `ls ~/.claude/scripts/lint-rules/rules/ | grep "^{domain}-"` — list rules in the same domain
+3. Read any rules with a pattern close to the violation just found
+4. If overlap ≥50% pattern or the same kind of violation → MUST UPDATE, do not create a new one
+5. Only create a new rule when no rule in the same domain exists AND the concern is entirely different
 
-A. Rule CHƯA tồn tại + grep-detectable + generic → TẠO MỚI
-B. Rule ĐÃ tồn tại nhưng pattern/scope cần cải thiện → CẬP NHẬT
-   Ví dụ: rule hiện tại chỉ scan *-service.ts nhưng violation cũng xuất hiện trong *-route.ts
-   Ví dụ: regex hiện tại miss một dạng pattern mới vừa tìm thấy
-C. Rule đã tồn tại, pattern đã đủ → SKIP, ghi nhận "already covered by {existing-rule-id}"
+EVALUATE EACH ISSUE — 4 possible outcomes (prefer B/D over A):
 
-Để đánh giá B: đọc nội dung file rule hiện có bằng `cat ~/.claude/scripts/lint-rules/rules/{file}`,
-so sánh pattern/scope với violation vừa tìm được. Chỉ update nếu thực sự cần mở rộng.
+A. Rule does NOT exist yet + grep-detectable + generic → CREATE NEW
+   (Only after the update-first check above confirms no overlapping rule exists)
+B. Rule EXISTS, pattern/scope needs expanding → UPDATE (expand)
+   Example: the current rule only scans *-service.ts but the violation also appears in *-route.ts
+   Example: the current regex misses a newly-found pattern variant
+C. Rule exists, pattern already sufficient → SKIP, note "already covered by {existing-rule-id}"
+D. Rule EXISTS, regex/scope too broad causing false positives → UPDATE (tighten)
+   (See the FP spot-check step under SCRIPT_SCAN below)
 
-THÊM: Phân tích PHASE0.txt — với MỖI rule đã bắt được violations:
+To evaluate B/D: read the existing rule file with `cat ~/.claude/scripts/lint-rules/rules/{file}`,
+compare its pattern/scope against the violation just found.
 
-5. Đọc rule script hiện có: `cat ~/.claude/scripts/lint-rules/rules/{rule_id}.sh`
-6. Xem xét violations cụ thể trong PHASE0.txt tại file:line → đọc code context thực tế
-7. Đánh giá rule hiện có:
-   - Regex có quá rộng (false positive)? → Tighten regex, update RULE
-   - Scope có miss file types? → Mở rộng scope pattern, update RULE
-   - Có dạng pattern tương tự mà regex không bắt được? → Update RULE
-   - Rule bắt đúng hoàn toàn → SKIP "script coverage adequate"
-   
-Ví dụ cụ thể cần update rule:
-  - be-delete-no-org-scope bắt `.delete(x).where(eq(x.id, ...))` nhưng miss `.delete(x).where(and(eq(x.id, ...), ...))`
-  - fe-mutation-fn-side-effect check 8 dòng nhưng setState thường ở dòng 2-3 → reduce window để giảm false positive
+ANALYZING SCRIPT_SCAN.json — MANDATORY for EVERY rule that caught violations:
 
-SCRIPT FORMAT — áp dụng cho cả TẠO MỚI lẫn CẬP NHẬT:
+5. Read the existing rule script: `cat ~/.claude/scripts/lint-rules/rules/{rule_id}.sh`
+6. FP SPOT-CHECK (mandatory): sample 2-3 violations from SCRIPT_SCAN.json, read the actual code context
+   - `sed -n '{line-2},{line+2}p' {file}` to read the 5 lines surrounding the violation
+   - Assess: is this violation a real issue, or a false positive?
+   - If FP: determine WHY (regex too broad? scope missing an exclusion? detection window too long?) → category D
+7. Comprehensive rule evaluation:
+   - FP found in step 6? → Tighten regex/scope/exclusion → UPDATE (D)
+   - Scope missing file types? → Expand the scope pattern → UPDATE (B)
+   - Similar pattern not yet caught? → Expand the regex → UPDATE (B)
+   - Rule catches everything correctly → SKIP "script coverage adequate"
+
+Concrete examples:
+  - be-delete-no-org-scope catches `.delete(x).where(eq(x.id, ...))` but misses `.delete(x).where(and(eq(x.id, ...), ...))` → UPDATE (B)
+  - fe-mutation-fn-side-effect checks 8 lines but setState is usually on line 2-3 → reduce window → UPDATE (D, FP fix)
+
+SCRIPT FORMAT — applies to both CREATE NEW and UPDATE:
 
 #!/bin/bash
 
-## RULE: {mô tả rule ngắn gọn}
-## PROBLEM: {vấn đề cụ thể, tại sao nguy hiểm}
-## FIX: {cách fix cụ thể}
-## HARVESTED FROM: .code-review/ — {original issue title từ SUMMARY.txt}
+## RULE: {brief rule description}
+## PROBLEM: {specific issue, why it's dangerous}
+## FIX: {specific fix approach}
+## HARVESTED FROM: .code-review/ — {original issue title from REPORT.md}
 
-## SCOPE: {loại files sẽ scan}
+## SCOPE: {kind of files to scan}
 
 ## EXAMPLES:
 ## ❌ {bad pattern}
@@ -601,64 +641,52 @@ done
 NAMING:
 - Domain prefix: ts-, backend-, frontend-, jsx-, service-, orm-, lib-, form-, test-, misc-
 - Format: {domain}-{check}-candidate.sh
-- Tên file UPDATE phải GIỐNG HỆT tên file gốc trong rules/ (để cp ghi đè đúng)
+- The UPDATE file name must be IDENTICAL to the original file name in rules/ (so cp overwrites it correctly)
 
-GENERIC RULE (BẮT BUỘC):
-- grep pattern PHẢI hoạt động trên bất kỳ TypeScript project
-- scope filter PHẢI dùng generic file suffix: *-service.ts, *-schemas.ts, *.tsx, *-route.ts, etc.
-- TUYỆT ĐỐI KHÔNG hardcode: tên file project cụ thể, tên function domain, route/API path
+GENERIC RULE (MANDATORY):
+- The grep pattern MUST work on any TypeScript project
+- The scope filter MUST use a generic file suffix: *-service.ts, *-schemas.ts, *.tsx, *-route.ts, etc.
+- ABSOLUTELY DO NOT hardcode: a specific project's file name, domain function name, route/API path
 
-SAVE tất cả scripts (mới + update) vào: .code-review/staged-lint-rules/{filename}
-Tạo thư mục trước nếu chưa có: mkdir -p .code-review/staged-lint-rules
-Chmod: chmod +x .code-review/staged-lint-rules/{filename}
+SAVE all scripts (new + updated) to: ~/.claude/scripts/lint-rules/rules/{filename}
+Chmod: chmod +x ~/.claude/scripts/lint-rules/rules/{filename}
 
-⚠️ KHÔNG ghi thẳng vào ~/.claude/scripts/lint-rules/rules/ — user phải duyệt trước.
-
-OUTPUT cuối cùng — in ra terminal:
+FINAL OUTPUT — print to terminal:
 LINT HARVEST SUMMARY:
   Semantic issues processed: {N}
   Script-confirmed rules reviewed: {M}
   Rules new: {A}
-  Rules updated (semantic finding): {B}
-  Rules updated (script coverage gap): {C}
+  Rules updated (expand — semantic finding): {B}
+  Rules updated (expand — script coverage gap): {C}
+  Rules updated (FP fix): {D}
   Skipped (not grep-detectable): {X}
   Skipped (project-specific): {Y}
   Skipped (already covered, no update needed): {Z}
 
-  Staged — NEW (.code-review/staged-lint-rules/):
-    - {filename}.sh — {one-line description}
-
-  Staged — UPDATED (.code-review/staged-lint-rules/):
-    - {filename}.sh — {what changed vs original: e.g. "added *.tsx scope, extended regex"}
-      Source: semantic finding | script coverage gap
-
-  Not harvested (với lý do):
+  Not harvested (with reason):
     - "{issue title}" → {reason}
 ──────────────────────────────────────────────────────
 
-Main agent sau khi subagent hoàn thành:
-- Đọc terminal output của subagent
-- Append vào .code-review/REPORT.md (hoặc SUMMARY.txt nếu không có REPORT.md):
+Main agent after the subagent completes:
+- Read the subagent's terminal output
+- Append to .code-review/REPORT.md:
 
 ## Lint Harvest
-New: {A} | Updated semantic: {B} | Updated script-gap: {C} → `.code-review/staged-lint-rules/` (chờ duyệt)
-To apply sau khi duyệt:
-  cp .code-review/staged-lint-rules/*.sh ~/.claude/scripts/lint-rules/rules/
-{list staged filenames or "No rules harvested"}
+New: {A} | Updated expand: {B+C} | Updated FP fix: {D} → `~/.claude/scripts/lint-rules/rules/` (applied)
 
 
 ═══════════════════════════════════════════════════════
-QUY TẮC CHUNG
+GENERAL RULES
 ═══════════════════════════════════════════════════════
 
-1. Mỗi file .code-review/*.txt phải có timestamp tạo ở header
-2. Final report PHẢI viết vào `.code-review/REPORT.md` — KHÔNG dùng `plans/reports/` (giữ toàn bộ artifacts trong cùng thư mục)
-3. Nếu diff < 5 file VÀ không dùng `--path` mode → skip Phase 2, main agent tự review bằng multi-pass (4 pass như mô tả trong subagent prompt) rồi viết thẳng SUMMARY.txt
-4. Nếu diff > 20 file → tăng số group, mỗi group tối đa 4 file
-5. KHÔNG loop Phase 1 → 2 → 3 → 4. Chạy đúng 1 lần.
-6. Nếu subagent fail hoặc timeout:
-   - Main agent đọc files của group đó
-   - Thực hiện đúng 3-pass như trong subagent prompt
-   - Ghi kết quả vào .code-review/{GROUP_NAME}.txt với header: [REVIEWED BY: MAIN AGENT — subagent failed]
-   - Ghi vào SUMMARY.txt phần CONFIDENCE NOTES: "Group X reviewed by main agent — confidence thấp hơn subagent review"
-7. Phase 5 (Lint Harvest) KHÔNG block merge — chạy sau Phase 4, failure không ảnh hưởng kết quả review chính.
+1. Every .code-review/*.txt file must have a creation timestamp in its header
+2. The final report MUST be written to `.code-review/REPORT.md` — do NOT use `plans/reports/` (keep all artifacts in the same directory)
+3. If the diff has < 5 files AND `--path` mode is not used → skip Phase 2, the main agent reviews it directly via multi-pass (4 passes as described in the subagent prompt) and writes straight into REPORT.md
+4. If the diff has > 20 files → increase the number of groups, max 4 files per group
+5. Do NOT loop Phase 1 → 2 → 3 → 4. Run exactly once.
+6. If a subagent fails or times out:
+   - Main agent reads that group's files
+   - Performs the exact same 3-pass process as in the subagent prompt
+   - Writes the result into .code-review/{GROUP_NAME}.txt with header: [REVIEWED BY: MAIN AGENT — subagent failed]
+   - Writes into REPORT.md's CONFIDENCE NOTES section: "Group X reviewed by main agent — lower confidence than subagent review"
+7. Phase 5 (Lint Harvest) does NOT block merge — runs after Phase 4, its failure does not affect the main review result.
