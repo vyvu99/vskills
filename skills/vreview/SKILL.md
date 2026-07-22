@@ -695,7 +695,4 @@ GENERAL RULES
 NEXT STEPS
 ═══════════════════════════════════════════════════════
 
-Once REPORT.md is written, tell the user what fits the outcome:
-- CRITICAL or WARNING issues found → suggest `/vfix` to address them in priority order.
-- Only SUGGESTIONs, no CRITICAL/WARNING → mention `/vfix` is optional, mainly to walk through the suggestions.
-- Zero issues found → the branch/PR looks clean, ready for human review or merge.
+Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.

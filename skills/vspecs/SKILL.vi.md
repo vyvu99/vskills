@@ -143,7 +143,4 @@ Khi cần tạo file mới:
 
 ## Bước tiếp theo
 
-Khi file specs đã xong (hết edge case cần bàn), báo user hướng đi phù hợp với tình huống:
-- Specs cho feature còn cần build → đề xuất `/vplan <specs-file>` để biến thành implementation plan.
-- User chỉ cần tài liệu, chưa cần build ngay → xác nhận file đã lưu, không cần làm gì thêm.
-- Sau này phát sinh edge case mới → chạy lại `/vspecs` trên cùng file để tiếp tục bổ sung.
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

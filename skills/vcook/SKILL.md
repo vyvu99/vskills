@@ -128,8 +128,4 @@ STEP 9: COMMIT + CREATE PR
 
 ## Next steps
 
-Once the PR is open, tell the user what fits the situation:
-- Typecheck/build wasn't run for this change yet → suggest `/vcheck` before requesting review.
-- The diff is large or touches sensitive logic → suggest `/vreview` to self-review before a human does.
-- There's a related plan/issue not yet tracked on GitHub → suggest `/vissues <plan-path>`.
-- None of the above apply → the PR is ready as-is, no further skill needed.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.

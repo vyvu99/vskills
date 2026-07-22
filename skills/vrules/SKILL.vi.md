@@ -76,3 +76,7 @@ Patch CLAUDE.md theo đúng rule Document Updates đã định nghĩa sẵn tron
 - Chỉ pattern lặp lại **≥2 lần** trong PR mới đủ điều kiện đề xuất thành rule chung — 1 lần xuất hiện là edge case, không tự đề xuất thành rule; nếu chỉ có 1 lần, nêu rõ số lần và để user tự quyết định có thêm hay không
 - KHÔNG BAO GIỜ đoán tên account bot khi không chắc — hỏi user
 - Không dump raw comment vào output — chỉ trình bày pattern đã cluster
+
+## Bước tiếp theo
+
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

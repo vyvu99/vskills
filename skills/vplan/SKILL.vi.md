@@ -78,10 +78,7 @@ Sau khi hoàn tất plan.md + phase files: tiếp tục đúng Post-Plan Handoff
 
 ## Bước tiếp theo
 
-Khi plan đã viết xong, báo user hướng đi phù hợp với tình huống:
-- Plan ổn, không còn câu hỏi mở → đề xuất `/vcook <plan-path>` để implement.
-- Plan đụng vùng rủi ro/quan trọng, đáng có thêm 1 lượt kiểm tra → đề xuất chạy validate/red-team gate của skill `plan` trước khi implement.
-- Specs còn khoảng trống không suy ra được từ code → đề xuất `/vspecs` để bổ sung trước khi plan tiếp.
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
 
 ---
 

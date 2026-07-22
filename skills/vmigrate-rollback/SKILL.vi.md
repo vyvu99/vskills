@@ -76,3 +76,7 @@ Sau khi rollback schema thành công → `DELETE FROM <tracking_table> WHERE ...
 - **CHỈ DÙNG CHO LOCAL/DEV DB** — KHÔNG BAO GIỜ chạy trên staging/production. Nếu config trỏ ra ngoài local/docker (host không phải `localhost`/`127.0.0.1`/một internal container) → **DỪNG NGAY LẬP TỨC**, cảnh báo user.
 - **LUÔN xác nhận với user** trước khi chạy rollback command thật (Bước 3) — KHÔNG BAO GIỜ bỏ qua bước này kể cả khi user đã cung cấp rõ tên migration ngay từ đầu.
 - **LUÔN xóa tracking record** sau khi rollback schema thành công — để tránh trạng thái không đồng nhất giữa schema thực tế và migration history.
+
+## Bước tiếp theo
+
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

@@ -74,3 +74,7 @@ Read the scripts in the root `package.json`, look for a format script (`format`,
 - Never hardcode any specific package name in the logic — every list must come from the argument or workspace auto-detect
 - Failing package → recheck only that package after fixing, don't re-run the whole list
 - Never skip a test failure to move past a step — must fix and recheck until it passes
+
+## Next steps
+
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.

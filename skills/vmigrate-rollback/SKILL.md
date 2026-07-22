@@ -76,3 +76,7 @@ After the schema rollback succeeds → `DELETE FROM <tracking_table> WHERE ...` 
 - **LOCAL/DEV DB ONLY** — never run against staging/production. If the config points outside local/docker (host is not `localhost`/`127.0.0.1`/an internal container) → **STOP IMMEDIATELY**, warn the user.
 - **Always confirm with the user** before running the actual rollback command (Step 3) — never skip this even if the user clearly provided the migration name upfront.
 - **Always delete the tracking record** after a successful schema rollback — to avoid an inconsistent state between the actual schema and the migration history.
+
+## Next steps
+
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.

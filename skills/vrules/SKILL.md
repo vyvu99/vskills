@@ -76,3 +76,7 @@ Patch CLAUDE.md following the Document Updates rule already defined in that same
 - Only patterns that repeat **≥2 times** within the PR qualify to be proposed as a general rule — a single occurrence is an edge case and should not be auto-proposed as a rule; if there's only 1 occurrence, state the count clearly and let the user decide whether to add it
 - Never guess the bot account name if unsure — ask the user
 - Don't dump raw comments into the output — only present the clustered patterns
+
+## Next steps
+
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.

@@ -128,8 +128,4 @@ BƯỚC 9: COMMIT + TẠO PR
 
 ## Bước tiếp theo
 
-Khi PR đã mở, báo user hướng đi phù hợp với tình huống:
-- Chưa chạy typecheck/build cho thay đổi này → đề xuất `/vcheck` trước khi xin review.
-- Diff lớn hoặc đụng logic nhạy cảm → đề xuất `/vreview` để tự review trước khi người khác review.
-- Có plan/issue liên quan chưa track trên GitHub → đề xuất `/vissues <plan-path>`.
-- Không rơi vào trường hợp nào ở trên → PR đã sẵn sàng, không cần thêm skill nào nữa.
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

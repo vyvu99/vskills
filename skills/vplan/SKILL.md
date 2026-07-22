@@ -78,10 +78,7 @@ After finishing plan.md + phase files: continue with the exact Post-Plan Handoff
 
 ## Next steps
 
-Once the plan is written, tell the user what fits the situation:
-- Plan looks solid, no open questions → suggest `/vcook <plan-path>` to implement it.
-- Plan touches a risky/critical area worth a second pair of eyes first → suggest the `plan` skill's validate/red-team gate before implementing.
-- Specs had gaps you couldn't resolve from code → suggest `/vspecs` to fill them in before planning further.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.
 
 ---
 

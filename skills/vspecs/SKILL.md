@@ -142,7 +142,4 @@ When a new file is needed:
 
 ## Next steps
 
-Once the specs file is done (no open edge cases left), tell the user what fits the situation:
-- Specs are for a feature that still needs building → suggest `/vplan <specs-file>` to turn it into an implementation plan.
-- User only wanted documentation, nothing to build right now → just confirm the file is saved, nothing further needed.
-- New edge cases come up later → re-run `/vspecs` on the same file to keep iterating.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.

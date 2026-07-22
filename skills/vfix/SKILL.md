@@ -122,7 +122,4 @@ HARD RULES
 NEXT STEPS
 ═══════════════════════════════════════════════════════
 
-Once everything applicable is fixed, tell the user what fits the situation:
-- The fixes touched enough code to be worth re-checking → suggest re-running `/vreview` to confirm the fixes are clean.
-- Fixes were small/contained → the report is resolved, ready to merge.
-- Some SUGGESTIONs were declined → note they were skipped intentionally, no action needed unless revisited later.
+Look at what was actually fixed in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.

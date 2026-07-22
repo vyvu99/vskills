@@ -122,7 +122,4 @@ QUY TẮC CỨNG
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Khi đã fix xong mọi thứ áp dụng được, báo user hướng đi phù hợp với tình huống:
-- Fix đụng đủ nhiều code để đáng kiểm tra lại → đề xuất chạy lại `/vreview` để xác nhận fix sạch.
-- Fix nhỏ/gọn → report đã resolved, sẵn sàng merge.
-- Có SUGGESTION bị từ chối → ghi nhận là bỏ qua có chủ đích, không cần làm gì thêm trừ khi quay lại sau.
+Nhìn vào những gì thực sự đã fix trong lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

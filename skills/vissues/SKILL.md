@@ -102,3 +102,7 @@ If the plan includes database changes → put ALL migration-related content into
 - Migrations always go into sub-issue 1, never scattered across multiple sub-issues
 - Never create a new label (`epic` or otherwise) without confirming with the user first
 - Merge related small phases into 1 sub-issue — don't create one issue per phase
+
+## Next steps
+
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.

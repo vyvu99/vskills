@@ -695,7 +695,4 @@ QUY TẮC CHUNG
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Khi REPORT.md đã viết xong, báo user hướng đi phù hợp với kết quả:
-- Có issue CRITICAL hoặc WARNING → đề xuất `/vfix` để xử lý theo thứ tự ưu tiên.
-- Chỉ có SUGGESTION, không có CRITICAL/WARNING → nói rõ `/vfix` là tuỳ chọn, chủ yếu để đi qua các suggestion.
-- Không có issue nào → branch/PR đã sạch, sẵn sàng cho review/merge.
+Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
