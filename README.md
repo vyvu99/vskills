@@ -21,6 +21,25 @@ Personal Claude Code skills — opinionated checklists layered on top of everyda
 
 Full detail lives in each `skills/<name>/SKILL.md`.
 
+## Workflow
+
+```mermaid
+flowchart LR
+    idea(["idea / bug"]) --> specs["/vspecs"]
+    specs --> plan["/vplan"]
+    plan --> cook["/vcook"]
+    cook --> review["/vreview"]
+    review --> fix["/vfix"]
+    fix --> ship(["ship"])
+
+    plan -. track on GitHub .-> issues["/vissues"]
+    cook -. before opening PR .-> check["/vcheck"]
+    cook -. UI work .-> design["/vdesign"]
+    review -. after a bot review .-> rules["/vrules"]
+```
+
+`/vmigrate-rollback` runs independently whenever a local migration needs undoing — not part of this pipeline.
+
 ## Use cases
 
 **Build a feature end to end** — you have an idea, nothing exists yet:

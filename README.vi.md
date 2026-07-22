@@ -21,6 +21,25 @@ Bộ skill Claude Code cá nhân — checklist theo phong cách riêng, đặt l
 
 Chi tiết đầy đủ nằm trong từng `skills/<name>/SKILL.vi.md`.
 
+## Sơ đồ luồng
+
+```mermaid
+flowchart LR
+    idea(["ý tưởng / bug"]) --> specs["/vspecs"]
+    specs --> plan["/vplan"]
+    plan --> cook["/vcook"]
+    cook --> review["/vreview"]
+    review --> fix["/vfix"]
+    fix --> ship(["ship"])
+
+    plan -. track trên GitHub .-> issues["/vissues"]
+    cook -. trước khi mở PR .-> check["/vcheck"]
+    cook -. UI work .-> design["/vdesign"]
+    review -. sau khi bot review .-> rules["/vrules"]
+```
+
+`/vmigrate-rollback` chạy độc lập, dùng bất cứ khi nào cần undo migration ở local — không nằm trong pipeline này.
+
 ## Use cases
 
 **Xây feature từ đầu tới cuối** — có ý tưởng, chưa có gì cả:
