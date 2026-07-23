@@ -92,10 +92,13 @@ cd vskills
 ./install.sh                       # symlink skills/ → ~/.claude/skills (bản English)
 ./install.sh --lang=vi             # tương tự, nhưng cài bản dịch SKILL.vi.md
 ./install.sh --with-scripts        # + symlink scripts/lint-rules (riêng tư, opt-in)
+./install.sh --with-claude-md      # + copy 1 bản ~/.claude/CLAUDE.md tổng quát (opt-in, bỏ qua nếu đã có sẵn)
 ./install.sh --dry-run             # chỉ xem trước, không đổi gì
 ```
 
 Skill được symlink chứ không copy — sửa `SKILL.md`/`SKILL.vi.md` trong `~/.claude/skills/` hay trong repo này đều là cùng 1 file. `scripts/lint-rules/` mặc định KHÔNG cài: đó là rule harvest từ `vreview` trên project riêng của tác giả, chưa chắc hợp với project của bạn. Mỗi skill đều có bản dịch tiếng Việt (`SKILL.vi.md` nằm cạnh `SKILL.md`) — chọn ngôn ngữ 1 lần lúc cài bằng `--lang`, không thể bật cả 2 cùng lúc.
+
+`vreview`, `vcook`, `vrules` đọc/ghi thẳng vào `~/.claude/CLAUDE.md` — nếu bạn chưa có file này, `--with-claude-md` sẽ copy 1 bản khởi đầu tổng quát (`claude-md/CLAUDE.md`) vào đúng chỗ. Copy chứ không symlink, vì bạn sẽ tuỳ chỉnh nó ngay sau khi cài; nếu `~/.claude/CLAUDE.md` đã tồn tại, install.sh sẽ cảnh báo và không đụng vào nó.
 
 ## Cách dùng
 

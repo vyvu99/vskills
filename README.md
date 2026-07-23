@@ -92,10 +92,13 @@ cd vskills
 ./install.sh                       # symlink skills/ → ~/.claude/skills (English)
 ./install.sh --lang=vi             # same, but installs the Vietnamese SKILL.vi.md variant
 ./install.sh --with-scripts        # + symlink scripts/lint-rules (personal, opt-in)
+./install.sh --with-claude-md      # + copy a generic starter ~/.claude/CLAUDE.md (opt-in, skipped if you already have one)
 ./install.sh --dry-run             # preview only
 ```
 
 Skills are symlinked, not copied — editing a `SKILL.md` in `~/.claude/skills/` or in this repo is the same file. `scripts/lint-rules/` is skipped by default: those are rules harvested from `vreview` on the author's own projects and may not fit yours. Every skill has a Vietnamese translation (`SKILL.vi.md` next to `SKILL.md`) — pick the language once at install time with `--lang`, both can't be active at once.
+
+`vreview`, `vcook`, and `vrules` read/write `~/.claude/CLAUDE.md` directly — if you don't already have one, `--with-claude-md` copies a generic starter (`claude-md/CLAUDE.md`) into place. It's copied, not symlinked, since you're expected to customize it right away; if `~/.claude/CLAUDE.md` already exists, install.sh warns and leaves it untouched.
 
 ## How to use
 

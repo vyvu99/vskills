@@ -1,17 +1,19 @@
 #!/bin/bash
-# Symlink skills (+ optionally scripts) into ~/.claude
-# Usage: ./install.sh [--dry-run] [--with-scripts] [--lang=en|vi]
+# Symlink skills (+ optionally scripts, CLAUDE.md starter) into ~/.claude
+# Usage: ./install.sh [--dry-run] [--with-scripts] [--with-claude-md] [--lang=en|vi]
 
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DRY_RUN=false
 WITH_SCRIPTS=false
+WITH_CLAUDE_MD=false
 LANG_CHOICE=en
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
     --with-scripts) WITH_SCRIPTS=true ;;
+    --with-claude-md) WITH_CLAUDE_MD=true ;;
     --lang=*) LANG_CHOICE="${arg#--lang=}" ;;
   esac
 done
@@ -67,6 +69,23 @@ if $WITH_SCRIPTS; then
   fi
 else
   log "skipped scripts/ (lint rules) — pass --with-scripts to install"
+fi
+
+# ── CLAUDE.md starter (opt-in, never overwrites an existing one) ───────────
+# Copied, not symlinked: this is a personal file you're meant to edit right
+# away, not something that should silently change when the repo updates.
+if $WITH_CLAUDE_MD; then
+  CLAUDE_MD_SRC="$REPO_DIR/claude-md/CLAUDE.md"
+  CLAUDE_MD_DST="$HOME/.claude/CLAUDE.md"
+
+  if [[ -e "$CLAUDE_MD_DST" ]]; then
+    log "WARNING: $CLAUDE_MD_DST already exists — not touching it. Skipping --with-claude-md."
+  elif [[ -f "$CLAUDE_MD_SRC" ]]; then
+    run "cp '$CLAUDE_MD_SRC' '$CLAUDE_MD_DST'"
+    log "copied starter CLAUDE.md → $CLAUDE_MD_DST (edit freely, not synced with this repo)"
+  fi
+else
+  log "skipped CLAUDE.md starter — pass --with-claude-md to install (only applies if you don't already have one)"
 fi
 
 log "Done. (lang: $LANG_CHOICE)"
