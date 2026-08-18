@@ -31,13 +31,15 @@ Nếu `$ARGUMENTS` rỗng — hỏi user muốn phân tích PR số mấy.
 
 ## Bước 2 — Lấy comment review của Claude bot
 
-Cần biết `<owner>/<repo>` — suy ra từ `git remote get-url origin` trong thư mục hiện tại, hỏi lại nếu không rõ.
+Xác định host + `<owner>/<repo>` theo `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (parse chuẩn dùng chung; nếu file không tồn tại, tự suy ra `<owner>/<repo>` trực tiếp từ `git remote get-url origin` — đúng hành vi mặc định hiện tại); hỏi user nếu vẫn không rõ.
 
 ```bash
 gh pr view <số-PR> --json comments,reviews
 gh api repos/<owner>/<repo>/pulls/<số-PR>/comments
 gh api repos/<owner>/<repo>/pulls/<số-PR>/reviews
 ```
+
+Không phải GitHub hoặc thiếu `gh` → in thông báo §2 dành cho vrules (`⚠️ không lấy được comment review vì thiếu gh — paste nội dung vào, tôi sẽ tiếp tục từ Bước 3`) rồi tiếp tục Bước 3 với comment user paste vào. Bước 1 (đọc `~/.claude/CLAUDE.md`) và Bước 3-5 không cần host access gì cả, nên skill vẫn hữu ích ~80% dù thiếu `gh`.
 
 Lọc theo author là bot review tự động (thường có hậu tố `[bot]` hoặc tên app tuỳ chỉnh). Nếu không chắc chắn tên account bot chính xác → hỏi user trước khi lọc, KHÔNG đoán.
 
@@ -76,6 +78,7 @@ Patch CLAUDE.md theo đúng rule Document Updates đã định nghĩa sẵn tron
 - Chỉ pattern lặp lại **≥2 lần** trong PR mới đủ điều kiện đề xuất thành rule chung — 1 lần xuất hiện là edge case, không tự đề xuất thành rule; nếu chỉ có 1 lần, nêu rõ số lần và để user tự quyết định có thêm hay không
 - KHÔNG BAO GIỜ đoán tên account bot khi không chắc — hỏi user
 - Không dump raw comment vào output — chỉ trình bày pattern đã cluster
+- Thiếu `gh` là degrade, không phải dừng — các bước cluster/đề xuất (3-5) chạy trên comment user paste vào
 
 ## Bước tiếp theo
 

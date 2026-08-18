@@ -31,13 +31,15 @@ Read the ENTIRE `~/.claude/CLAUDE.md`. Extract every rule/bullet into a numbered
 
 ## Step 2 — Fetch Claude bot's review comments
 
-You need to know `<owner>/<repo>` — infer it from `git remote get-url origin` in the current directory, and ask if it's unclear.
+Resolve host + `<owner>/<repo>` per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (single canonical parse; if the file is absent, infer `<owner>/<repo>` from `git remote get-url origin` directly — today's default); ask the user if still unclear.
 
 ```bash
 gh pr view <PR-number> --json comments,reviews
 gh api repos/<owner>/<repo>/pulls/<PR-number>/comments
 gh api repos/<owner>/<repo>/pulls/<PR-number>/reviews
 ```
+
+Not GitHub or no `gh` → print the §2 vrules message (`⚠️ can't fetch review comments without gh — paste them and I'll continue from Step 3`) and continue from Step 3 with user-pasted comments. Step 1 (read `~/.claude/CLAUDE.md`) and Steps 3-5 need no host access at all, so the skill is still ~80% useful without `gh`.
 
 Filter by author being the automated review bot (usually suffixed `[bot]` or a custom-configured app name). If you're not sure of the exact bot account name → ask the user before filtering, don't guess.
 
@@ -76,6 +78,7 @@ Patch CLAUDE.md following the Document Updates rule already defined in that same
 - Only patterns that repeat **≥2 times** within the PR qualify to be proposed as a general rule — a single occurrence is an edge case and should not be auto-proposed as a rule; if there's only 1 occurrence, state the count clearly and let the user decide whether to add it
 - Never guess the bot account name if unsure — ask the user
 - Don't dump raw comments into the output — only present the clustered patterns
+- Missing `gh` is a degrade, not a stop — the clustering/proposal steps (3-5) run on pasted comments
 
 ## Next steps
 

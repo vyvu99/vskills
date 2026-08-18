@@ -52,6 +52,8 @@ PHASE 1: CONTEXT GATHERING (Main agent does this itself, NO reviewing)
 
 1.1 Determine the changes
 
+Resolve the repo profile first: read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (host + gh availability) and §3 (language/framework tally, used from Phase 2 on). Fallback if the file is absent: GitHub + gh + TypeScript, i.e. today's assumptions. A CLAUDE.md rule that names a language or framework (TypeScript rules, React/Next.js rules, Tailwind rules) applies only to files of that language/framework in the diff — a `.py` or `.go` file must not be flagged against a TypeScript rule. Security-class checks (secrets, injection, authz) are language-agnostic and apply to every file regardless of the tally. Where no rule applies to a file's language, review it on general principles (naming, error handling, security, dead code) rather than skipping it.
+
 Parse args in priority order:
 
 FLAGS:
@@ -84,12 +86,14 @@ RESOLVE PR REFS → BRANCH/COMMIT (do this before building branch_list):
     - Otherwise → treat as a branch name, use directly
 
   For EACH extracted PR number:
+    Full gh mode (per §2) →
     ```bash
     gh pr view {pr_number} --json headRefName,state,mergeCommit,baseRefName \
       --jq '{branch: .headRefName, state: .state, sha: .mergeCommit.oid, base: .baseRefName}'
     ```
+    Degraded mode → print the §2 vreview message (`⚠️ can't resolve PR refs without gh — pass a branch name instead; branch/diff modes work without gh`), drop this positional arg from `branch_list`, and continue with the remaining args. If `branch_list` ends up empty after dropping all PR refs, fall back to reviewing HEAD (the documented no-arg behavior above) rather than aborting.
 
-  Handle by state:
+  Handle by state (full gh mode only):
     OPEN:
       - Use headRefName as the branch
       - Fetch if not present locally: `git fetch origin {headRefName} 2>/dev/null`
@@ -114,7 +118,7 @@ DISTINGUISH `branch_list` FROM `base_branch`:
 - Example: `vreview` → review HEAD against the auto-detected base
 
 Auto-detect `base_branch` when `--base` is absent (not applicable with `--path`):
-  1. If all args are PR refs → take baseRefName from gh pr view (usually main/master)
+  1. If all args are PR refs and full gh mode (per §2) → take baseRefName from gh pr view (usually main/master). Degraded mode → skip to point 2.
   2. Try: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'`
   3. If empty → try `git rev-parse --verify main 2>/dev/null` → use `main`
   4. If `main` doesn't exist → use `master`
@@ -180,6 +184,7 @@ Automatically exclude files matching the following patterns — do NOT review th
   - `openapi.json`, `openapi.yaml`, `openapi.yml` — OpenAPI spec files
   - `**/__generated__/**`, `**/generated/**` — any generated directory
   - `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lockb` — lockfiles
+  - `Cargo.lock`, `go.sum`, `poetry.lock`, `Gemfile.lock`, `composer.lock` — lockfiles, other ecosystems
   - `**/*.sql` — raw SQL dumps
   - `**/*.min.js`, `**/*.bundle.js` — minified/bundled output
 
@@ -204,6 +209,7 @@ BRANCHES REVIEWED: {branch1}, {branch2}, ...  →  BASE: {base_branch}
   [or: PR #{n} (OPEN|MERGED via {sha[:8]}), PR #{m} ...  →  BASE: {base_branch}]
   [or: SINCE: {duration}  |  or: HEAD → {base_branch}]
 TOTAL CHANGED FILES: {count} (user-excluded: {excluded_patterns_or_none})
+PROFILE: lang={tally, e.g. TypeScript(12) Python(2)} · framework={framework} · host={host_mode} · pm={pm}
 
 BOILERPLATE SKIPPED (auto):
   {list of auto-filtered files, or "none"}

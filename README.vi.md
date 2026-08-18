@@ -13,7 +13,7 @@ Bộ skill Claude Code cá nhân — checklist theo phong cách riêng, đặt l
 | `vcook` | Implement theo checklist 9 bước: branch, test-first, SDK client, review, PR | Đã có plan (hoặc mô tả nhanh), cần code |
 | `vreview` | Code review 6-phase bằng subagent song song + adversarial pass | Cần review 1 branch/PR |
 | `vfix` | Fix issue từ report của `vreview` theo thứ tự ưu tiên cố định | Có report review cần fix |
-| `vcheck` | Typecheck + build song song cho pnpm monorepo | Check nhanh trước khi commit |
+| `vcheck` | Typecheck + build song song cho JS/TS workspace (mọi package manager) | Check nhanh trước khi commit |
 | `vissues` | Tạo/update GitHub epic + sub-issues từ 1 plan | Cần track plan trên GitHub |
 | `vdesign` | Redesign UI/UX theo thẩm mỹ cá nhân (uplift / redesign toàn diện) | Cần nâng cấp UI 1 page/component |
 | `vrules` | Rút pattern từ PR review của bot → đề xuất rule mới cho CLAUDE.md | Bot vừa review xong 1 PR |
@@ -152,6 +152,7 @@ vskills/
 ├── install.sh          # symlink skills/ (+ scripts/ nếu có --with-scripts) vào ~/.claude
 ├── skills/<name>/SKILL.md       # bản English
 ├── skills/<name>/SKILL.vi.md    # bản tiếng Việt
+├── skills/_vskills-shared/repo-profile.md   # reference detect stack dùng chung, luôn symlink (không opt-in)
 └── scripts/<name>/      # vd lint-rules, chỉ cài khi opt-in
 ```
 

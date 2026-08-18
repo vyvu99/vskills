@@ -13,7 +13,7 @@ Personal Claude Code skills — opinionated checklists layered on top of everyda
 | `vcook` | Implement via a 9-step checklist: branch, test-first, SDK client, review, PR | Have a plan (or a quick description), need to code |
 | `vreview` | 6-phase code review using parallel subagents + an adversarial pass | Need to review a branch/PR |
 | `vfix` | Fix issues from a `vreview` report in a fixed priority order | Have a review report that needs fixing |
-| `vcheck` | Typecheck + build in parallel across a pnpm monorepo | Quick check before committing |
+| `vcheck` | Typecheck + build in parallel across a JS/TS workspace (any package manager) | Quick check before committing |
 | `vissues` | Create/update a GitHub epic + sub-issues from a plan | Need to track a plan on GitHub |
 | `vdesign` | Redesign UI/UX to a personal aesthetic (uplift / full redesign) | Need to upgrade a page/component's UI |
 | `vrules` | Extract patterns from a bot's PR review → propose a new CLAUDE.md rule | A bot just finished reviewing a PR |
@@ -151,6 +151,7 @@ I have a coding task
 vskills/
 ├── install.sh          # symlink skills/ (+ scripts/ if --with-scripts) into ~/.claude
 ├── skills/<name>/SKILL.md
+├── skills/_vskills-shared/repo-profile.md   # shared stack-detection reference, always symlinked (not opt-in)
 └── scripts/<name>/      # e.g. lint-rules, opt-in only
 ```
 

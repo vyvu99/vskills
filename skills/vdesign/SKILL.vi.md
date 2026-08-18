@@ -36,7 +36,7 @@ Không đổi tech stack. Không phá logic/state/API.
 | Route path (ví dụ `/clients/[id]?tab=notes`) | Resolve ra file pages/components tương ứng |
 | Tên component/feature (ví dụ `TreatmentPlanWizard`) | Grep để tìm file → đọc toàn bộ component tree |
 | `[Image]` / screenshot đính kèm | Phân tích ảnh → trích xuất các thiếu sót về design → áp fix |
-| `--pr` | `gh pr diff` để lấy các file đã thay đổi → redesign toàn bộ file UI trong đó |
+| `--pr` | `gh pr diff` để lấy các file đã thay đổi → redesign toàn bộ file UI trong đó (cần gh, §2 của `repo-profile.md`; không có → fallback sang `--diff`) |
 | `--diff` | `git diff --name-only` để lấy staged/unstaged → redesign các file UI |
 
 ---
@@ -65,7 +65,7 @@ Không đổi tech stack. Không phá logic/state/API.
 
 1. Parse argument để xác định input mode (xem bảng trên)
 2. Nếu có URL/localhost → **chụp screenshot ngay** bằng `mcp__mimo__vision` hoặc Playwright
-3. Nếu có `--pr` → `gh pr diff --name-only` để lấy danh sách file
+3. Nếu có `--pr` → xác định VCS profile theo `~/.claude/skills/_vskills-shared/repo-profile.md` §2 trước (nếu file không tồn tại, coi như full gh mode — đúng hành vi mặc định hiện tại). Full gh mode → `gh pr diff --name-only` để lấy danh sách file. Degraded (thiếu gh / không phải GitHub) → in thông báo §2 và hỏi user tên branch, hoặc fallback sang `--diff` (`git diff --name-only`, không cần gh) — rồi tiếp tục vào Phase 1 bình thường.
 4. Nếu rỗng → hỏi user qua `AskUserQuestion` — **đúng 1 câu**
 
 ---
@@ -213,7 +213,7 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 - [ ] Text/email/URL dài: `truncate` hoặc `break-all` trên mobile — không để nó tràn ra ngoài
 
 **Ảnh & Media:**
-- [ ] `next/image` với `fill` + container có size tường minh — không bị layout shift
+- [ ] Component ảnh có size tường minh + container có size tường minh — không bị layout shift. Tên component tuỳ theo framework detect được (§3 của `repo-profile.md`): Next.js → `next/image` với `fill`; Nuxt → `NuxtImg`; Astro → `astro:assets` `<Image>`; generic → component ảnh riêng của project với width/height tường minh hoặc container aspect-ratio, hỏi user nếu không tìm ra. Tính điều kiện §3 này áp dụng tương tự cho bất kỳ API đặc thù framework nào khác nêu trong checklist.
 - [ ] Ảnh decorative/hero: `objectPosition` đảm bảo subject vẫn thấy được khi crop trên mobile
 - [ ] Size responsive của avatar/thumbnail: `size-8 sm:size-10` nếu cần
 

@@ -52,6 +52,8 @@ PHASE 1: THU THẬP CONTEXT (Main agent tự làm, KHÔNG review)
 
 1.1 Xác định các thay đổi
 
+Resolve repo profile trước: đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (host + khả năng dùng gh) và §3 (tally ngôn ngữ/framework, dùng từ Phase 2 trở đi). Fallback nếu file không tồn tại: GitHub + gh + TypeScript, tức là assumption hiện tại. Một rule CLAUDE.md nêu tên ngôn ngữ/framework cụ thể (rule TypeScript, rule React/Next.js, rule Tailwind) chỉ áp dụng cho file thuộc ngôn ngữ/framework đó trong diff — file `.py` hoặc `.go` không được flag theo rule TypeScript. Check thuộc nhóm security (secret, injection, authz) là ngôn ngữ-agnostic và áp dụng cho MỌI file bất kể tally. Nơi không có rule nào áp dụng cho ngôn ngữ của file → review theo nguyên tắc chung (naming, error handling, security, dead code) thay vì bỏ qua.
+
 Parse args theo thứ tự ưu tiên:
 
 FLAGS:
@@ -84,12 +86,14 @@ RESOLVE PR REF → BRANCH/COMMIT (làm bước này trước khi build branch_li
     - Ngược lại → coi là tên branch, dùng trực tiếp
 
   Với MỖI PR number đã trích:
+    Full gh mode (theo §2) →
     ```bash
     gh pr view {pr_number} --json headRefName,state,mergeCommit,baseRefName \
       --jq '{branch: .headRefName, state: .state, sha: .mergeCommit.oid, base: .baseRefName}'
     ```
+    Degraded mode → in thông báo §2 của vreview (`⚠️ can't resolve PR refs without gh — pass a branch name instead; branch/diff modes work without gh`), bỏ positional arg này khỏi `branch_list`, và tiếp tục với các arg còn lại. Nếu `branch_list` rỗng sau khi bỏ hết PR ref, fallback về review HEAD (hành vi mặc định khi không có arg đã mô tả ở trên) thay vì abort.
 
-  Xử lý theo state:
+  Xử lý theo state (chỉ áp dụng full gh mode):
     OPEN:
       - Dùng headRefName làm branch
       - Fetch nếu chưa có ở local: `git fetch origin {headRefName} 2>/dev/null`
@@ -114,7 +118,7 @@ PHÂN BIỆT `branch_list` VỚI `base_branch`:
 - Ví dụ: `vreview` → review HEAD so với base auto-detect
 
 Auto-detect `base_branch` khi thiếu `--base` (không áp dụng khi dùng `--path`):
-  1. Nếu tất cả args đều là PR ref → lấy baseRefName từ gh pr view (thường là main/master)
+  1. Nếu tất cả args đều là PR ref VÀ full gh mode (theo §2) → lấy baseRefName từ gh pr view (thường là main/master). Degraded mode → chuyển sang bước 2.
   2. Thử: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'`
   3. Nếu rỗng → thử `git rev-parse --verify main 2>/dev/null` → dùng `main`
   4. Nếu `main` không tồn tại → dùng `master`
@@ -180,6 +184,7 @@ Tự động loại trừ các file khớp pattern sau — KHÔNG review chúng:
   - `openapi.json`, `openapi.yaml`, `openapi.yml` — file OpenAPI spec
   - `**/__generated__/**`, `**/generated/**` — mọi directory generated
   - `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lockb` — lockfile
+  - `Cargo.lock`, `go.sum`, `poetry.lock`, `Gemfile.lock`, `composer.lock` — lockfile của ecosystem khác
   - `**/*.sql` — SQL dump thô
   - `**/*.min.js`, `**/*.bundle.js` — output minified/bundled
 
@@ -204,6 +209,7 @@ BRANCHES REVIEWED: {branch1}, {branch2}, ...  →  BASE: {base_branch}
   [hoặc: PR #{n} (OPEN|MERGED via {sha[:8]}), PR #{m} ...  →  BASE: {base_branch}]
   [hoặc: SINCE: {duration}  |  hoặc: HEAD → {base_branch}]
 TOTAL CHANGED FILES: {count} (user-excluded: {excluded_patterns_or_none})
+PROFILE: lang={tally, vd TypeScript(12) Python(2)} · framework={framework} · host={host_mode} · pm={pm}
 
 BOILERPLATE SKIPPED (auto):
   {danh sách file bị lọc tự động, hoặc "none"}

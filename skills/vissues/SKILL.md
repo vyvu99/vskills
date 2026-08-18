@@ -25,12 +25,18 @@ If `$ARGUMENTS` is empty — ask the user for the path to the plan directory (e.
 
 ---
 
+## Step 0 — Resolve the VCS profile
+
+Read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (if present; if absent, assume GitHub + gh — today's default). Full gh mode → continue as written below. Degraded/local-only → print the §2 vissues message (`addSubIssue` is GitHub's own GraphQL mutation, no equivalent elsewhere), then still do Step 1 (read the plan) and Step 4 (compose issue content), and print the epic + sub-issue bodies ready to paste — marking which sub-issue holds the migrations per Step 5. Never abort the run because `gh` is unavailable.
+
 ## Step 1 — Read the plan
 
 - Read `<plan-path>/plan.md` + ALL relevant `<plan-path>/phase-XX-*.md` files
 - Understand the full scope: feature name, the phases, and which phase touches database/migration
 
 ## Step 2 — Find/create the Epic issue
+
+These commands assume full gh mode from Step 0; in degraded mode, follow the manual path from Step 0 instead.
 
 1. Search for an existing issue matching this plan:
    ```
@@ -47,7 +53,7 @@ If `$ARGUMENTS` is empty — ask the user for the path to the plan directory (e.
    ```
    gh issue create --title "<feature name, in English>" --body "<epic description, see Step 4>" --label epic
    ```
-5. Get the epic's node ID (required before linking sub-issues in Step 3):
+5. Get the epic's node ID (required before linking sub-issues in Step 3; `<owner>`/`<repo>` resolved per §2):
    ```
    gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id}}}' -f owner=<owner> -f repo=<repo> -F number=<epic_number>
    ```
@@ -67,7 +73,7 @@ If `$ARGUMENTS` is empty — ask the user for the path to the plan directory (e.
    ```
    gh issue create --title "<title, in English>" --body "<content, see Step 4>"
    ```
-4. Get the sub-issue's node ID (GraphQL query similar to Step 2, swap in `<number>`)
+4. Get the sub-issue's node ID (GraphQL query similar to Step 2, swap in `<number>`; `<owner>`/`<repo>` per §2)
 5. Link it to the epic — **IMPORTANT: only call addSubIssue for NEWLY CREATED sub-issues or ones NOT YET linked**, skip this step for sub-issues already linked from a previous run:
    ```
    gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId}){issue{title}subIssue{title}}}' -f issueId=<epic_node_id> -f subIssueId=<sub_issue_node_id>
@@ -102,6 +108,7 @@ If the plan includes database changes → put ALL migration-related content into
 - Migrations always go into sub-issue 1, never scattered across multiple sub-issues
 - Never create a new label (`epic` or otherwise) without confirming with the user first
 - Merge related small phases into 1 sub-issue — don't create one issue per phase
+- Never abort because `gh` is unavailable or the remote isn't GitHub — degrade per §2 and still deliver the issue bodies
 
 ## Next steps
 
