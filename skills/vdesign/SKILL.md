@@ -5,23 +5,28 @@ user-invocable: true
 when_to_use: "Invoke when you want to redesign or upgrade the UI/UX of a page, component, feature, or an entire existing diff/PR."
 category: frontend
 keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
-argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--uplift | --redesign]"
+argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3 | --L4 | --L5] [--bold]"
 metadata:
   author: vyvu
-  version: "3.1.0"
+  version: "4.0.0"
 ---
 
 # vdesign — Personal UI/UX Redesign Skill
 
 Upgrade or redesign UI/UX with a consistent aesthetic: **refined · harmonious · modern · elegant · consistent with the system**.
 
-Two levels — specify via flag or let Claude auto-judge:
+Five cumulative depth levels, plus an independent `--bold` flag:
 
-| Flag | Mode | Scope |
-|------|------|---------|
-| `--uplift` | **Uplift** | Targeted fixes: spacing, color, states, micro-details |
-| `--redesign` | **Redesign** | Entire layout, component structure, visual direction — keep logic/API/state unchanged |
-| _(none)_ | Auto | Claude judges from wording: "tweak/improve" → uplift · "redesign/overhaul/whole thing" → redesign |
+| Flag | Level | Unlocks (cumulative on top of the previous level) |
+|------|-------|------|
+| `--L1` | Polish | Spacing/alignment, icon size, text-overflow. Does NOT touch color, state, or layout. |
+| `--L2` | Uplift | + missing states (loading/empty/error/hover/focus/active/disabled), color/token alignment, typography hierarchy |
+| `--L3` | Component rework | + swap/extract/merge components; grid/flex structure stays as-is |
+| `--L4` | Layout redesign | + change grid/flex structure, section order, density — visual direction stays the same (a card stays a card) |
+| `--L5` | Full redesign | + change visual direction entirely (card→list, sidebar→top nav), rewrite JSX/TSX from scratch |
+| _(none)_ | Ask | If wording is ambiguous, ask 1 question via `AskUserQuestion` listing the 5 levels — do not silently guess |
+
+`--bold` (optional, requires `--L4` or `--L5`) — unlocks Awwwards-tier creative freedom; see Phase 3.
 
 Do not change the tech stack. Do not break logic/state/API.
 
@@ -43,7 +48,7 @@ Do not change the tech stack. Do not break logic/state/API.
 
 ## Personal Aesthetic (Non-negotiable)
 
-This is the user's vocabulary — **ALL** must be met, not just a few picked at random:
+This is the user's vocabulary — **ALL** must be met by default, not just a few picked at random. Suspended only when `--bold` is explicitly passed (see Phase 3):
 
 | Keyword | Practical meaning in code |
 |---------|--------------------------|
@@ -66,7 +71,8 @@ This is the user's vocabulary — **ALL** must be met, not just a few picked at 
 1. Parse the argument to determine the input mode (see table above)
 2. If there's a URL/localhost → **take a screenshot immediately** using `mcp__mimo__vision` or Playwright
 3. If there's `--pr` → resolve the VCS profile per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 first (if the file is absent, assume full gh mode — today's default). Full gh mode → `gh pr diff --name-only` to get the list of files. Degraded (no gh / non-GitHub) → print the §2 message and ask the user for a branch name, or fall back to `--diff` (`git diff --name-only`, needs no gh) — then continue into Phase 1 normally.
-4. If empty → ask the user via `AskUserQuestion` — **exactly 1 question**
+4. Resolve the Project Profile: check `.vdesign/profile.md` at the target project's git root (`git rev-parse --show-toplevel`). Present → read and use it. Absent → infer UI library/design tokens from `package.json` dependencies, `tailwind.config.*`, and the components folder. Still ambiguous → ask 1 question, then offer (don't force) to save the answer to `.vdesign/profile.md` for next time.
+5. If empty → ask the user via `AskUserQuestion` — **exactly 1 question**
 
 ---
 
@@ -262,21 +268,23 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 
 ### Phase 3: Fix
 
-**Uplift mode** — fixes in priority order:
-1. Spacing & alignment
-2. Missing states (empty/loading/error)
-3. Color & surfaces — align tokens
-4. Typography hierarchy
-5. Component upgrades
-6. Animation — last, only if needed
+Apply fixes only within the current level's unlocked scope (cumulative):
 
-**Redesign mode** — not bound by the order above, allowed to:
-- Replace the entire layout structure (grid/flex, section order, density)
-- Extract or merge components as needed
-- Fully change the visual direction (card → list, sidebar → top nav, etc.)
-- Rewrite JSX/TSX from scratch — but reuse existing data/hooks/handlers
+| Level | Fix scope unlocked |
+|-------|------|
+| `--L1` Polish | Spacing & alignment, icon size, text-overflow |
+| `--L2` Uplift | + missing states (empty/loading/error/hover/focus/active/disabled), color/token alignment, typography hierarchy |
+| `--L3` Component rework | + swap/extract/merge components; grid/flex structure stays as-is |
+| `--L4` Layout redesign | + replace grid/flex structure, section order, density — visual direction stays the same |
+| `--L5` Full redesign | + fully change visual direction (card → list, sidebar → top nav), rewrite JSX/TSX from scratch — reuse existing data/hooks/handlers |
 
-**Hard rules (apply to both modes):**
+Findings outside the current level's scope are still reported to the user (never silently dropped), with a note on which `--L` would unlock the fix.
+
+**`--bold` (optional, requires `--L4` or `--L5`)**
+If passed with no level, or with `--L1`-`--L3`, bump to `--L5` and tell the user why. Suspends for this run only: "DO NOT apply portfolio/avant-garde aesthetics", the "clarity > impressiveness" default bias, and the anti-pattern "Copy creative design from a landing page/portfolio into product UI" — allows bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion.
+Still mandatory even under `--bold`: accessibility (contrast, focus rings, all required states), no tech-stack migration, no logic/state/API changes, still stop-and-ask before adding a new dependency (e.g. an animation library).
+
+**Hard rules (apply to every level, including `--bold`):**
 - ✅ Work with the existing tech stack — DO NOT migrate framework
 - ✅ DO NOT break logic/state/API — only change the presentation layer
 - ✅ Check `package.json` before adding a dependency
@@ -305,9 +313,14 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 
 ---
 
-## Constraints for eTARO
+## Project Profile
 
-When working inside `/Users/vyvu/Documents/work/taro/eTARO`:
+Resolve in this order before Phase 1:
+1. `.vdesign/profile.md` at the target project's git root — if present, read and use it directly.
+2. Absent → infer from `package.json` dependencies, `tailwind.config.*`, and the components folder.
+3. Still ambiguous → ask 1 question, then offer (don't force) to save the answer to `.vdesign/profile.md` for next time.
+
+### Example — eTARO project profile (illustrative shape, not a default)
 
 | Constraint | Detail |
 |------------|----------|
@@ -350,6 +363,7 @@ When working inside `/Users/vyvu/Documents/work/taro/eTARO`:
 - ❌ Full-bleed image using `object-contain` without matching the container's `aspect-ratio` to the image file's actual ratio — gets letterboxed on both sides even though the container is full width
 - ❌ Setting `h-full` only on the grid item wrapper while forgetting to set it on the inner visual frame (border/bg/shadow) too — cards still end up mismatched in height even though the grid stretched items equally
 - ❌ Forcing `line-clamp`/fixed height onto copy of varying length across parallel cards instead of rebalancing the text length — line-clamp is a band-aid, rebalancing the copy is the actual root fix for "harmoniousness"
+- ❌ Run a low level (e.g. `--L1`) but change layout/visual direction anyway — stay within the current level's unlocked scope, report out-of-scope findings instead of fixing them
 
 ## Next steps
 
