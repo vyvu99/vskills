@@ -25,12 +25,18 @@ Nếu `$ARGUMENTS` rỗng — hỏi user đường dẫn đến plan directory (
 
 ---
 
+## Bước 0 — Xác định VCS profile
+
+Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (nếu có; nếu không có, giả định GitHub + gh — mặc định hiện tại). Full gh mode → tiếp tục như bình thường bên dưới. Degraded/local-only → in thông báo §2 dành cho vissues (`addSubIssue` là GraphQL mutation riêng của GitHub, không có tương đương ở host khác), rồi vẫn làm Bước 1 (đọc plan) và Bước 4 (soạn nội dung issue), in ra nội dung epic + sub-issue sẵn sàng để paste — đánh dấu sub-issue nào chứa migration theo Bước 5. KHÔNG BAO GIỜ abort chỉ vì thiếu `gh`.
+
 ## Bước 1 — Đọc plan
 
 - Đọc `<plan-path>/plan.md` + TẤT CẢ các file `<plan-path>/phase-XX-*.md` liên quan
 - Hiểu toàn bộ scope: tên feature, các phase, và phase nào đụng đến database/migration
 
 ## Bước 2 — Tìm/tạo Epic issue
+
+Các lệnh này giả định đang ở full gh mode từ Bước 0; ở chế độ degraded, làm theo hướng dẫn thủ công ở Bước 0 thay thế.
 
 1. Search issue hiện có khớp với plan này:
    ```
@@ -47,7 +53,7 @@ Nếu `$ARGUMENTS` rỗng — hỏi user đường dẫn đến plan directory (
    ```
    gh issue create --title "<feature name, in English>" --body "<epic description, see Step 4>" --label epic
    ```
-5. Lấy node ID của epic (cần trước khi link sub-issues ở Bước 3):
+5. Lấy node ID của epic (cần trước khi link sub-issues ở Bước 3; `<owner>`/`<repo>` xác định theo §2):
    ```
    gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id}}}' -f owner=<owner> -f repo=<repo> -F number=<epic_number>
    ```
@@ -67,7 +73,7 @@ Nếu `$ARGUMENTS` rỗng — hỏi user đường dẫn đến plan directory (
    ```
    gh issue create --title "<title, in English>" --body "<content, see Step 4>"
    ```
-4. Lấy node ID của sub-issue (query GraphQL tương tự Bước 2, thay `<number>`)
+4. Lấy node ID của sub-issue (query GraphQL tương tự Bước 2, thay `<number>`; `<owner>`/`<repo>` theo §2)
 5. Link nó với epic — **QUAN TRỌNG: chỉ gọi addSubIssue cho các sub-issue MỚI TẠO hoặc CHƯA được link**, bỏ qua bước này với các sub-issue đã link từ lần chạy trước:
    ```
    gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId}){issue{title}subIssue{title}}}' -f issueId=<epic_node_id> -f subIssueId=<sub_issue_node_id>
@@ -102,6 +108,7 @@ Nếu plan có thay đổi database → đưa TOÀN BỘ nội dung liên quan �
 - Migration luôn đưa vào sub-issue 1, không bao giờ rải ra nhiều sub-issue
 - Không bao giờ tạo label mới (`epic` hay bất kỳ label nào khác) mà không xác nhận với user trước
 - Gộp các phase nhỏ liên quan thành 1 sub-issue — không tạo mỗi phase 1 issue riêng
+- KHÔNG BAO GIỜ abort chỉ vì thiếu `gh` hoặc remote không phải GitHub — degrade theo §2 và vẫn phải giao đủ nội dung issue
 
 ## Bước tiếp theo
 

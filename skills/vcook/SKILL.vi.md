@@ -101,6 +101,8 @@ BƯỚC 8: CHẠY TEST, FIX ĐẾN KHI PASS
 BƯỚC 9: COMMIT + TẠO PR
 ═══════════════════════════════════════════════════════
 
+Resolve VCS profile trước: đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (fallback nếu file không tồn tại: giả định GitHub + gh).
+
 **Commit:**
 - Message tiếng Anh, conventional commit format (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`).
 - Squash thành số lượng commit hợp lý, gom theo logical change — KHÔNG tạo nhiều commit nhỏ lẻ rải rác.
@@ -108,10 +110,11 @@ BƯỚC 9: COMMIT + TẠO PR
 **PR:**
 - Đọc `.github/pull_request_template.md` của project (nếu có) → PR body PHẢI theo đúng template đó. Nếu không có → dùng format mặc định hợp lý (Summary / Changes / Test plan).
 - Title: tiếng Anh, ngắn gọn.
-- Description: **viết bằng tiếng Việt**, không thuật ngữ kỹ thuật — dành cho người đọc không phải engineer, tập trung vào tác động user/business, không dùng code jargon.
+- Description: viết bằng ngôn ngữ giao tiếp của project (resolve theo `repo-profile.md` §4: CLAUDE.md của project → `~/.claude/CLAUDE.md` → tiếng Anh; nếu file không tồn tại thì mặc định tiếng Việt), không thuật ngữ kỹ thuật — dành cho người đọc không phải engineer, tập trung vào tác động user/business, không dùng code jargon.
+- Full gh mode (theo §2) → tạo PR bằng `gh` như bình thường. Degraded/local-only → push branch, in thông báo §2 của vcook kèm title + body đã soạn đầy đủ để user tự paste vào UI của host — luôn soạn body ở cả 2 chế độ, không bỏ qua.
 - Nếu có GitHub issue liên quan (từ plan hoặc user cung cấp số issue):
-  - Thêm `Closes #<issue>` ở ĐẦU PR body
-  - `gh issue edit <issue>` để append link tới PR vào CUỐI issue body
+  - Thêm `Closes #<issue>` ở ĐẦU PR body (plain text, hoạt động ở cả 2 chế độ)
+  - Full gh mode → `gh issue edit <issue>` để append link tới PR vào CUỐI issue body. Degraded mode → in "thêm link PR vào issue #N thủ công" rồi tiếp tục.
 
 ---
 
@@ -123,7 +126,7 @@ BƯỚC 9: COMMIT + TẠO PR
 - **Commit** → squash hợp lý theo logical change, KHÔNG spam nhiều commit nhỏ
 - **API call phía client** → LUÔN dùng generated SDK, raw fetch/axios CẤM; thiếu response schema → thêm schema + regenerate SDK trước khi viết code FE
 - **Scope** → bám sát chặt scope của plan/mô tả; improvement thêm → đề xuất, không tự ý mở rộng scope
-- **PR description** → tiếng Việt, không thuật ngữ kỹ thuật, theo đúng `.github/pull_request_template.md` nếu có
+- **PR description** → ngôn ngữ resolve theo §4 (CLAUDE.md project → CLAUDE.md global → tiếng Anh; tiếng Việt nếu `repo-profile.md` không tồn tại), không thuật ngữ kỹ thuật, theo đúng `.github/pull_request_template.md` nếu có
 - **Test-first** → bắt buộc với API/backend logic, không bắt buộc với pure UI (phải ghi rõ lý do khi bỏ qua)
 
 ## Bước tiếp theo

@@ -1,11 +1,11 @@
 ---
 name: vcheck
-description: "Chạy typecheck + build (+ test tùy chọn) song song cho toàn bộ hoặc một phần package trong pnpm monorepo, dùng background command. Tự động phát hiện package trong workspace, không hardcode tên package."
+description: "Chạy typecheck + build (+ test tùy chọn) song song cho toàn bộ hoặc một phần package trong repo JS/TS (monorepo hoặc single package). Tự động phát hiện package trong workspace và package manager, không hardcode tên package."
 argument-hint: "[package-names...]"
 user-invocable: true
-when_to_use: "Dùng khi cần typecheck/build (và test) nhanh cho toàn bộ monorepo hoặc một nhóm package trong pnpm monorepo trước khi commit/PR."
+when_to_use: "Dùng khi cần typecheck/build (và test) nhanh cho toàn bộ repo hoặc một nhóm package trong monorepo JS/TS (hoặc single package) trước khi commit/PR."
 category: workflow
-keywords: [typecheck, build, tsc, pnpm, monorepo, ci]
+keywords: [typecheck, build, tsc, pnpm, npm, yarn, bun, monorepo, ci]
 metadata:
   author: vyvu
   version: "1.0.0"
@@ -13,7 +13,7 @@ metadata:
 
 # vcheck
 
-Chạy typecheck + build (+ test tùy chọn) song song cho các package trong pnpm monorepo, dùng background command + `wait`. Generic — không hardcode tên package.
+Chạy typecheck + build (+ test tùy chọn) song song cho các package trong repo JS/TS (monorepo hoặc single package), dùng background command + `wait`. Generic — không hardcode tên package hay package manager.
 
 Đọc input từ user:
 
@@ -23,11 +23,15 @@ $ARGUMENTS
 
 ---
 
+## Bước -1 — Xác định repo profile
+
+Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (nếu có) để xác định package manager (`pm`), workspace shape, và tên script typecheck/build/format. Nếu file không tồn tại, giả định pnpm + workspace (`pnpm --filter <pkg> exec …`) — mặc định hiện tại. Nếu §1 báo "not a JS/TS project", dừng ở đây và nói rõ — vcheck không có gì để làm trong repo không phải JS/TS.
+
 ## Bước 0 — Xác định danh sách package
 
 - Nếu `$ARGUMENTS` chứa danh sách tên package → dùng đúng danh sách đó, bỏ qua auto-detect
 - Nếu rỗng → auto-detect toàn bộ workspace:
-  1. Đọc field `packages:` trong `pnpm-workspace.yaml` (hoặc field `workspaces` trong `package.json` gốc nếu file đó không tồn tại) để lấy glob pattern
+  1. Dùng workspace shape từ Bước -1. **Single-package** → danh sách package chỉ là root package; bỏ qua resolve glob, đi thẳng sang Bước 1. **Monorepo** → tiếp tục với glob pattern từ `pnpm-workspace.yaml` (hoặc field `workspaces` trong `package.json` gốc):
   2. Resolve glob thành danh sách thư mục package thực tế
   3. Với mỗi thư mục, đọc `package.json` con để lấy field `name`
   4. Chỉ giữ lại package có script `build` trong `package.json` VÀ/HOẶC có `tsconfig.json` — package không có gì để check thì loại bỏ
@@ -37,8 +41,12 @@ $ARGUMENTS
 Với MỖI package trong danh sách, spawn một background command:
 
 ```
-pnpm --filter <package> exec tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &
+<pm workspace/root exec template từ Bước -1> <typecheck cmd> > /tmp/tsc-<package>.log 2>&1 &
 ```
+
+`<typecheck cmd>` = script đã resolve ở Bước -1 (`typecheck` → `type-check` → `tsc --noEmit`). Ví dụ minh hoạ:
+- pnpm + workspace, không có script `typecheck` → `pnpm --filter <package> exec tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &` (mặc định hiện tại, y hệt)
+- npm + single-package → `npm exec -- tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &`
 
 Spawn tất cả package trước, rồi mới `wait` — KHÔNG chạy tuần tự từng cái một.
 
@@ -51,14 +59,16 @@ Sau `wait`, đọc từng `/tmp/tsc-<package>.log`:
 Tương tự bước 1, spawn một background command cho mỗi package:
 
 ```
-pnpm --filter <package> build > /tmp/build-<package>.log 2>&1 &
+<pm workspace/root exec template từ Bước -1> <build script> > /tmp/build-<package>.log 2>&1 &
 ```
+
+`<build script>` = script `build` khai báo của package đó (Bước -1 — không có fallback raw; package không có script `build` thì bị skip, không chạy bằng lệnh thay thế). Ví dụ minh hoạ: pnpm + workspace → `pnpm --filter <package> build > /tmp/build-<package>.log 2>&1 &` (mặc định hiện tại, y hệt).
 
 Spawn tất cả → `wait` → parse log từng package (pass/fail). Package fail → fix, recheck chỉ package đó.
 
 ## Bước 3 — Format
 
-Đọc scripts trong `package.json` gốc, tìm format script (`format`, `format:fix`, ...) theo thứ tự ưu tiên đó, chạy script đầu tiên tìm thấy.
+Đọc scripts trong `package.json` gốc, tìm format script (`format`, `format:fix`, ...) theo thứ tự ưu tiên đó, chạy script đầu tiên tìm thấy qua root template từ Bước -1 (`pnpm exec <script>` / `npm exec -- <script>` / `yarn <script>` / `bun <script>`).
 
 ## Bước 4 — Test (chỉ khi user yêu cầu hoặc chỉ định qua argument)
 
