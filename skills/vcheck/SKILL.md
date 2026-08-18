@@ -1,11 +1,11 @@
 ---
 name: vcheck
-description: "Run typecheck + build (+ optional test) in parallel for all or part of the packages in a pnpm monorepo, using background commands. Auto-detects workspace packages, no hardcoded package names."
+description: "Run typecheck + build (+ optional test) in parallel for all or part of the packages in a JS/TS repo (monorepo or single package). Auto-detects workspace packages and package manager, no hardcoded package names."
 argument-hint: "[package-names...]"
 user-invocable: true
-when_to_use: "Invoke when you need a fast typecheck/build (and test) of the whole monorepo or a group of packages in a pnpm monorepo before commit/PR."
+when_to_use: "Invoke when you need a fast typecheck/build (and test) of the whole repo or a group of packages in a JS/TS monorepo (or single package) before commit/PR."
 category: workflow
-keywords: [typecheck, build, tsc, pnpm, monorepo, ci]
+keywords: [typecheck, build, tsc, pnpm, npm, yarn, bun, monorepo, ci]
 metadata:
   author: vyvu
   version: "1.0.0"
@@ -13,7 +13,7 @@ metadata:
 
 # vcheck
 
-Runs typecheck + build (+ optional test) in parallel for packages in a pnpm monorepo, using background commands + `wait`. Generic — no hardcoded package names.
+Runs typecheck + build (+ optional test) in parallel for packages in a JS/TS repo (monorepo or single package), using background commands + `wait`. Generic — no hardcoded package names or package manager.
 
 Read input from the user:
 
@@ -23,11 +23,15 @@ $ARGUMENTS
 
 ---
 
+## Step -1 — Resolve the repo profile
+
+Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (if present) to resolve the package manager (`pm`), workspace shape, and the typecheck/build/format script names. If the file is absent, assume pnpm + workspace (`pnpm --filter <pkg> exec …`) — today's default. If §1 reports "not a JS/TS project", stop here and say so — vcheck has nothing to do in a non-JS/TS repo.
+
 ## Step 0 — Determine the package list
 
 - If `$ARGUMENTS` contains a list of package names → use that exact list, skip auto-detect
 - If empty → auto-detect the whole workspace:
-  1. Read the `packages:` field in `pnpm-workspace.yaml` (or the `workspaces` field in the root `package.json` if that file doesn't exist) to get the glob pattern
+  1. Use the workspace shape from Step -1. **Single-package** → the package list is just the root package; skip glob resolution, go straight to Step 1. **Monorepo** → continue with the glob pattern from `pnpm-workspace.yaml` (or the `workspaces` field in the root `package.json`):
   2. Resolve the glob into the actual list of package directories
   3. For each directory, read the child `package.json` to get the `name` field
   4. Only keep packages that have a `build` script in `package.json` AND/OR a `tsconfig.json` — packages with nothing to check are dropped
@@ -37,8 +41,12 @@ $ARGUMENTS
 For EACH package in the list, spawn a background command:
 
 ```
-pnpm --filter <package> exec tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &
+<pm workspace/root exec template from Step -1> <typecheck cmd> > /tmp/tsc-<package>.log 2>&1 &
 ```
+
+`<typecheck cmd>` = the resolved script from Step -1 (`typecheck` → `type-check` → `tsc --noEmit`). Worked examples:
+- pnpm + workspace, no `typecheck` script → `pnpm --filter <package> exec tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &` (today's default, byte-identical)
+- npm + single-package → `npm exec -- tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &`
 
 Spawn all packages first, then `wait` — do not run them sequentially one by one.
 
@@ -51,14 +59,16 @@ After `wait`, read each `/tmp/tsc-<package>.log`:
 Same as step 1, spawn a background command for each package:
 
 ```
-pnpm --filter <package> build > /tmp/build-<package>.log 2>&1 &
+<pm workspace/root exec template from Step -1> <build script> > /tmp/build-<package>.log 2>&1 &
 ```
+
+`<build script>` = the package's declared `build` script (Step -1 — no raw fallback; a package with no `build` script is skipped, not run with a substitute). Worked example: pnpm + workspace → `pnpm --filter <package> build > /tmp/build-<package>.log 2>&1 &` (today's default, byte-identical).
 
 Spawn all → `wait` → parse each package's log (pass/fail). Failing package → fix, recheck only that package.
 
 ## Step 3 — Format
 
-Read the scripts in the root `package.json`, look for a format script (`format`, `format:fix`, ...) in that priority order, run the first one found.
+Read the scripts in the root `package.json`, look for a format script (`format`, `format:fix`, ...) in that priority order, run the first one found via the root template from Step -1 (`pnpm exec <script>` / `npm exec -- <script>` / `yarn <script>` / `bun <script>`).
 
 ## Step 4 — Test (only when the user requests it or specifies it via argument)
 

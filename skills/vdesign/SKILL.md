@@ -36,7 +36,7 @@ Do not change the tech stack. Do not break logic/state/API.
 | Route path (e.g. `/clients/[id]?tab=notes`) | Resolve to the corresponding pages/components files |
 | Component/feature name (e.g. `TreatmentPlanWizard`) | Grep to find the file → read the entire component tree |
 | `[Image]` / attached screenshot | Analyze the image → extract design gaps → apply fixes |
-| `--pr` | `gh pr diff` to get changed files → redesign all UI files in it |
+| `--pr` | `gh pr diff` to get changed files → redesign all UI files in it (requires gh, §2 of `repo-profile.md`; unavailable → falls back to `--diff`) |
 | `--diff` | `git diff --name-only` to get staged/unstaged → redesign UI files |
 
 ---
@@ -65,7 +65,7 @@ This is the user's vocabulary — **ALL** must be met, not just a few picked at 
 
 1. Parse the argument to determine the input mode (see table above)
 2. If there's a URL/localhost → **take a screenshot immediately** using `mcp__mimo__vision` or Playwright
-3. If there's `--pr` → `gh pr diff --name-only` to get the list of files
+3. If there's `--pr` → resolve the VCS profile per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 first (if the file is absent, assume full gh mode — today's default). Full gh mode → `gh pr diff --name-only` to get the list of files. Degraded (no gh / non-GitHub) → print the §2 message and ask the user for a branch name, or fall back to `--diff` (`git diff --name-only`, needs no gh) — then continue into Phase 1 normally.
 4. If empty → ask the user via `AskUserQuestion` — **exactly 1 question**
 
 ---
@@ -213,7 +213,7 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Long text/email/URL: `truncate` or `break-all` on mobile — don't let it overflow
 
 **Images & Media:**
-- [ ] `next/image` with `fill` + container with an explicit size — no layout shift
+- [ ] Sized image component + container with an explicit size — no layout shift. Component name is conditional on the detected framework (§3 of `repo-profile.md`): Next.js → `next/image` with `fill`; Nuxt → `NuxtImg`; Astro → `astro:assets` `<Image>`; generic → the project's own image component with explicit width/height or an aspect-ratio container, ask the user if none is discoverable. The same §3 conditionality applies to any other framework-specific API named elsewhere in this checklist.
 - [ ] Decorative/hero images: `objectPosition` ensures the subject is visible in the mobile crop
 - [ ] Avatar/thumbnail responsive size: `size-8 sm:size-10` if needed
 

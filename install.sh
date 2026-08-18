@@ -45,6 +45,8 @@ SKILLS_DST="$HOME/.claude/skills"
 if [[ -d "$SKILLS_SRC" ]]; then
   for skill_dir in "$SKILLS_SRC"/*/; do
     skill_name="$(basename "$skill_dir")"
+    # shared reference dirs (e.g. _shared/) are not skills — linked whole, below
+    [[ "$skill_name" == _* ]] && continue
     src_file="${skill_dir}SKILL.md"
     if [[ "$LANG_CHOICE" != "en" && -f "${skill_dir}SKILL.$LANG_CHOICE.md" ]]; then
       src_file="${skill_dir}SKILL.$LANG_CHOICE.md"
@@ -55,6 +57,9 @@ if [[ -d "$SKILLS_SRC" ]]; then
     link "$src_file" "$dst_dir/SKILL.md"
   done
 fi
+
+# ── Shared reference docs (always installed — skills read these at runtime) ──
+[[ -d "$SKILLS_SRC/_vskills-shared" ]] && link "$SKILLS_SRC/_vskills-shared" "$SKILLS_DST/_vskills-shared"
 
 # ── Scripts (opt-in — personal lint rules, may not fit your codebase) ──────
 if $WITH_SCRIPTS; then

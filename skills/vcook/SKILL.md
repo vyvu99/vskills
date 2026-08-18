@@ -101,6 +101,8 @@ STEP 8: RUN TESTS, FIX UNTIL PASSING
 STEP 9: COMMIT + CREATE PR
 ═══════════════════════════════════════════════════════
 
+Resolve the VCS profile first: read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (fallback if the file is absent: assume GitHub + gh).
+
 **Commit:**
 - English message, conventional commit format (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`).
 - Squash into a reasonable number of commits grouped by logical change — do NOT create many small, scattered commits.
@@ -108,10 +110,11 @@ STEP 9: COMMIT + CREATE PR
 **PR:**
 - Read the project's `.github/pull_request_template.md` (if it exists) → the PR body MUST follow that template exactly. If it doesn't exist → use a sensible default format (Summary / Changes / Test plan).
 - Title: English, concise.
-- Description: **written in Vietnamese**, non-technical — for readers who aren't engineers, focused on user/business impact, no code jargon.
+- Description: written in the project's communication language (resolve per `repo-profile.md` §4: project `CLAUDE.md` → `~/.claude/CLAUDE.md` → English; if the file is absent, Vietnamese), non-technical — for readers who aren't engineers, focused on user/business impact, no code jargon.
+- Full gh mode (per §2) → create the PR with `gh` as usual. Degraded/local-only → push the branch, print the §2 vcook message plus the fully composed title and body so the user pastes it into their host's UI — compose the body in both modes, never skip it.
 - If there's a related GitHub issue (from the plan or provided by the user as an issue number):
-  - Add `Closes #<issue>` at the TOP of the PR body
-  - `gh issue edit <issue>` to append a link to the PR at the END of the issue body
+  - Add `Closes #<issue>` at the TOP of the PR body (plain text, works in both modes)
+  - Full gh mode → `gh issue edit <issue>` to append a link to the PR at the END of the issue body. Degraded mode → print "add a link to the PR in issue #N manually" and continue.
 
 ---
 
@@ -123,7 +126,7 @@ STEP 9: COMMIT + CREATE PR
 - **Commit** → squash sensibly by logical change, do NOT spam many small commits
 - **Client-side API calls** → ALWAYS use the generated SDK, raw fetch/axios FORBIDDEN; missing response schema → add the schema + regenerate the SDK before writing FE code
 - **Scope** → stick strictly to the plan/description's scope; further improvements → propose them, don't expand scope unilaterally
-- **PR description** → in Vietnamese, non-technical, following `.github/pull_request_template.md` exactly if it exists
+- **PR description** → in the §4-resolved language (project CLAUDE.md → global CLAUDE.md → English; Vietnamese if `repo-profile.md` is absent), non-technical, following `.github/pull_request_template.md` exactly if it exists
 - **Test-first** → mandatory for API/backend logic, not mandatory for pure UI (must state the reason clearly when skipped)
 
 ## Next steps
