@@ -1,5 +1,7 @@
 #!/bin/bash
-# Symlink skills (+ optionally scripts, CLAUDE.md starter) into ~/.claude
+# Symlink skills (+ optionally scripts, CLAUDE.md starter) into ~/.claude,
+# and remove any previously-installed skill symlinks whose source was since
+# deleted from this repo.
 # Usage: ./install.sh [--dry-run] [--with-scripts] [--with-claude-md] [--lang=en|vi]
 
 set -euo pipefail
@@ -55,6 +57,33 @@ if [[ -d "$SKILLS_SRC" ]]; then
     # clean up an older dir-level symlink from a previous install.sh version
     [[ -L "$dst_dir" ]] && run "rm '$dst_dir'"
     link "$src_file" "$dst_dir/SKILL.md"
+  done
+fi
+
+# ── Orphaned skills (removed from this repo since the last install) ────────
+# A destination whose symlink still points into this repo's skills/ dir, but
+# whose source skill dir no longer exists, was deleted upstream — clean it up
+# so it doesn't linger as a dangling symlink. Only touches entries this script
+# itself created (target resolves under $SKILLS_SRC); anything else is left alone.
+if [[ -d "$SKILLS_DST" ]]; then
+  for dst_skill_dir in "$SKILLS_DST"/*/; do
+    dst_skill_dir="${dst_skill_dir%/}"
+    skill_name="$(basename "$dst_skill_dir")"
+    [[ "$skill_name" == _* ]] && continue
+    if [[ -L "$dst_skill_dir" ]]; then
+      target="$(readlink "$dst_skill_dir")"
+    elif [[ -L "$dst_skill_dir/SKILL.md" ]]; then
+      target="$(readlink "$dst_skill_dir/SKILL.md")"
+    else
+      continue
+    fi
+    case "$target" in
+      "$SKILLS_SRC"/*) ;;
+      *) continue ;;
+    esac
+    [[ -d "$SKILLS_SRC/$skill_name" ]] && continue
+    run "rm -rf '$dst_skill_dir'"
+    log "removed orphaned skill: $skill_name (no longer in this repo)"
   done
 fi
 
