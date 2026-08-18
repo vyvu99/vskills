@@ -5,23 +5,28 @@ user-invocable: true
 when_to_use: "Kích hoạt khi bạn muốn redesign hoặc nâng cấp UI/UX của một trang, component, feature, hoặc toàn bộ diff/PR hiện có."
 category: frontend
 keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
-argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--uplift | --redesign]"
+argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3 | --L4 | --L5] [--bold]"
 metadata:
   author: vyvu
-  version: "3.1.0"
+  version: "4.0.0"
 ---
 
 # vdesign — Skill Redesign UI/UX Cá Nhân
 
 Nâng cấp hoặc redesign UI/UX theo một gu thẩm mỹ nhất quán: **tinh tế · hài hòa · hiện đại · thanh lịch · nhất quán với hệ thống**.
 
-Hai mức độ — chỉ định qua flag hoặc để Claude tự phán đoán:
+Năm mức độ sâu tích lũy, cộng thêm flag `--bold` độc lập:
 
-| Flag | Mode | Phạm vi |
-|------|------|---------|
-| `--uplift` | **Uplift** | Fix có mục tiêu: spacing, màu sắc, states, chi tiết nhỏ |
-| `--redesign` | **Redesign** | Toàn bộ layout, cấu trúc component, hướng thị giác — giữ nguyên logic/API/state |
-| _(none)_ | Auto | Claude phán đoán từ câu chữ: "chỉnh/cải thiện" → uplift · "redesign/làm lại toàn bộ/cả cái này" → redesign |
+| Flag | Mức | Mở khóa (tích lũy trên mức trước) |
+|------|-----|------|
+| `--L1` | Polish | Spacing/alignment, icon size, text-overflow. KHÔNG đụng màu, state, hay layout. |
+| `--L2` | Uplift | + state còn thiếu (loading/empty/error/hover/focus/active/disabled), align color/token, hierarchy typography |
+| `--L3` | Component rework | + swap/extract/merge component; cấu trúc grid/flex giữ nguyên |
+| `--L4` | Layout redesign | + đổi cấu trúc grid/flex, thứ tự section, density — hướng thị giác giữ nguyên (card vẫn là card) |
+| `--L5` | Full redesign | + đổi hoàn toàn hướng thị giác (card→list, sidebar→top nav), viết lại JSX/TSX từ đầu |
+| _(none)_ | Hỏi | Nếu câu chữ mơ hồ, hỏi 1 câu qua `AskUserQuestion` liệt kê 5 mức — không tự đoán ngầm |
+
+`--bold` (tùy chọn, bắt buộc đi kèm `--L4` hoặc `--L5`) — mở khóa mức độ táo bạo thẩm mỹ tầm Awwwards; xem Phase 3.
 
 Không đổi tech stack. Không phá logic/state/API.
 
@@ -43,7 +48,7 @@ Không đổi tech stack. Không phá logic/state/API.
 
 ## Gu Thẩm Mỹ Cá Nhân (Không thương lượng)
 
-Đây là từ vựng của user — **TẤT CẢ** phải đạt, không phải chọn vài cái ngẫu nhiên:
+Đây là từ vựng của user — **TẤT CẢ** phải đạt theo mặc định, không phải chọn vài cái ngẫu nhiên. Chỉ tạm ngưng áp dụng khi `--bold` được truyền tường minh (xem Phase 3):
 
 | Từ khóa | Ý nghĩa thực tế trong code |
 |---------|--------------------------|
@@ -66,7 +71,8 @@ Không đổi tech stack. Không phá logic/state/API.
 1. Parse argument để xác định input mode (xem bảng trên)
 2. Nếu có URL/localhost → **chụp screenshot ngay** bằng `mcp__mimo__vision` hoặc Playwright
 3. Nếu có `--pr` → xác định VCS profile theo `~/.claude/skills/_vskills-shared/repo-profile.md` §2 trước (nếu file không tồn tại, coi như full gh mode — đúng hành vi mặc định hiện tại). Full gh mode → `gh pr diff --name-only` để lấy danh sách file. Degraded (thiếu gh / không phải GitHub) → in thông báo §2 và hỏi user tên branch, hoặc fallback sang `--diff` (`git diff --name-only`, không cần gh) — rồi tiếp tục vào Phase 1 bình thường.
-4. Nếu rỗng → hỏi user qua `AskUserQuestion` — **đúng 1 câu**
+4. Xác định Project Profile: kiểm tra `.vdesign/profile.md` tại git root của project đích (`git rev-parse --show-toplevel`). Có → đọc và dùng luôn. Không có → suy luận UI library/design tokens từ dependency trong `package.json`, `tailwind.config.*`, và cấu trúc thư mục components. Vẫn mơ hồ → hỏi 1 câu, rồi đề nghị (không ép) lưu câu trả lời vào `.vdesign/profile.md` cho lần sau.
+5. Nếu rỗng → hỏi user qua `AskUserQuestion` — **đúng 1 câu**
 
 ---
 
@@ -262,21 +268,23 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 
 ### Phase 3: Fix
 
-**Uplift mode** — fix theo thứ tự ưu tiên:
-1. Spacing & alignment
-2. State còn thiếu (empty/loading/error)
-3. Color & surfaces — align tokens
-4. Hierarchy typography
-5. Nâng cấp component
-6. Animation — làm cuối cùng, chỉ khi cần
+Chỉ fix trong phạm vi đã mở khóa của mức hiện tại (tích lũy):
 
-**Redesign mode** — không bị ràng buộc theo thứ tự trên, được phép:
-- Thay toàn bộ cấu trúc layout (grid/flex, thứ tự section, density)
-- Extract hoặc merge component khi cần
-- Đổi hoàn toàn hướng thị giác (card → list, sidebar → top nav, v.v.)
-- Viết lại JSX/TSX từ đầu — nhưng tái dùng data/hooks/handlers hiện có
+| Mức | Phạm vi fix mở khóa |
+|-----|------|
+| `--L1` Polish | Spacing & alignment, icon size, text-overflow |
+| `--L2` Uplift | + state còn thiếu (empty/loading/error/hover/focus/active/disabled), align color/token, hierarchy typography |
+| `--L3` Component rework | + swap/extract/merge component; cấu trúc grid/flex giữ nguyên |
+| `--L4` Layout redesign | + thay cấu trúc grid/flex, thứ tự section, density — hướng thị giác giữ nguyên |
+| `--L5` Full redesign | + đổi hoàn toàn hướng thị giác (card → list, sidebar → top nav), viết lại JSX/TSX từ đầu — tái dùng data/hooks/handlers hiện có |
 
-**Quy tắc cứng (áp dụng cho cả hai mode):**
+Finding nằm ngoài phạm vi mức hiện tại vẫn phải báo cho user (không bao giờ âm thầm bỏ qua), kèm ghi chú mức `--L` nào sẽ mở khóa fix đó.
+
+**`--bold` (tùy chọn, bắt buộc đi kèm `--L4` hoặc `--L5`)**
+Nếu truyền mà không kèm mức, hoặc kèm `--L1`-`--L3`, tự nâng lên `--L5` và báo cho user biết lý do. Tạm ngưng chỉ trong lần chạy này: "KHÔNG áp dụng thẩm mỹ portfolio/avant-garde", thiên hướng mặc định "rõ ràng > gây ấn tượng", và anti-pattern "Copy design sáng tạo từ landing page/portfolio vào product UI" — cho phép art direction riêng biệt, typography scale biểu cảm hơn, layout độc đáo/bất đối xứng, motion tùy chỉnh.
+Vẫn bắt buộc kể cả khi `--bold`: accessibility (contrast, focus ring, đầy đủ state), không migrate tech stack, không đổi logic/state/API, vẫn phải dừng lại hỏi trước khi thêm dependency mới (ví dụ animation library).
+
+**Quy tắc cứng (áp dụng cho mọi mức, kể cả `--bold`):**
 - ✅ Làm việc trong tech stack hiện có — KHÔNG migrate framework
 - ✅ KHÔNG phá logic/state/API — chỉ đổi presentation layer
 - ✅ Kiểm tra `package.json` trước khi thêm dependency
@@ -305,9 +313,14 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 
 ---
 
-## Ràng buộc riêng cho eTARO
+## Project Profile
 
-Khi làm việc trong `/Users/vyvu/Documents/work/taro/eTARO`:
+Xác định theo thứ tự này trước Phase 1:
+1. `.vdesign/profile.md` tại git root của project đích — nếu có, đọc và dùng luôn.
+2. Không có → suy luận từ dependency trong `package.json`, `tailwind.config.*`, và thư mục components.
+3. Vẫn mơ hồ → hỏi 1 câu, rồi đề nghị (không ép) lưu câu trả lời vào `.vdesign/profile.md` cho lần sau.
+
+### Ví dụ — Project Profile của eTARO (chỉ minh họa hình dạng, không phải mặc định)
 
 | Ràng buộc | Chi tiết |
 |------------|----------|
@@ -350,6 +363,7 @@ Khi làm việc trong `/Users/vyvu/Documents/work/taro/eTARO`:
 - ❌ Ảnh full-bleed dùng `object-contain` mà không khớp `aspect-ratio` của container với tỉ lệ thực tế của file ảnh — bị letterbox hai bên dù container đã full width
 - ❌ Chỉ set `h-full` trên wrapper của grid item mà quên set luôn trên khung visual bên trong (border/bg/shadow) — card vẫn lệch chiều cao dù grid đã stretch item bằng nhau
 - ❌ Ép `line-clamp`/height cố định lên copy có độ dài khác nhau giữa các card song song thay vì cân bằng lại độ dài text — line-clamp chỉ là band-aid, cân bằng lại copy mới là fix gốc thực sự cho "sự hài hòa"
+- ❌ Chạy mức thấp (ví dụ `--L1`) nhưng vẫn đổi layout/hướng thị giác — phải ở đúng phạm vi mở khóa của mức hiện tại, báo finding ngoài phạm vi thay vì tự fix
 
 ## Bước tiếp theo
 
