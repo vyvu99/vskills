@@ -8,7 +8,7 @@ keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
 argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3] [--bold]"
 metadata:
   author: vyvu
-  version: "5.1.0"
+  version: "5.2.0"
 ---
 
 # vdesign — Skill Redesign UI/UX Cá Nhân
@@ -73,10 +73,11 @@ Không đổi tech stack. Không phá logic/state/API.
 5. Nếu rỗng → hỏi user qua `AskUserQuestion` — **đúng 1 câu**
 6. Nếu có `--bold` → **Domain Research**, trước Vibe Commitment:
    - Domain slug = domain từ context của Project Profile (ví dụ "B2B Healthcare") + tên feature/trang đích đã resolve ở step 1 (ví dụ "booking form") — slugify (ví dụ `healthcare-booking-form`)
-   - Cache check: tìm trong `plans/reports/` file `researcher-vdesign-bold-<slug>*.md` đã tạo trong session/ngày hôm nay — có → đọc và tái dùng, bỏ qua thẳng bước 7
-   - Không có cache → spawn 1 researcher agent (Task/Agent tool) để tìm pattern UI/UX/animation/layout hiện hành (2025-2026) đặc thù cho `<target feature>` trong bối cảnh sản phẩm `<domain>` — phải giữ trong thiên hướng B2B "rõ ràng > gây ấn tượng" (không phải pure Awwwards/portfolio inspiration); report các pattern cụ thể có tên kèm nguồn. Lưu vào `plans/reports/researcher-vdesign-bold-<slug>-<HHMMSS>.md`
-   - Agent/search lỗi hoặc không khả dụng → fallback im lặng về catalog tĩnh; note "domain research unavailable" trong báo cáo ngắn ở Phase 4
-7. Nếu có `--bold` → **Vibe Commitment**, trước khi đụng vào code: chốt MỘT hướng thẩm mỹ — một archetype từ `~/.claude/skills/frontend-design/references/premium-design-patterns.md` (Ethereal Glass / Editorial Luxury / Soft Structuralism), một trào lưu 2025-2026 có tên (Neo-Brutalism, Immersive 3D/WebGL, Kinetic Typography, Bento-interactive, Maximalist editorial), một vibe tùy chỉnh từ keyword tham chiếu/mood của user, hoặc một vibe được gợi ý từ report domain research ở step 6 nếu có. Nếu user không chỉ định, đề xuất vibe phù hợp nhất với domain của project và nói rõ trước khi implement — nêu rõ nguồn nào (catalog tĩnh hay domain research) đã dẫn tới lựa chọn đó. Một lần chạy `--bold` không có điểm neo (chưa chốt vibe) là lý do lớn nhất khiến output bold vẫn đọc ra generic/an toàn.
+   - Danh sách khía cạnh cố định, luôn đủ 4: `ui` (UI/Visual), `ux` (UX/Interaction), `animation` (Animation/Motion), `layout` (Layout/Responsive)
+   - Cache check theo từng khía cạnh, độc lập: tìm trong `plans/reports/` file `researcher-vdesign-bold-<slug>-<aspect>*.md` đã tạo trong session/ngày hôm nay — có → tái dùng report của khía cạnh đó; không có → đánh dấu khía cạnh cần research mới
+   - Spawn song song tất cả khía cạnh chưa có cache — mỗi khía cạnh 1 Task/Agent call, cùng 1 message — mỗi agent tìm pattern UI/UX/animation/layout hiện hành (2025-2026) đặc thù cho `<target feature>` trong bối cảnh sản phẩm `<domain>`, chỉ tập trung vào đúng 1 khía cạnh được giao, giữ trong thiên hướng B2B "rõ ràng > gây ấn tượng" (không phải pure Awwwards/portfolio inspiration); report các pattern cụ thể có tên kèm nguồn. Lưu mỗi report vào `plans/reports/researcher-vdesign-bold-<slug>-<aspect>-<HHMMSS>.md`
+   - Khía cạnh nào agent lỗi hoặc không khả dụng → fallback im lặng về catalog tĩnh **chỉ cho khía cạnh đó** — các khía cạnh còn lại (cached hoặc research mới) vẫn tiếp tục bình thường; không fail toàn bộ bước domain research chỉ vì 1 khía cạnh lỗi
+7. Nếu có `--bold` → **Vibe Commitment**, trước khi đụng vào code: chốt MỘT hướng thẩm mỹ — một archetype từ `~/.claude/skills/frontend-design/references/premium-design-patterns.md` (Ethereal Glass / Editorial Luxury / Soft Structuralism), một trào lưu 2025-2026 có tên (Neo-Brutalism, Immersive 3D/WebGL, Kinetic Typography, Bento-interactive, Maximalist editorial), một vibe tùy chỉnh từ keyword tham chiếu/mood của user, hoặc một vibe được gợi ý từ các report domain research ở step 6 (cached và/hoặc mới, tối đa 4 report) nếu có. Nếu user không chỉ định, đề xuất vibe phù hợp nhất với domain của project và nói rõ trước khi implement — nêu rõ những khía cạnh nào đã dẫn tới lựa chọn đó và trạng thái của chúng (cached/fresh/fallback về catalog tĩnh). Một lần chạy `--bold` không có điểm neo (chưa chốt vibe) là lý do lớn nhất khiến output bold vẫn đọc ra generic/an toàn.
 
 ---
 
@@ -287,7 +288,7 @@ Nếu truyền mà không kèm mức, hoặc kèm `--L1`, tự nâng lên `--L3`
 
 Bắt buộc phải có Vibe Commitment từ Phase 0 step 7 trước — chốt vibe rồi mới kéo pattern. Không được kéo pattern trước rồi mới ngụy biện ra vibe sau.
 
-**Kéo pattern, không chỉ audit-fix.** Sau khi chốt vibe, kéo 3-5 pattern cụ thể có tên từ arsenal của vibe đó — xem `~/.claude/skills/frontend-design/references/premium-design-patterns.md` để có catalog đầy đủ (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction) — cộng thêm pattern/insight domain-specific từ report domain research ở Phase 0 step 6, nếu có. Merge với catalog tĩnh, không thay thế. Audit ở Phase 2 vẫn chạy (bắt state hỏng/a11y/responsive) nhưng dưới `--bold` nó là sàn, không phải trần — output bold được đánh giá bằng độ đặc trưng của pattern đã kéo, không chỉ bằng việc không còn lỗi.
+**Kéo pattern, không chỉ audit-fix.** Sau khi chốt vibe, kéo 3-5 pattern cụ thể có tên từ arsenal của vibe đó — xem `~/.claude/skills/frontend-design/references/premium-design-patterns.md` để có catalog đầy đủ (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction) — cộng thêm pattern/insight domain-specific từ các report domain research ở Phase 0 step 6 hiện có cho lần chạy này (tối đa 4). Merge tất cả với catalog tĩnh, không thay thế. Audit ở Phase 2 vẫn chạy (bắt state hỏng/a11y/responsive) nhưng dưới `--bold` nó là sàn, không phải trần — output bold được đánh giá bằng độ đặc trưng của pattern đã kéo, không chỉ bằng việc không còn lỗi.
 
 **Dependency allowlist — thêm thẳng, không cần hỏi:** GSAP (+ ScrollTrigger), Motion (Framer Motion), Lenis (smooth scroll), CSS scroll-driven animation gốc / View Transitions API, Rive, Lottie — bộ công cụ chuẩn de-facto của site đoạt giải 2025-2026.
 **Vẫn phải dừng lại hỏi:** React Three Fiber/Three.js (650KB+ — chỉ khi 3D thực sự là cốt lõi của concept), Barba.js, bất kỳ tool trả phí/SaaS nào ngoài Rive, custom WebGL/GLSL shader.
@@ -322,7 +323,7 @@ Vẫn bắt buộc kể cả khi `--bold`: accessibility (contrast, focus ring, 
 5. **Báo cáo ngắn gọn**: "Đã redesign [X]. Thay đổi chính: [liệt kê 3-5 bullet points]"
    - Không summary dài
    - Chỉ nêu các thay đổi đáng kể
-   - Nếu có chạy `--bold`: thêm 1 dòng nêu rõ domain research ở Phase 0 step 6 có được dùng không (mới research hay tái dùng cache) hay đã fallback về catalog tĩnh
+   - Nếu có chạy `--bold`: thêm 1 dòng trạng thái theo từng khía cạnh của Phase 0 step 6 — VD "ui: fresh, ux: cached, animation: fallback (agent không khả dụng), layout: fresh"
 
 ---
 
@@ -378,7 +379,7 @@ Xác định theo thứ tự này trước Phase 1:
 - ❌ Ép `line-clamp`/height cố định lên copy có độ dài khác nhau giữa các card song song thay vì cân bằng lại độ dài text — line-clamp chỉ là band-aid, cân bằng lại copy mới là fix gốc thực sự cho "sự hài hòa"
 - ❌ Chạy mức thấp (ví dụ `--L1`) nhưng vẫn đổi layout/hướng thị giác — phải ở đúng phạm vi mở khóa của mức hiện tại, báo finding ngoài phạm vi thay vì tự fix
 - ❌ Chạy `--bold` mà không chốt vibe trước (Phase 0 step 7) — bold không có điểm neo vẫn đọc ra là generic/an toàn; chọn pattern trước khi chọn hướng chỉ tạo ra một mớ hổ lốn, không phải một thiết kế mạch lạc
-- ❌ Research lại domain đã có cache trong session/ngày (Phase 0 step 6) — kiểm tra `plans/reports/` trước, tái dùng thay vì research lại
+- ❌ Research lại một khía cạnh đã có cache trong session/ngày cho cùng domain-slug (Phase 0 step 6) — kiểm tra `plans/reports/` theo từng khía cạnh trước, chỉ khía cạnh chưa có cache mới spawn agent mới
 
 ## Bước tiếp theo
 
