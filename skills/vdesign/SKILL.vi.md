@@ -5,28 +5,26 @@ user-invocable: true
 when_to_use: "Kích hoạt khi bạn muốn redesign hoặc nâng cấp UI/UX của một trang, component, feature, hoặc toàn bộ diff/PR hiện có."
 category: frontend
 keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
-argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3 | --L4 | --L5] [--bold]"
+argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3] [--bold]"
 metadata:
   author: vyvu
-  version: "4.0.0"
+  version: "5.1.0"
 ---
 
 # vdesign — Skill Redesign UI/UX Cá Nhân
 
 Nâng cấp hoặc redesign UI/UX theo một gu thẩm mỹ nhất quán: **tinh tế · hài hòa · hiện đại · thanh lịch · nhất quán với hệ thống**.
 
-Năm mức độ sâu tích lũy, cộng thêm flag `--bold` độc lập:
+Ba mức độ sâu tích lũy, cộng thêm flag `--bold` độc lập:
 
 | Flag | Mức | Mở khóa (tích lũy trên mức trước) |
 |------|-----|------|
-| `--L1` | Polish | Spacing/alignment, icon size, text-overflow. KHÔNG đụng màu, state, hay layout. |
-| `--L2` | Uplift | + state còn thiếu (loading/empty/error/hover/focus/active/disabled), align color/token, hierarchy typography |
-| `--L3` | Component rework | + swap/extract/merge component; cấu trúc grid/flex giữ nguyên |
-| `--L4` | Layout redesign | + đổi cấu trúc grid/flex, thứ tự section, density — hướng thị giác giữ nguyên (card vẫn là card) |
-| `--L5` | Full redesign | + đổi hoàn toàn hướng thị giác (card→list, sidebar→top nav), viết lại JSX/TSX từ đầu |
-| _(none)_ | Hỏi | Nếu câu chữ mơ hồ, hỏi 1 câu qua `AskUserQuestion` liệt kê 5 mức — không tự đoán ngầm |
+| `--L1` | Light | Spacing/alignment, icon size, text-overflow, state còn thiếu (loading/empty/error/hover/focus/active/disabled), align color/token, hierarchy typography. KHÔNG đụng layout/cấu trúc. |
+| `--L2` | Structural | + swap/extract/merge component, đổi cấu trúc grid/flex, thứ tự section, density — hướng thị giác giữ nguyên (card vẫn là card) |
+| `--L3` | Full redesign | + đổi hoàn toàn hướng thị giác (card→list, sidebar→top nav), viết lại JSX/TSX từ đầu |
+| _(none)_ | Hỏi | Nếu câu chữ mơ hồ, hỏi 1 câu qua `AskUserQuestion` liệt kê 3 mức — không tự đoán ngầm |
 
-`--bold` (tùy chọn, bắt buộc đi kèm `--L4` hoặc `--L5`) — mở khóa mức độ táo bạo thẩm mỹ tầm Awwwards; xem Phase 3.
+`--bold` (tùy chọn, bắt buộc đi kèm `--L2` hoặc `--L3`) — mở khóa mức độ táo bạo thẩm mỹ tầm Awwwards; xem Phase 3.
 
 Không đổi tech stack. Không phá logic/state/API.
 
@@ -73,6 +71,12 @@ Không đổi tech stack. Không phá logic/state/API.
 3. Nếu có `--pr` → xác định VCS profile theo `~/.claude/skills/_vskills-shared/repo-profile.md` §2 trước (nếu file không tồn tại, coi như full gh mode — đúng hành vi mặc định hiện tại). Full gh mode → `gh pr diff --name-only` để lấy danh sách file. Degraded (thiếu gh / không phải GitHub) → in thông báo §2 và hỏi user tên branch, hoặc fallback sang `--diff` (`git diff --name-only`, không cần gh) — rồi tiếp tục vào Phase 1 bình thường.
 4. Xác định Project Profile: kiểm tra `.vdesign/profile.md` tại git root của project đích (`git rev-parse --show-toplevel`). Có → đọc và dùng luôn. Không có → suy luận UI library/design tokens từ dependency trong `package.json`, `tailwind.config.*`, và cấu trúc thư mục components. Vẫn mơ hồ → hỏi 1 câu, rồi đề nghị (không ép) lưu câu trả lời vào `.vdesign/profile.md` cho lần sau.
 5. Nếu rỗng → hỏi user qua `AskUserQuestion` — **đúng 1 câu**
+6. Nếu có `--bold` → **Domain Research**, trước Vibe Commitment:
+   - Domain slug = domain từ context của Project Profile (ví dụ "B2B Healthcare") + tên feature/trang đích đã resolve ở step 1 (ví dụ "booking form") — slugify (ví dụ `healthcare-booking-form`)
+   - Cache check: tìm trong `plans/reports/` file `researcher-vdesign-bold-<slug>*.md` đã tạo trong session/ngày hôm nay — có → đọc và tái dùng, bỏ qua thẳng bước 7
+   - Không có cache → spawn 1 researcher agent (Task/Agent tool) để tìm pattern UI/UX/animation/layout hiện hành (2025-2026) đặc thù cho `<target feature>` trong bối cảnh sản phẩm `<domain>` — phải giữ trong thiên hướng B2B "rõ ràng > gây ấn tượng" (không phải pure Awwwards/portfolio inspiration); report các pattern cụ thể có tên kèm nguồn. Lưu vào `plans/reports/researcher-vdesign-bold-<slug>-<HHMMSS>.md`
+   - Agent/search lỗi hoặc không khả dụng → fallback im lặng về catalog tĩnh; note "domain research unavailable" trong báo cáo ngắn ở Phase 4
+7. Nếu có `--bold` → **Vibe Commitment**, trước khi đụng vào code: chốt MỘT hướng thẩm mỹ — một archetype từ `~/.claude/skills/frontend-design/references/premium-design-patterns.md` (Ethereal Glass / Editorial Luxury / Soft Structuralism), một trào lưu 2025-2026 có tên (Neo-Brutalism, Immersive 3D/WebGL, Kinetic Typography, Bento-interactive, Maximalist editorial), một vibe tùy chỉnh từ keyword tham chiếu/mood của user, hoặc một vibe được gợi ý từ report domain research ở step 6 nếu có. Nếu user không chỉ định, đề xuất vibe phù hợp nhất với domain của project và nói rõ trước khi implement — nêu rõ nguồn nào (catalog tĩnh hay domain research) đã dẫn tới lựa chọn đó. Một lần chạy `--bold` không có điểm neo (chưa chốt vibe) là lý do lớn nhất khiến output bold vẫn đọc ra generic/an toàn.
 
 ---
 
@@ -272,29 +276,37 @@ Chỉ fix trong phạm vi đã mở khóa của mức hiện tại (tích lũy):
 
 | Mức | Phạm vi fix mở khóa |
 |-----|------|
-| `--L1` Polish | Spacing & alignment, icon size, text-overflow |
-| `--L2` Uplift | + state còn thiếu (empty/loading/error/hover/focus/active/disabled), align color/token, hierarchy typography |
-| `--L3` Component rework | + swap/extract/merge component; cấu trúc grid/flex giữ nguyên |
-| `--L4` Layout redesign | + thay cấu trúc grid/flex, thứ tự section, density — hướng thị giác giữ nguyên |
-| `--L5` Full redesign | + đổi hoàn toàn hướng thị giác (card → list, sidebar → top nav), viết lại JSX/TSX từ đầu — tái dùng data/hooks/handlers hiện có |
+| `--L1` Light | Spacing & alignment, icon size, text-overflow, state còn thiếu (empty/loading/error/hover/focus/active/disabled), align color/token, hierarchy typography — cấu trúc grid/flex giữ nguyên |
+| `--L2` Structural | + swap/extract/merge component, thay cấu trúc grid/flex, thứ tự section, density — hướng thị giác giữ nguyên |
+| `--L3` Full redesign | + đổi hoàn toàn hướng thị giác (card → list, sidebar → top nav), viết lại JSX/TSX từ đầu — tái dùng data/hooks/handlers hiện có |
 
 Finding nằm ngoài phạm vi mức hiện tại vẫn phải báo cho user (không bao giờ âm thầm bỏ qua), kèm ghi chú mức `--L` nào sẽ mở khóa fix đó.
 
-**`--bold` (tùy chọn, bắt buộc đi kèm `--L4` hoặc `--L5`)**
-Nếu truyền mà không kèm mức, hoặc kèm `--L1`-`--L3`, tự nâng lên `--L5` và báo cho user biết lý do. Tạm ngưng chỉ trong lần chạy này: "KHÔNG áp dụng thẩm mỹ portfolio/avant-garde", thiên hướng mặc định "rõ ràng > gây ấn tượng", và anti-pattern "Copy design sáng tạo từ landing page/portfolio vào product UI" — cho phép art direction riêng biệt, typography scale biểu cảm hơn, layout độc đáo/bất đối xứng, motion tùy chỉnh.
-Vẫn bắt buộc kể cả khi `--bold`: accessibility (contrast, focus ring, đầy đủ state), không migrate tech stack, không đổi logic/state/API, vẫn phải dừng lại hỏi trước khi thêm dependency mới (ví dụ animation library).
+**`--bold` (tùy chọn, bắt buộc đi kèm `--L2` hoặc `--L3`)**
+Nếu truyền mà không kèm mức, hoặc kèm `--L1`, tự nâng lên `--L3` và báo cho user biết lý do. Tạm ngưng chỉ trong lần chạy này: "KHÔNG áp dụng thẩm mỹ portfolio/avant-garde", thiên hướng mặc định "rõ ràng > gây ấn tượng", và anti-pattern "Copy design sáng tạo từ landing page/portfolio vào product UI" — cho phép art direction riêng biệt, typography scale biểu cảm hơn, layout độc đáo/bất đối xứng, motion tùy chỉnh.
+
+Bắt buộc phải có Vibe Commitment từ Phase 0 step 7 trước — chốt vibe rồi mới kéo pattern. Không được kéo pattern trước rồi mới ngụy biện ra vibe sau.
+
+**Kéo pattern, không chỉ audit-fix.** Sau khi chốt vibe, kéo 3-5 pattern cụ thể có tên từ arsenal của vibe đó — xem `~/.claude/skills/frontend-design/references/premium-design-patterns.md` để có catalog đầy đủ (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction) — cộng thêm pattern/insight domain-specific từ report domain research ở Phase 0 step 6, nếu có. Merge với catalog tĩnh, không thay thế. Audit ở Phase 2 vẫn chạy (bắt state hỏng/a11y/responsive) nhưng dưới `--bold` nó là sàn, không phải trần — output bold được đánh giá bằng độ đặc trưng của pattern đã kéo, không chỉ bằng việc không còn lỗi.
+
+**Dependency allowlist — thêm thẳng, không cần hỏi:** GSAP (+ ScrollTrigger), Motion (Framer Motion), Lenis (smooth scroll), CSS scroll-driven animation gốc / View Transitions API, Rive, Lottie — bộ công cụ chuẩn de-facto của site đoạt giải 2025-2026.
+**Vẫn phải dừng lại hỏi:** React Three Fiber/Three.js (650KB+ — chỉ khi 3D thực sự là cốt lõi của concept), Barba.js, bất kỳ tool trả phí/SaaS nào ngoài Rive, custom WebGL/GLSL shader.
+
+**Anti-slop gate trước khi báo done** — xem `~/.claude/skills/frontend-design/references/anti-slop-rules.md` để có checklist đầy đủ; tối thiểu fail run nếu có: Inter/Roboto là font duy nhất, gradient tím-xanh là thẩm mỹ chủ đạo, 3+ card giống hệt nhau trong một hàng, tên/số placeholder ("John Doe", số tròn 50%/$100), copy sáo rỗng kiểu startup ("Elevate", "Seamless", "Next-Gen"), background `#000000` thuần, thiếu hover/focus state.
+
+Vẫn bắt buộc kể cả khi `--bold`: accessibility (contrast, focus ring, đầy đủ state), không migrate tech stack, không đổi logic/state/API, chỉ dùng motion GPU-safe (`transform`/`opacity` — không animate `width`/`height`/`top`/`left`; LCP mobile của B2B vốn đã sát ngưỡng, bold không được phá budget đó).
 
 **Quy tắc cứng (áp dụng cho mọi mức, kể cả `--bold`):**
 - ✅ Làm việc trong tech stack hiện có — KHÔNG migrate framework
 - ✅ KHÔNG phá logic/state/API — chỉ đổi presentation layer
-- ✅ Kiểm tra `package.json` trước khi thêm dependency
+- ✅ Kiểm tra `package.json` trước khi thêm dependency — trừ dependency allowlist của `--bold` ở trên, được thêm thẳng
 - ✅ Khi ẩn (không xóa) → dùng opacity/visibility, không unmount
 - ✅ Dùng Tailwind tokens — không hardcode hex
 - ✅ Dùng component đẹp nhất trong project (booking form, notes UI) làm chuẩn tham chiếu
 - ✅ **Responsive là bắt buộc**: mọi thay đổi layout PHẢI verify ở 3 viewport — mobile (375px), tablet (768px), desktop (1280px); viết mobile-first, rồi override bằng sm:/lg:
 - ✅ Component styled bởi bên thứ ba (có `import 'lib/*.css'`) bọc trong wrapper div → wrapper sở hữu TOÀN BỘ visual state (border, ring, disabled opacity); null hết border/shadow bên trong component qua override CSS var + scoped `!important`
-- ❌ KHÔNG thêm animation phức tạp nếu Motion/Framer chưa có sẵn trong project
-- ❌ KHÔNG thêm màu brand mới — chỉ dùng token hiện có
+- ❌ KHÔNG thêm animation phức tạp nếu Motion/Framer chưa có sẵn trong project — ngoại lệ: dưới `--bold`, áp dụng dependency allowlist ở trên thay vì rule này
+- ❌ KHÔNG thêm màu brand mới — chỉ dùng token hiện có (ngoại lệ: `--bold` được phép thêm accent mới nếu vibe đã chốt yêu cầu)
 - ❌ KHÔNG dùng màu mặc định của component library (shadcn blue) nếu project đã có màu primary riêng
 - ❌ KHÔNG thêm toast notification không cần thiết
 - ❌ KHÔNG đổi logic/API/state management
@@ -310,6 +322,7 @@ Vẫn bắt buộc kể cả khi `--bold`: accessibility (contrast, focus ring, 
 5. **Báo cáo ngắn gọn**: "Đã redesign [X]. Thay đổi chính: [liệt kê 3-5 bullet points]"
    - Không summary dài
    - Chỉ nêu các thay đổi đáng kể
+   - Nếu có chạy `--bold`: thêm 1 dòng nêu rõ domain research ở Phase 0 step 6 có được dùng không (mới research hay tái dùng cache) hay đã fallback về catalog tĩnh
 
 ---
 
@@ -364,6 +377,8 @@ Xác định theo thứ tự này trước Phase 1:
 - ❌ Chỉ set `h-full` trên wrapper của grid item mà quên set luôn trên khung visual bên trong (border/bg/shadow) — card vẫn lệch chiều cao dù grid đã stretch item bằng nhau
 - ❌ Ép `line-clamp`/height cố định lên copy có độ dài khác nhau giữa các card song song thay vì cân bằng lại độ dài text — line-clamp chỉ là band-aid, cân bằng lại copy mới là fix gốc thực sự cho "sự hài hòa"
 - ❌ Chạy mức thấp (ví dụ `--L1`) nhưng vẫn đổi layout/hướng thị giác — phải ở đúng phạm vi mở khóa của mức hiện tại, báo finding ngoài phạm vi thay vì tự fix
+- ❌ Chạy `--bold` mà không chốt vibe trước (Phase 0 step 7) — bold không có điểm neo vẫn đọc ra là generic/an toàn; chọn pattern trước khi chọn hướng chỉ tạo ra một mớ hổ lốn, không phải một thiết kế mạch lạc
+- ❌ Research lại domain đã có cache trong session/ngày (Phase 0 step 6) — kiểm tra `plans/reports/` trước, tái dùng thay vì research lại
 
 ## Bước tiếp theo
 

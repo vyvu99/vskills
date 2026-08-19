@@ -5,28 +5,26 @@ user-invocable: true
 when_to_use: "Invoke when you want to redesign or upgrade the UI/UX of a page, component, feature, or an entire existing diff/PR."
 category: frontend
 keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
-argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3 | --L4 | --L5] [--bold]"
+argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3] [--bold]"
 metadata:
   author: vyvu
-  version: "4.0.0"
+  version: "5.1.0"
 ---
 
 # vdesign — Personal UI/UX Redesign Skill
 
 Upgrade or redesign UI/UX with a consistent aesthetic: **refined · harmonious · modern · elegant · consistent with the system**.
 
-Five cumulative depth levels, plus an independent `--bold` flag:
+Three cumulative depth levels, plus an independent `--bold` flag:
 
 | Flag | Level | Unlocks (cumulative on top of the previous level) |
 |------|-------|------|
-| `--L1` | Polish | Spacing/alignment, icon size, text-overflow. Does NOT touch color, state, or layout. |
-| `--L2` | Uplift | + missing states (loading/empty/error/hover/focus/active/disabled), color/token alignment, typography hierarchy |
-| `--L3` | Component rework | + swap/extract/merge components; grid/flex structure stays as-is |
-| `--L4` | Layout redesign | + change grid/flex structure, section order, density — visual direction stays the same (a card stays a card) |
-| `--L5` | Full redesign | + change visual direction entirely (card→list, sidebar→top nav), rewrite JSX/TSX from scratch |
-| _(none)_ | Ask | If wording is ambiguous, ask 1 question via `AskUserQuestion` listing the 5 levels — do not silently guess |
+| `--L1` | Light | Spacing/alignment, icon size, text-overflow, missing states (loading/empty/error/hover/focus/active/disabled), color/token alignment, typography hierarchy. Does NOT touch layout/structure. |
+| `--L2` | Structural | + swap/extract/merge components, change grid/flex structure, section order, density — visual direction stays the same (a card stays a card) |
+| `--L3` | Full redesign | + change visual direction entirely (card→list, sidebar→top nav), rewrite JSX/TSX from scratch |
+| _(none)_ | Ask | If wording is ambiguous, ask 1 question via `AskUserQuestion` listing the 3 levels — do not silently guess |
 
-`--bold` (optional, requires `--L4` or `--L5`) — unlocks Awwwards-tier creative freedom; see Phase 3.
+`--bold` (optional, requires `--L2` or `--L3`) — unlocks Awwwards-tier creative freedom; see Phase 3.
 
 Do not change the tech stack. Do not break logic/state/API.
 
@@ -73,6 +71,12 @@ This is the user's vocabulary — **ALL** must be met by default, not just a few
 3. If there's `--pr` → resolve the VCS profile per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 first (if the file is absent, assume full gh mode — today's default). Full gh mode → `gh pr diff --name-only` to get the list of files. Degraded (no gh / non-GitHub) → print the §2 message and ask the user for a branch name, or fall back to `--diff` (`git diff --name-only`, needs no gh) — then continue into Phase 1 normally.
 4. Resolve the Project Profile: check `.vdesign/profile.md` at the target project's git root (`git rev-parse --show-toplevel`). Present → read and use it. Absent → infer UI library/design tokens from `package.json` dependencies, `tailwind.config.*`, and the components folder. Still ambiguous → ask 1 question, then offer (don't force) to save the answer to `.vdesign/profile.md` for next time.
 5. If empty → ask the user via `AskUserQuestion` — **exactly 1 question**
+6. If `--bold` is set → **Domain Research**, before Vibe Commitment:
+   - Domain slug = the domain from the Project Profile's context (e.g. "B2B Healthcare") + the target feature/page name resolved in step 1 (e.g. "booking form") — slugify (e.g. `healthcare-booking-form`)
+   - Cache check: look in `plans/reports/` for `researcher-vdesign-bold-<slug>*.md` created earlier this session/today — present → read and reuse, skip straight to step 7
+   - No cache → spawn 1 researcher agent (Task/Agent tool) to find current (2025-2026) UI/UX/animation/layout patterns specific to `<target feature>` in `<domain>` product context — must stay inside the B2B "clarity > impressiveness" bias (not pure Awwwards/portfolio inspiration); report concrete named patterns with sources. Save to `plans/reports/researcher-vdesign-bold-<slug>-<HHMMSS>.md`
+   - Agent/search fails or unavailable → fall back silently to the static catalog only; note "domain research unavailable" in the Phase 4 short report
+7. If `--bold` is set → **Vibe Commitment**, before touching any code: pick ONE aesthetic direction — an archetype from `~/.claude/skills/frontend-design/references/premium-design-patterns.md` (Ethereal Glass / Editorial Luxury / Soft Structuralism), a named 2025-2026 movement (Neo-Brutalism, Immersive 3D/WebGL, Kinetic Typography, Bento-interactive, Maximalist editorial), a custom vibe from the user's own reference/mood keywords, or a vibe informed by step 6's domain research report when one exists. If the user didn't specify one, propose the best-fit vibe for the project's domain and state it out loud before implementing — say which source (static catalog vs. domain research) grounded the pick. An un-anchored `--bold` run (no committed vibe) is the single biggest reason bold output still reads as generic/safe.
 
 ---
 
@@ -272,29 +276,37 @@ Apply fixes only within the current level's unlocked scope (cumulative):
 
 | Level | Fix scope unlocked |
 |-------|------|
-| `--L1` Polish | Spacing & alignment, icon size, text-overflow |
-| `--L2` Uplift | + missing states (empty/loading/error/hover/focus/active/disabled), color/token alignment, typography hierarchy |
-| `--L3` Component rework | + swap/extract/merge components; grid/flex structure stays as-is |
-| `--L4` Layout redesign | + replace grid/flex structure, section order, density — visual direction stays the same |
-| `--L5` Full redesign | + fully change visual direction (card → list, sidebar → top nav), rewrite JSX/TSX from scratch — reuse existing data/hooks/handlers |
+| `--L1` Light | Spacing & alignment, icon size, text-overflow, missing states (empty/loading/error/hover/focus/active/disabled), color/token alignment, typography hierarchy — grid/flex structure stays as-is |
+| `--L2` Structural | + swap/extract/merge components, replace grid/flex structure, section order, density — visual direction stays the same |
+| `--L3` Full redesign | + fully change visual direction (card → list, sidebar → top nav), rewrite JSX/TSX from scratch — reuse existing data/hooks/handlers |
 
 Findings outside the current level's scope are still reported to the user (never silently dropped), with a note on which `--L` would unlock the fix.
 
-**`--bold` (optional, requires `--L4` or `--L5`)**
-If passed with no level, or with `--L1`-`--L3`, bump to `--L5` and tell the user why. Suspends for this run only: "DO NOT apply portfolio/avant-garde aesthetics", the "clarity > impressiveness" default bias, and the anti-pattern "Copy creative design from a landing page/portfolio into product UI" — allows bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion.
-Still mandatory even under `--bold`: accessibility (contrast, focus rings, all required states), no tech-stack migration, no logic/state/API changes, still stop-and-ask before adding a new dependency (e.g. an animation library).
+**`--bold` (optional, requires `--L2` or `--L3`)**
+If passed with no level, or with `--L1`, bump to `--L3` and tell the user why. Suspends for this run only: "DO NOT apply portfolio/avant-garde aesthetics", the "clarity > impressiveness" default bias, and the anti-pattern "Copy creative design from a landing page/portfolio into product UI" — allows bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion.
+
+Requires the Vibe Commitment from Phase 0 step 7 first — pick the vibe, then pull patterns. Never pull patterns first and rationalize a vibe after the fact.
+
+**Pattern-pull, not audit-fix.** Once the vibe is committed, pull 3-5 concrete named patterns from that vibe's arsenal — see `~/.claude/skills/frontend-design/references/premium-design-patterns.md` for the full catalog (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction patterns) — plus any domain-specific patterns/insights from Phase 0 step 6's domain research report, if one exists for this run. Merge the two, don't replace the catalog. Phase 2's audit still runs (it catches broken states/a11y/responsive) but under `--bold` it's a floor, not a ceiling — bold output is judged by how distinctive the pulled patterns are, not just by absence of defects.
+
+**Dependency allowlist — add directly, no need to ask:** GSAP (+ ScrollTrigger), Motion (Framer Motion), Lenis (smooth scroll), native CSS scroll-driven animations / View Transitions API, Rive, Lottie — the de-facto standard toolkit on 2025-2026 award-winning sites.
+**Still stop-and-ask:** React Three Fiber/Three.js (650KB+ — only if 3D is genuinely core to the concept), Barba.js, any paid/SaaS tool beyond Rive, custom WebGL/GLSL shaders.
+
+**Anti-slop gate before reporting done** — see `~/.claude/skills/frontend-design/references/anti-slop-rules.md` for the full checklist; at minimum fail the run on: Inter/Roboto as the only typeface, purple-to-blue gradient as the dominant aesthetic, 3+ visually-identical cards in a row, placeholder names/numbers ("John Doe", round 50%/$100), generic startup copy ("Elevate", "Seamless", "Next-Gen"), pure `#000000` background, missing hover/focus states.
+
+Still mandatory even under `--bold`: accessibility (contrast, focus rings, all required states), no tech-stack migration, no logic/state/API changes, GPU-safe motion only (`transform`/`opacity` — never animate `width`/`height`/`top`/`left`; B2B mobile LCP is already tight, bold must not blow the budget).
 
 **Hard rules (apply to every level, including `--bold`):**
 - ✅ Work with the existing tech stack — DO NOT migrate framework
 - ✅ DO NOT break logic/state/API — only change the presentation layer
-- ✅ Check `package.json` before adding a dependency
+- ✅ Check `package.json` before adding a dependency — except the `--bold` allowlist above, which may be added directly
 - ✅ When hiding (not deleting) → use opacity/visibility, don't unmount
 - ✅ Use Tailwind tokens — no hardcoded hex
 - ✅ Use the best-looking component in the project (booking form, notes UI) as the reference standard
 - ✅ **Responsive is mandatory**: every layout change MUST be verified at 3 viewports — mobile (375px), tablet (768px), desktop (1280px); write mobile-first, then override with sm:/lg:
 - ✅ Third-party styled component (has `import 'lib/*.css'`) wrapped in a wrapper div → wrapper owns ALL visual state (border, ring, disabled opacity); null out all border/shadow inside the component via CSS var override + scoped `!important`
-- ❌ DO NOT add complex animation if Motion/Framer isn't already in the project
-- ❌ DO NOT add new brand colors — only use existing tokens
+- ❌ DO NOT add complex animation if Motion/Framer isn't already in the project — exception: under `--bold`, the dependency allowlist above applies instead
+- ❌ DO NOT add new brand colors — only use existing tokens (exception: `--bold` may introduce a new accent if the committed vibe requires it)
 - ❌ DO NOT use the component library's default color (shadcn blue) if the project has its own primary color
 - ❌ DO NOT add unnecessary toast notifications
 - ❌ DO NOT change logic/API/state management
@@ -310,6 +322,7 @@ Still mandatory even under `--bold`: accessibility (contrast, focus rings, all r
 5. **Short report**: "Redesigned [X]. Main changes: [list 3-5 bullet points]"
    - No long summary
    - Only mention significant changes
+   - If `--bold` ran: 1 line noting whether Phase 0 step 6's domain research was used (fresh or cached) or fell back to the static catalog only
 
 ---
 
@@ -364,6 +377,8 @@ Resolve in this order before Phase 1:
 - ❌ Setting `h-full` only on the grid item wrapper while forgetting to set it on the inner visual frame (border/bg/shadow) too — cards still end up mismatched in height even though the grid stretched items equally
 - ❌ Forcing `line-clamp`/fixed height onto copy of varying length across parallel cards instead of rebalancing the text length — line-clamp is a band-aid, rebalancing the copy is the actual root fix for "harmoniousness"
 - ❌ Run a low level (e.g. `--L1`) but change layout/visual direction anyway — stay within the current level's unlocked scope, report out-of-scope findings instead of fixing them
+- ❌ Run `--bold` without committing to a vibe first (Phase 0 step 7) — un-anchored boldness still reads as generic/safe; picking patterns before picking a direction produces a grab-bag, not a coherent design
+- ❌ Re-run domain research for a domain-slug already cached this session/day (Phase 0 step 6) — check `plans/reports/` first, reuse instead of re-researching
 
 ## Next steps
 
