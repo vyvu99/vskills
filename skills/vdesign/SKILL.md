@@ -8,7 +8,7 @@ keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
 argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3] [--bold]"
 metadata:
   author: vyvu
-  version: "5.1.0"
+  version: "5.2.0"
 ---
 
 # vdesign — Personal UI/UX Redesign Skill
@@ -73,10 +73,11 @@ This is the user's vocabulary — **ALL** must be met by default, not just a few
 5. If empty → ask the user via `AskUserQuestion` — **exactly 1 question**
 6. If `--bold` is set → **Domain Research**, before Vibe Commitment:
    - Domain slug = the domain from the Project Profile's context (e.g. "B2B Healthcare") + the target feature/page name resolved in step 1 (e.g. "booking form") — slugify (e.g. `healthcare-booking-form`)
-   - Cache check: look in `plans/reports/` for `researcher-vdesign-bold-<slug>*.md` created earlier this session/today — present → read and reuse, skip straight to step 7
-   - No cache → spawn 1 researcher agent (Task/Agent tool) to find current (2025-2026) UI/UX/animation/layout patterns specific to `<target feature>` in `<domain>` product context — must stay inside the B2B "clarity > impressiveness" bias (not pure Awwwards/portfolio inspiration); report concrete named patterns with sources. Save to `plans/reports/researcher-vdesign-bold-<slug>-<HHMMSS>.md`
-   - Agent/search fails or unavailable → fall back silently to the static catalog only; note "domain research unavailable" in the Phase 4 short report
-7. If `--bold` is set → **Vibe Commitment**, before touching any code: pick ONE aesthetic direction — an archetype from `~/.claude/skills/frontend-design/references/premium-design-patterns.md` (Ethereal Glass / Editorial Luxury / Soft Structuralism), a named 2025-2026 movement (Neo-Brutalism, Immersive 3D/WebGL, Kinetic Typography, Bento-interactive, Maximalist editorial), a custom vibe from the user's own reference/mood keywords, or a vibe informed by step 6's domain research report when one exists. If the user didn't specify one, propose the best-fit vibe for the project's domain and state it out loud before implementing — say which source (static catalog vs. domain research) grounded the pick. An un-anchored `--bold` run (no committed vibe) is the single biggest reason bold output still reads as generic/safe.
+   - Aspect list is fixed, always these 4: `ui` (UI/Visual), `ux` (UX/Interaction), `animation` (Animation/Motion), `layout` (Layout/Responsive)
+   - Cache check per aspect, independently: look in `plans/reports/` for `researcher-vdesign-bold-<slug>-<aspect>*.md` created earlier this session/today — hit → reuse that aspect's report; miss → mark the aspect for fresh research
+   - Spawn all cache-missed aspects in parallel — one Task/Agent call per aspect, in the same message — each agent finds current (2025-2026) UI/UX/animation/layout patterns specific to `<target feature>` in `<domain>` product context, scoped to its one assigned aspect, staying inside the B2B "clarity > impressiveness" bias (not pure Awwwards/portfolio inspiration); report concrete named patterns with sources. Save each to `plans/reports/researcher-vdesign-bold-<slug>-<aspect>-<HHMMSS>.md`
+   - An aspect whose agent fails or is unavailable falls back silently to the static catalog **for that aspect only** — the other aspects (cached or freshly researched) still proceed; never fail the whole domain-research step because one aspect failed
+7. If `--bold` is set → **Vibe Commitment**, before touching any code: pick ONE aesthetic direction — an archetype from `~/.claude/skills/frontend-design/references/premium-design-patterns.md` (Ethereal Glass / Editorial Luxury / Soft Structuralism), a named 2025-2026 movement (Neo-Brutalism, Immersive 3D/WebGL, Kinetic Typography, Bento-interactive, Maximalist editorial), a custom vibe from the user's own reference/mood keywords, or a vibe informed by whichever of step 6's per-aspect domain research reports exist (cached and/or fresh, up to 4). If the user didn't specify one, propose the best-fit vibe for the project's domain and state it out loud before implementing — say which aspects grounded the pick and their status (cached/fresh/fallback to static catalog). An un-anchored `--bold` run (no committed vibe) is the single biggest reason bold output still reads as generic/safe.
 
 ---
 
@@ -287,7 +288,7 @@ If passed with no level, or with `--L1`, bump to `--L3` and tell the user why. S
 
 Requires the Vibe Commitment from Phase 0 step 7 first — pick the vibe, then pull patterns. Never pull patterns first and rationalize a vibe after the fact.
 
-**Pattern-pull, not audit-fix.** Once the vibe is committed, pull 3-5 concrete named patterns from that vibe's arsenal — see `~/.claude/skills/frontend-design/references/premium-design-patterns.md` for the full catalog (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction patterns) — plus any domain-specific patterns/insights from Phase 0 step 6's domain research report, if one exists for this run. Merge the two, don't replace the catalog. Phase 2's audit still runs (it catches broken states/a11y/responsive) but under `--bold` it's a floor, not a ceiling — bold output is judged by how distinctive the pulled patterns are, not just by absence of defects.
+**Pattern-pull, not audit-fix.** Once the vibe is committed, pull 3-5 concrete named patterns from that vibe's arsenal — see `~/.claude/skills/frontend-design/references/premium-design-patterns.md` for the full catalog (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction patterns) — plus any domain-specific patterns/insights from whichever of Phase 0 step 6's per-aspect domain research reports exist for this run (up to 4). Merge all of them, don't replace the catalog. Phase 2's audit still runs (it catches broken states/a11y/responsive) but under `--bold` it's a floor, not a ceiling — bold output is judged by how distinctive the pulled patterns are, not just by absence of defects.
 
 **Dependency allowlist — add directly, no need to ask:** GSAP (+ ScrollTrigger), Motion (Framer Motion), Lenis (smooth scroll), native CSS scroll-driven animations / View Transitions API, Rive, Lottie — the de-facto standard toolkit on 2025-2026 award-winning sites.
 **Still stop-and-ask:** React Three Fiber/Three.js (650KB+ — only if 3D is genuinely core to the concept), Barba.js, any paid/SaaS tool beyond Rive, custom WebGL/GLSL shaders.
@@ -322,7 +323,7 @@ Still mandatory even under `--bold`: accessibility (contrast, focus rings, all r
 5. **Short report**: "Redesigned [X]. Main changes: [list 3-5 bullet points]"
    - No long summary
    - Only mention significant changes
-   - If `--bold` ran: 1 line noting whether Phase 0 step 6's domain research was used (fresh or cached) or fell back to the static catalog only
+   - If `--bold` ran: 1 line per aspect noting Phase 0 step 6's status — e.g. "ui: fresh, ux: cached, animation: fallback (agent unavailable), layout: fresh"
 
 ---
 
@@ -378,7 +379,7 @@ Resolve in this order before Phase 1:
 - ❌ Forcing `line-clamp`/fixed height onto copy of varying length across parallel cards instead of rebalancing the text length — line-clamp is a band-aid, rebalancing the copy is the actual root fix for "harmoniousness"
 - ❌ Run a low level (e.g. `--L1`) but change layout/visual direction anyway — stay within the current level's unlocked scope, report out-of-scope findings instead of fixing them
 - ❌ Run `--bold` without committing to a vibe first (Phase 0 step 7) — un-anchored boldness still reads as generic/safe; picking patterns before picking a direction produces a grab-bag, not a coherent design
-- ❌ Re-run domain research for a domain-slug already cached this session/day (Phase 0 step 6) — check `plans/reports/` first, reuse instead of re-researching
+- ❌ Re-run domain research for an aspect already cached this session/day for the same domain-slug (Phase 0 step 6) — check `plans/reports/` per-aspect first, reuse instead of re-researching; only cache-missed aspects get a fresh agent
 
 ## Next steps
 
