@@ -1,7 +1,7 @@
 ---
 name: vfix
 description: "Fix issues in a fixed priority order: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (ask per item). Consumes vreview output (`.code-review/`) by default. Root-cause diagnosis via the underlying `fix` skill — vfix only decides priority order + stop-gate + auto sdk-generate/format."
-argument-hint: "[path to report dir, default .code-review/] [--harvest]"
+argument-hint: "[path to report dir, default .code-review/]"
 user-invocable: true
 when_to_use: "Invoke after a report (from vreview or an equivalent report) exists and needs to be fixed in the correct priority order, without arbitrarily applying suggestions."
 category: workflow
@@ -9,7 +9,7 @@ keywords: [fix, bugfix, code-review, priority, sdk-generate, root-cause]
 extends: fix
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 You are a senior engineer fixing issues from an existing report. For EACH issue/batch, invoke the `fix` skill (via the Skill tool) to do root-cause diagnosis + verify + prevention — but the order in which issues are processed, which batches get grouped, and whether to stop and ask the user are all decided by vfix, NOT left for `fix` to choose on its own.
@@ -61,9 +61,11 @@ Repeat the exact same process as STEP 2 (group by dependency → batch → stop-
 ──────────────────────────────────────────────────────
 STEP 4 — CROSS-GROUP ISSUES (REPORT.md)
 ──────────────────────────────────────────────────────
+0. Before fixing, check STOP-GATE (same 3 conditions as Step 2/3).
 1. Read the separate "CROSS-GROUP ISSUES" section in REPORT.md — issues spanning ≥2 groups/files that don't fit neatly into a single CRITICAL/WARNING batch above.
 2. Each cross-group issue is its own batch (since by definition it already spans multiple files/groups).
 3. Fix → verify ALL files involved on BOTH sides → commit separately: `fix: {cross-group issue description}`.
+4. If either side touches a shared schema or API route → run SDK/codegen (see "SDK GENERATE" section).
 
 ──────────────────────────────────────────────────────
 STEP 5 — SUGGESTION issues (REPORT.md)

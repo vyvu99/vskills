@@ -9,7 +9,7 @@ argument-hint: "Feature: [tên feature]\nCompare: [tên sản phẩm] (tuỳ ch�
 extends: brainstorm
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Specs Loop
@@ -81,7 +81,7 @@ Sau mỗi vòng 5 case:
 
 ## Bước 4 — Experience Specs
 
-Chỉ làm bước này sau khi user xác nhận không còn edge case nào cần cover nữa. Thêm một section duy nhất vào cuối file specs:
+Chỉ làm bước này sau khi user xác nhận không còn edge case nào cần cover nữa. Thêm nội dung vào section `## Experience Specs` (xem template bên dưới — section này nằm trước `## Open Questions`, không nhất thiết là section cuối file):
 
 ```
 ### Experience Specs
@@ -106,7 +106,7 @@ Khi cần tạo file mới:
 
 ## Decisions
 
-| #  | Case | Decision |
+| ID | Case | Decision |
 | -- | ---- | ----------- |
 
 ---
@@ -128,11 +128,13 @@ Khi cần tạo file mới:
 1. ...
 ```
 
+Cột `ID` dùng lại đúng scheme Type-Number như ở Edge Cases (ví dụ: `UI-1`, `FLOW-3`) — `vplan` sẽ tham chiếu đúng giá trị này làm `[Case ID]`.
+
 ---
 
 ## Hard rules
 
-- **Ngôn ngữ:** tiếng Việt thuần, không thuật ngữ kỹ thuật, không code snippet trong specs; người không rành kỹ thuật đọc hiểu được
+- **Ngôn ngữ:** resolve động — kiểm tra `CLAUDE.md` của project xem có section `## Ngôn ngữ`/`## Language` không, sau đó đến `~/.claude/CLAUDE.md`, cuối cùng mặc định tiếng Anh (đúng chain mà `repo-profile.md` §4 mô tả, không cần file đó phải tồn tại) — không thuật ngữ kỹ thuật, không code snippet trong specs; người không rành kỹ thuật đọc hiểu được
 - Nếu buộc phải nhắc đến khái niệm kỹ thuật → giải thích ngay sau đó bằng ngôn ngữ đơn giản, trong ngoặc đơn
 - **Không so sánh** → bỏ field Compare, tập trung vào gap giữa code hiện tại và kỳ vọng
 - **Verify trước khi hỏi:** chỉ hỏi khi code không trả lời được — nếu code đã rõ ràng thì viết thẳng vào Decisions

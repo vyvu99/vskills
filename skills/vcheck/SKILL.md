@@ -1,14 +1,14 @@
 ---
 name: vcheck
-description: "Run typecheck + build (+ optional test) in parallel for all or part of the packages in a JS/TS repo (monorepo or single package). Auto-detects workspace packages and package manager, no hardcoded package names."
-argument-hint: "[package-names...]"
+description: "Run typecheck + build + format (+ optional test) in parallel for all or part of the packages in a JS/TS repo (monorepo or single package). Auto-detects workspace packages and package manager, no hardcoded package names."
+argument-hint: "[package-names...] [--test]"
 user-invocable: true
 when_to_use: "Invoke when you need a fast typecheck/build (and test) of the whole repo or a group of packages in a JS/TS monorepo (or single package) before commit/PR."
 category: workflow
 keywords: [typecheck, build, tsc, pnpm, npm, yarn, bun, monorepo, ci]
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # vcheck
@@ -29,6 +29,7 @@ Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (if present) to reso
 
 ## Step 0 — Determine the package list
 
+- If `$ARGUMENTS` contains `--test`, treat it as a test-request flag (see Step 4) and strip it before parsing package names
 - If `$ARGUMENTS` contains a list of package names → use that exact list, skip auto-detect
 - If empty → auto-detect the whole workspace:
   1. Use the workspace shape from Step -1. **Single-package** → the package list is just the root package; skip glob resolution, go straight to Step 1. **Monorepo** → continue with the glob pattern from `pnpm-workspace.yaml` (or the `workspaces` field in the root `package.json`):
@@ -53,6 +54,7 @@ Spawn all packages first, then `wait` — do not run them sequentially one by on
 After `wait`, read each `/tmp/tsc-<package>.log`:
 - No errors → report pass
 - Errors → extract the specific file:line + message, fix, then recheck **only the package just fixed** (rerun exactly 1 tsc command for that package, do not re-run the whole list)
+- If the package has no `tsconfig.json`, treat the failure as "no typecheck config" rather than a type error, and skip/report it accordingly instead of treating it as a code bug
 
 ## Step 2 — Parallel build
 
@@ -70,7 +72,7 @@ Spawn all → `wait` → parse each package's log (pass/fail). Failing package �
 
 Read the scripts in the root `package.json`, look for a format script (`format`, `format:fix`, ...) in that priority order, run the first one found via the root template from Step -1 (`pnpm exec <script>` / `npm exec -- <script>` / `yarn <script>` / `bun <script>`).
 
-## Step 4 — Test (only when the user requests it or specifies it via argument)
+## Step 4 — Test (only when the user requests it or `$ARGUMENTS` contains `--test`)
 
 - Determine the test script in each package's `package.json` that needs testing — prefer non-watch mode (`test:run`, `test:ci`, `test -- --run`, ...) over plain `test` if you suspect the default is watch mode
 - Run in background + `wait`, same as steps 1-2

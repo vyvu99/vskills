@@ -11,7 +11,7 @@ Personal Claude Code skills — opinionated checklists layered on top of everyda
 | `vspecs` | Write/update specs for a feature through a brainstorm-edge-case loop | Starting a new feature, no specs yet |
 | `vplan` | Build an implementation plan from specs — checks each case against current code | Specs exist, need a plan to code from |
 | `vcook` | Implement via a 9-step checklist: branch, test-first, SDK client, review, PR | Have a plan (or a quick description), need to code |
-| `vreview` | 6-phase code review using parallel subagents + an adversarial pass | Need to review a branch/PR |
+| `vreview` | 4-phase code review (+ optional pre-scan / lint-harvest phases) using parallel subagents + an adversarial pass | Need to review a branch/PR |
 | `vfix` | Fix issues from a `vreview` report in a fixed priority order | Have a review report that needs fixing |
 | `vcheck` | Typecheck + build in parallel across a JS/TS workspace (any package manager) | Quick check before committing |
 | `vissues` | Create/update a GitHub epic + sub-issues from a plan | Need to track a plan on GitHub |
@@ -50,7 +50,7 @@ flowchart LR
 /vreview
 /vfix
 ```
-→ specs → plan (migrations squashed into one phase) → code + tests + PR → 6-phase review → fix by priority.
+→ specs → plan (migrations squashed into one phase) → code + tests + PR → 4-phase review → fix by priority.
 
 **Fix a bug quickly, no plan needed:**
 ```bash
@@ -166,8 +166,9 @@ git add . && git commit -m "feat: add <skill-name> skill"
 ```
 
 **Add a lint rule after a `vreview` Phase 5 harvest:**
+
+Phase 5 already writes (and chmods) new/updated rule scripts directly into the live `~/.claude/scripts/lint-rules/rules/` directory — symlinked from `scripts/lint-rules/rules/` in this repo when installed with `--with-scripts`. So there's no `cp` step, just commit what's already there:
 ```bash
-cp .code-review/staged-lint-rules/*.sh scripts/lint-rules/rules/
 git add . && git commit -m "feat(lint): add <rule-name> rule"
 git push
 ```
