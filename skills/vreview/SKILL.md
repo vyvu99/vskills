@@ -48,7 +48,22 @@ PHASE 1: CONTEXT GATHERING (Main agent does this itself, NO reviewing)
 ═══════════════════════════════════════════════════════
 
 **EXECUTION FLOW:**
-  Phase 1.1 (collect file list) → spawn Phase 0 subagent → Phase 1.2–1.5 in parallel with Phase 0
+  1.0 (incremental check) → Phase 1.1 (collect file list) → spawn Phase 0 subagent → Phase 1.2–1.5 in parallel with Phase 0
+
+1.0 Check for a prior review (incremental mode — Mode 3 only, see 1.1)
+
+Before building the file list: if `.code-review/REPORT.md` exists, read its header for a `REVIEWED_COMMIT:` line.
+  - No `REVIEWED_COMMIT` found (older report, or file absent) → full review, skip the rest of 1.0.
+  - Found, `{prev_sha}` still resolvable (`git cat-file -e {prev_sha} 2>/dev/null`), and `{prev_sha}` != current HEAD → incremental mode:
+      Copy the existing report first (before this run overwrites it): `cp .code-review/REPORT.md .code-review/REPORT.prev.md`
+      `git diff --name-status {prev_sha}...HEAD` → files changed SINCE the last review
+      When building the file list in 1.1, tag each file:
+        changed since `{prev_sha}` → `[NEW-SINCE-LAST-REVIEW]`
+        unchanged since `{prev_sha}` but still present in the current base...HEAD diff → `[CARRIED-FORWARD]`
+      Phase 1.4 groups ONLY `[NEW-SINCE-LAST-REVIEW]` files (plus their dependencies) for Phase 2. `[CARRIED-FORWARD]` files skip Phase 2 — Phase 3.1b copies their prior findings from `REPORT.prev.md` instead of re-reviewing them.
+  - Found and `{prev_sha}` == current HEAD (re-run with nothing new) → skip Phase 0/2/4 entirely, copy `REPORT.md` forward unchanged with a prepended note `No changes since last review ({prev_sha[:8]})`, stop.
+
+This only applies to MODE 3 (branch/commit diff). `--path` and `--since` modes always run a full review — there is no single "previous commit" to diff against.
 
 1.1 Determine the changes
 
@@ -126,8 +141,9 @@ Auto-detect `base_branch` when `--base` is absent (not applicable with `--path`)
 Get the file list:
 
   MODE 1 — `--path` (review by domain/directory):
+    Extensions to scan = source extensions of every language present in the repo-profile §3 tally (e.g. TypeScript(12) → *.ts *.tsx; Python(3) → *.py; Go → *.go; Rust → *.rs; Java/Kotlin → *.java *.kt). Tally not resolved yet → resolve it first (repo-profile §3), then use the result here.
     For EACH path in `--path`:
-      `find {path} -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \)`
+      `find {path} -type f \( -name "*.{ext1}" -o -name "*.{ext2}" ... \)`  (one `-o -name` clause per extension resolved above)
     Union all results → exclude `--exclude` patterns
     Mark the STATUS of all files as [EXISTING] (no distinction between M/A/D)
     CONTEXT.txt header: `PATH REVIEW: {paths}  (not using git diff)`
@@ -155,6 +171,14 @@ Read the ENTIRE ~/.claude/CLAUDE.md. Extract EVERY rule into a numbered list.
 
 1.3 Build the dependency graph
 
+Import-search pattern by language (from the repo-profile §3 tally resolved in 1.1) — substitute {module} with the changed file's module name/basename (no extension):
+  TypeScript/JavaScript → `from ['"].*{module}['"]` or `require\(.*{module}\)`
+  Python                → `from .*{module} import` or `^import {module}`
+  Go                    → `"{import_path}"` inside an `import (...)` block
+  Rust                  → `use .*{module}`
+  Java/Kotlin           → `import .*\.{ClassName}`
+  Other / no match      → skip the import-syntax grep, use the exported-symbol grep below only
+
 For EACH changed file, determine:
 - Upstream: files it imports (including type imports)
 - Downstream: files that import it
@@ -162,9 +186,15 @@ For EACH changed file, determine:
 - Type definitions: interfaces/types it defines or consumes
 
 How to do this:
-- grep -r "from.*{filename}" --include="*.ts" --include="*.tsx" to find downstream
+- grep -r using the pattern above (matched to the file's language) to find downstream
 - Read the import section of every changed file to find upstream
 - Grep exported symbol names to find usage
+
+Coverage-confidence tag (grep-based wiring misses these — flag, don't try to resolve them):
+  - File sits under a directory with `index.ts`/`index.js`/`index.py` (barrel re-export) → tag `[heuristic-incomplete: barrel-reexport]`
+  - File/symbol carries a DI/framework marker (`@Injectable`, `@Controller`, `@Component`, `@Service`, Spring `@Autowired`, decorator-based route registration) → tag `[heuristic-incomplete: DI-wiring]`
+  - Framework = Next.js/Nuxt/SvelteKit/Remix (file-based routing — no import ties the route to its caller) → tag `[heuristic-incomplete: file-based-routing]`
+  Write the tag next to the file's dependency entry in CONTEXT.txt (1.5 output). Phase 2 subagents seeing a tagged file MUST widen their manual read (check the barrel index / DI module / route registration) instead of trusting the grep-derived edge list alone.
 
 1.3d Regression risk mapping
 
@@ -190,6 +220,15 @@ Automatically exclude files matching the following patterns — do NOT review th
 
 Write the list of auto-excluded files into the CONTEXT.txt "BOILERPLATE SKIPPED" section (for transparency).
 
+1.3c Trivial-diff / empty-after-filter early exit
+
+Empty-after-filter: if the file list is empty after 1.3b (every changed file was boilerplate, or the diff itself is empty) → skip Phase 0, 2, 3, 4 entirely. Write `.code-review/REPORT.md` with just the header block, `TOTAL ISSUES: 0`, and a one-line note "No reviewable files (all changes were boilerplate/docs)". Stop — do not spawn any subagent.
+
+Comment/whitespace-only files: for each remaining file, check whether every changed hunk is comment or whitespace only:
+  `git diff -U0 {base_branch}...{entry} -- {file} | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vE '^[+-]\s*(//|#|\*|/\*|"""|--)'`
+  Empty result → the file's diff is comment/whitespace-only. Tag it `[COMMENT-ONLY]` in CONTEXT.txt, exclude it from 1.4 grouping (it still appears in "FILES NOT REVIEWED" in the final report, not silently dropped), and don't count it toward the >20-files / <5-files thresholds in GENERAL RULES.
+  Best-effort only — skip this check for a file whose language has no comment-syntax match above, never block the review on it.
+
 1.4 Group the files
 
 Group files based on the following principles:
@@ -210,6 +249,7 @@ BRANCHES REVIEWED: {branch1}, {branch2}, ...  →  BASE: {base_branch}
   [or: SINCE: {duration}  |  or: HEAD → {base_branch}]
 TOTAL CHANGED FILES: {count} (user-excluded: {excluded_patterns_or_none})
 PROFILE: lang={tally, e.g. TypeScript(12) Python(2)} · framework={framework} · host={host_mode} · pm={pm}
+INCREMENTAL: {no  |  yes, since {prev_sha[:8]} — {N} new, {M} carried forward}
 
 BOILERPLATE SKIPPED (auto):
   {list of auto-filtered files, or "none"}
@@ -379,6 +419,10 @@ After ALL subagents have completed:
 
   Read EVERY .code-review/{GROUP}.txt file.
 
+3.1b Carry forward (incremental mode only, per 1.0)
+
+  For every file tagged `[CARRIED-FORWARD]` in CONTEXT.txt: read its entry from `.code-review/REPORT.prev.md`, copy its CRITICAL/WARNING/SUGGESTION items into this run's working set, and append `(carried forward from previous review)` to each. Do not re-review these files in Phase 2 — they were already skipped there per 1.0.
+
 3.2 Cross-check
 
   Verify:
@@ -407,6 +451,7 @@ FILES CHANGED: X (excluded: {excluded_patterns_or_none})
 GROUPS REVIEWED: N
 TOTAL ISSUES: M (Critical: A, Warning: B, Suggestion: C)
 REVIEW CONFIDENCE: {HIGH/MEDIUM/LOW} — {reason}
+REVIEWED_COMMIT: {current HEAD sha}  [previous: {prev_sha[:8] or "none"}]
 
 ────────────────────────────────────────
 CRITICAL ISSUES (fix before merge)
@@ -534,7 +579,22 @@ ABSOLUTELY DO NOT:
 
 
 ═══════════════════════════════════════════════════════
-PHASE 5: LINT HARVEST (1 subagent, after Phase 4)
+PHASE 4.5: MAIN AGENT SPOT-CHECK (no subagent — runs whenever Phase 4 found NEW issues)
+═══════════════════════════════════════════════════════
+
+Purpose: ADVERSARIAL.txt is a single subagent's single pass — nothing verifies it before it lands in REPORT.md. Close that gap without spawning another subagent.
+
+For EACH "NEW ISSUE" in ADVERSARIAL.txt:
+  1. Main agent (not a subagent) reads the cited file:line directly.
+  2. Confirm the code at that location actually matches the claimed issue — the attack vector is real and the line does what's claimed.
+  3. Match confirmed → merge into REPORT.md as normal.
+  4. Match fails (line doesn't exist, code doesn't match the claim, attack vector doesn't apply) → drop the finding, note it in REPORT.md's CONFIDENCE NOTES: "Adversarial finding '{title}' dropped — {reason}".
+
+This is a read-only spot-check (no re-analysis, no new grep) — cost is a handful of Read calls, not a new agent spawn.
+
+
+═══════════════════════════════════════════════════════
+PHASE 5: LINT HARVEST (1 subagent, after Phase 4.5)
 ═══════════════════════════════════════════════════════
 
 Purpose: extract grep-detectable + generic violations from the review just completed → create/update lint rules to auto-detect them in future reviews.
@@ -695,7 +755,10 @@ GENERAL RULES
    - Performs the exact same 3-pass process as in the subagent prompt
    - Writes the result into .code-review/{GROUP_NAME}.txt with header: [REVIEWED BY: MAIN AGENT — subagent failed]
    - Writes into REPORT.md's CONFIDENCE NOTES section: "Group X reviewed by main agent — lower confidence than subagent review"
-7. Phase 5 (Lint Harvest) does NOT block merge — runs after Phase 4, its failure does not affect the main review result.
+7. Phase 5 (Lint Harvest) does NOT block merge — runs after Phase 4.5, its failure does not affect the main review result.
+8. Empty-after-filter or all-comment-only diffs (1.3c) → early exit, no subagent spawned.
+9. Incremental mode (1.0) applies only to Mode 3 diff review; `--path`/`--since` always run full.
+10. Phase 4.5 spot-check runs inline in the main agent — never spawn a subagent for it.
 
 ═══════════════════════════════════════════════════════
 NEXT STEPS
