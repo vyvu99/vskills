@@ -1,6 +1,6 @@
 ---
 name: vissues
-description: "Tạo/đồng bộ 1 GitHub epic issue + sub-issues từ 1 plan directory, dùng gh CLI + GraphQL addSubIssue. Nội dung issue phi kỹ thuật, migration được gộp vào sub-issue 1. Idempotent — chạy lại không tạo trùng."
+description: "Tạo/đồng bộ 1 GitHub epic issue + sub-issues từ 1 plan directory, dùng gh CLI + GraphQL addSubIssue. Nội dung issue phi kỹ thuật, migration được gộp vào sub-issue chứa nội dung phase 1. Idempotent — chạy lại không tạo trùng."
 argument-hint: "<plan-path>"
 user-invocable: true
 when_to_use: "Dùng khi cần tạo hoặc đồng bộ GitHub epic + sub-issues từ 1 plan có sẵn (plan.md + phase-XX-*.md)."
@@ -8,7 +8,7 @@ category: workflow
 keywords: [github, issues, epic, sub-issues, graphql]
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # vissues
@@ -60,7 +60,7 @@ Các lệnh này giả định đang ở full gh mode từ Bước 0; ở chế 
 
 ## Bước 3 — Tạo/cập nhật sub-issues
 
-1. Gom các phase của plan thành sub-issues theo mảng công việc — **KHÔNG** tạo mỗi phase nhỏ 1 sub-issue riêng; các phase liên quan (cùng layer, cùng feature slice) phải gộp vào 1 sub-issue. Tránh tạo quá nhiều issue.
+1. Gom các phase của plan thành sub-issues theo mảng công việc — **KHÔNG** tạo mỗi phase nhỏ 1 sub-issue riêng; các phase liên quan (cùng layer, cùng feature slice) phải gộp vào 1 sub-issue. Tránh tạo quá nhiều issue. Đặt title của mỗi sub-issue theo cách **deterministic**, suy ra trực tiếp từ số phase/mảng công việc mà nó bao phủ (ví dụ 1 template cố định như `<Tên mảng> (Phase N-M)`) — không phrase tự do có thể đổi khác giữa các lần chạy, để search dedupe ở bước 2 luôn khớp đúng title khi chạy lại.
 2. Với MỖI sub-issue định tạo — search trước để tránh trùng khi skill chạy lại (chế độ update):
    ```
    gh issue list --search "<planned title>" --state all --json number,title,url
@@ -73,8 +73,14 @@ Các lệnh này giả định đang ở full gh mode từ Bước 0; ở chế 
    ```
    gh issue create --title "<title, in English>" --body "<content, see Step 4>"
    ```
-4. Lấy node ID của sub-issue (query GraphQL tương tự Bước 2, thay `<number>`; `<owner>`/`<repo>` theo §2)
-5. Link nó với epic — **QUAN TRỌNG: chỉ gọi addSubIssue cho các sub-issue MỚI TẠO hoặc CHƯA được link**, bỏ qua bước này với các sub-issue đã link từ lần chạy trước:
+4. Lấy node ID của sub-issue **và** trạng thái link hiện tại của nó, trong 1 query GraphQL (`<owner>`/`<repo>` theo §2):
+   ```
+   gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id parent{id}}}}' -f owner=<owner> -f repo=<repo> -F number=<sub_issue_number>
+   ```
+   `parent.id` trong response (nếu có) là node ID của issue mà sub-issue này đang được link vào, nếu có.
+5. Link nó với epic — so sánh `parent.id` ở bước 4 với node ID của epic (từ Bước 2.5):
+   - Sub-issue mới tạo (response không có `parent`) HOẶC `parent.id` khác node ID của epic → gọi `addSubIssue`
+   - `parent.id` bằng node ID của epic → đã link từ lần chạy trước, **bỏ qua** — đây chính là cơ chế giúp chạy lại không tạo trùng link
    ```
    gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId}){issue{title}subIssue{title}}}' -f issueId=<epic_node_id> -f subIssueId=<sub_issue_node_id>
    ```
@@ -96,16 +102,16 @@ Ngôn ngữ đơn giản, phi kỹ thuật — không tên file, không tên hà
 
 ## Bước 5 — Ràng buộc về migration
 
-Nếu plan có thay đổi database → đưa TOÀN BỘ nội dung liên quan đến migration vào **sub-issue đầu tiên** (tương ứng với phase 1 của plan). KHÔNG rải nội dung migration ra nhiều sub-issue.
+Nếu plan có thay đổi database → đưa TOÀN BỘ nội dung liên quan đến migration vào **sub-issue chứa nội dung phase 1** (không nhất thiết là sub-issue tạo đầu tiên — Bước 3.1 gom nhóm theo mảng công việc, không theo thứ tự phase). KHÔNG rải nội dung migration ra nhiều sub-issue.
 
 ---
 
 ## Hard rules
 
 - Luôn search trước khi tạo (`gh issue list --search`) — tránh trùng epic/sub-issue khi chạy lại skill
-- Luôn lấy node ID qua query GraphQL TRƯỚC khi gọi `addSubIssue` — mutation cần global ID (chuỗi base64), không phải số issue
+- Luôn lấy node ID qua query GraphQL TRƯỚC khi gọi `addSubIssue` — mutation cần global ID (chuỗi base64), không phải số issue; field `parent{id}` trong cùng query cho biết sub-issue đã được link với epic chưa — bỏ qua `addSubIssue` nếu đã khớp
 - Ngôn ngữ issue luôn phải phi kỹ thuật — không thuật ngữ code, không tên file/hàm/table DB
-- Migration luôn đưa vào sub-issue 1, không bao giờ rải ra nhiều sub-issue
+- Migration luôn đưa vào sub-issue chứa nội dung phase 1, không bao giờ rải ra nhiều sub-issue
 - Không bao giờ tạo label mới (`epic` hay bất kỳ label nào khác) mà không xác nhận với user trước
 - Gộp các phase nhỏ liên quan thành 1 sub-issue — không tạo mỗi phase 1 issue riêng
 - KHÔNG BAO GIỜ abort chỉ vì thiếu `gh` hoặc remote không phải GitHub — degrade theo §2 và vẫn phải giao đủ nội dung issue

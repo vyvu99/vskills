@@ -1,16 +1,16 @@
 ---
 name: vreview
-description: "Reviewer code senior, thực hiện theo quy trình 4 phase: thu thập context + map rủi ro regression → subagent review song song (Pass 0: test spec, Pass 1-3: logic/rules/self-check) → tổng hợp cross-check → subagent adversarial (tấn công input/flow + phản biện bản tóm tắt). KHÔNG được bỏ qua bất kỳ phase nào."
+description: "Reviewer code senior, thực hiện 4 phase cốt lõi — thu thập context + map rủi ro regression → subagent review song song (Pass 0: test spec, Pass 1-3: logic/rules/self-check) → tổng hợp cross-check → subagent adversarial (tấn công input/flow + phản biện bản tóm tắt) — bao quanh bởi Phase 0 pre-scan tùy chọn và Phase 5 lint harvest tùy chọn, cộng thêm Phase 4.5 spot-check nhẹ. KHÔNG được bỏ qua bất kỳ phase nào."
 argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
 user-invocable: true
-when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase."
+when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase (kèm phase pre-scan và lint-harvest tùy chọn)."
 extends: code-review
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
-Extends skill nền `code-review`. Bạn là một reviewer code senior, thực hiện review qua 6 phase bên dưới (xây trên nền quy trình gốc). KHÔNG được bỏ qua bất kỳ phase nào.
+Extends skill nền `code-review`. Bạn là một reviewer code senior, thực hiện review qua 4 phase cốt lõi (1-4) bên dưới, bao quanh bởi Phase 0 pre-scan tùy chọn và Phase 5 lint harvest tùy chọn, cộng thêm Phase 4.5 spot-check nhẹ (xây trên nền quy trình gốc). KHÔNG được bỏ qua bất kỳ phase nào.
 
 ═══════════════════════════════════════════════════════
 PHASE 0: SCRIPT SCAN (Spawn subagent SAU KHI danh sách file đã sẵn sàng)
@@ -747,8 +747,8 @@ QUY TẮC CHUNG
 
 1. Mọi file .code-review/*.txt phải có timestamp tạo trong header
 2. Report cuối cùng PHẢI được ghi vào `.code-review/REPORT.md` — KHÔNG dùng `plans/reports/` (giữ tất cả artifact trong cùng một directory)
-3. Nếu diff có < 5 file VÀ không dùng mode `--path` → bỏ qua Phase 2, main agent review trực tiếp qua multi-pass (4 pass như mô tả trong prompt subagent) và ghi thẳng vào REPORT.md
-4. Nếu diff có > 20 file → tăng số group, tối đa 4 file mỗi group
+3. Nếu diff có < 5 file VÀ không dùng mode `--path` → bỏ qua Phase 2, main agent review trực tiếp qua multi-pass (4 pass như mô tả trong prompt subagent) và ghi thẳng vào REPORT.md. Ở incremental mode (1.0), số lượng này tính theo file `[NEW-SINCE-LAST-REVIEW]`, không phải tổng diff/carried-forward — file carried-forward không bao giờ quay lại Phase 2 bất kể ngưỡng này.
+4. Nếu diff có > 20 file → tăng số group, tối đa 4 file mỗi group. Ở incremental mode (1.0), số lượng này tính theo file `[NEW-SINCE-LAST-REVIEW]`, không phải tổng diff/carried-forward.
 5. KHÔNG lặp Phase 1 → 2 → 3 → 4. Chạy đúng một lần.
 6. Nếu một subagent fail hoặc timeout:
    - Main agent đọc các file của group đó

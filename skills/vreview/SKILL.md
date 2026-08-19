@@ -1,16 +1,16 @@
 ---
 name: vreview
-description: "Senior code reviewer following a 4-phase process: context gathering + regression mapping → parallel subagent review (Pass 0: test spec, Pass 1-3: logic/rules/self-check) → cross-check synthesis → adversarial subagent (attack input/flow + rebut the summary). Do NOT skip any phase."
+description: "Senior code reviewer running 4 core phases — context gathering + regression mapping → parallel subagent review (Pass 0: test spec, Pass 1-3: logic/rules/self-check) → cross-check synthesis → adversarial subagent (attack input/flow + rebut the summary) — bracketed by an optional Phase 0 pre-scan and Phase 5 lint harvest, plus a lightweight Phase 4.5 spot-check. Do NOT skip any phase."
 argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
 user-invocable: true
-when_to_use: "Invoke to review current branch diff or specific branches/paths with 4-phase subagent review."
+when_to_use: "Invoke to review current branch diff or specific branches/paths with a 4-phase subagent review (plus optional pre-scan and lint-harvest phases)."
 extends: code-review
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
-Extends the underlying `code-review` skill. You are a senior code reviewer, executing the review through the 6 phases below (built on top of the underlying process). Do NOT skip any phase.
+Extends the underlying `code-review` skill. You are a senior code reviewer, executing the review through 4 core phases (1-4) below, bracketed by an optional Phase 0 pre-scan and optional Phase 5 lint harvest, plus a lightweight Phase 4.5 spot-check (built on top of the underlying process). Do NOT skip any phase.
 
 ═══════════════════════════════════════════════════════
 PHASE 0: SCRIPT SCAN (Spawn subagent AFTER the file list is ready)
@@ -747,8 +747,8 @@ GENERAL RULES
 
 1. Every .code-review/*.txt file must have a creation timestamp in its header
 2. The final report MUST be written to `.code-review/REPORT.md` — do NOT use `plans/reports/` (keep all artifacts in the same directory)
-3. If the diff has < 5 files AND `--path` mode is not used → skip Phase 2, the main agent reviews it directly via multi-pass (4 passes as described in the subagent prompt) and writes straight into REPORT.md
-4. If the diff has > 20 files → increase the number of groups, max 4 files per group
+3. If the diff has < 5 files AND `--path` mode is not used → skip Phase 2, the main agent reviews it directly via multi-pass (4 passes as described in the subagent prompt) and writes straight into REPORT.md. In incremental mode (1.0), this count is the `[NEW-SINCE-LAST-REVIEW]` file count, not the total diff/carried-forward count — carried-forward files never re-enter Phase 2 regardless of this threshold.
+4. If the diff has > 20 files → increase the number of groups, max 4 files per group. In incremental mode (1.0), this count is the `[NEW-SINCE-LAST-REVIEW]` file count, not the total diff/carried-forward count.
 5. Do NOT loop Phase 1 → 2 → 3 → 4. Run exactly once.
 6. If a subagent fails or times out:
    - Main agent reads that group's files

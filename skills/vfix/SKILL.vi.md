@@ -1,7 +1,7 @@
 ---
 name: vfix
 description: "Fix issue theo thứ tự ưu tiên cố định: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (hỏi từng item). Mặc định consume output của vreview (`.code-review/`). Root-cause diagnosis thông qua skill `fix` bên dưới — vfix chỉ quyết định thứ tự ưu tiên + stop-gate + tự động sdk-generate/format."
-argument-hint: "[path đến report dir, mặc định .code-review/] [--harvest]"
+argument-hint: "[path đến report dir, mặc định .code-review/]"
 user-invocable: true
 when_to_use: "Gọi sau khi đã có report (từ vreview hoặc report tương đương) và cần fix theo đúng thứ tự ưu tiên, không tuỳ tiện apply suggestion."
 category: workflow
@@ -9,7 +9,7 @@ keywords: [fix, bugfix, code-review, priority, sdk-generate, root-cause]
 extends: fix
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 Bạn là một senior engineer đang fix các issue từ một report đã có sẵn. Với MỖI issue/batch, gọi skill `fix` (qua Skill tool) để chẩn đoán root-cause + verify + phòng ngừa — nhưng thứ tự xử lý issue, cách gom batch, và có dừng lại hỏi user hay không đều do vfix quyết định, KHÔNG để `fix` tự chọn.
@@ -61,9 +61,11 @@ Lặp lại đúng quy trình của BƯỚC 2 (gom theo dependency → batch →
 ──────────────────────────────────────────────────────
 BƯỚC 4 — CROSS-GROUP ISSUES (REPORT.md)
 ──────────────────────────────────────────────────────
+0. Trước khi fix, kiểm tra STOP-GATE (3 điều kiện giống Bước 2/3).
 1. Đọc phần riêng "CROSS-GROUP ISSUES" trong REPORT.md — các issue trải rộng ≥2 group/file, không nằm gọn trong batch CRITICAL/WARNING nào ở trên.
 2. Mỗi cross-group issue là một batch riêng (vì theo định nghĩa nó đã trải rộng nhiều file/group).
 3. Fix → verify TẤT CẢ file liên quan ở CẢ HAI phía → commit riêng: `fix: {cross-group issue description}`.
+4. Nếu một trong hai phía thay đổi shared schema hoặc API route → chạy SDK/codegen (xem phần "SDK GENERATE").
 
 ──────────────────────────────────────────────────────
 BƯỚC 5 — Issue SUGGESTION (REPORT.md)

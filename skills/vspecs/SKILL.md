@@ -9,7 +9,7 @@ argument-hint: "Feature: [feature name]\nCompare: [product name] (optional)"
 extends: brainstorm
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Specs Loop
@@ -80,7 +80,7 @@ After each round of 5 cases:
 
 ## Step 4 — Experience Specs
 
-Only do this after the user confirms there are no more edge cases to cover. Add a single section at the end of the specs file:
+Only do this after the user confirms there are no more edge cases to cover. Add the content into the `## Experience Specs` section (see template below — it sits before `## Open Questions`, not necessarily the file's last section):
 
 ```
 ### Experience Specs
@@ -105,7 +105,7 @@ When a new file is needed:
 
 ## Decisions
 
-| #  | Case | Decision |
+| ID | Case | Decision |
 | -- | ---- | ----------- |
 
 ---
@@ -127,11 +127,13 @@ When a new file is needed:
 1. ...
 ```
 
+The `ID` column reuses the same Type-Number scheme as Edge Cases (e.g. `UI-1`, `FLOW-3`) — `vplan` references this exact value as `[Case ID]`.
+
 ---
 
 ## Hard rules
 
-- **Language:** plain Vietnamese — no technical jargon, no code snippets in the specs; understandable by non-technical readers
+- **Language:** resolve dynamically — check the project's `CLAUDE.md` for a `## Ngôn ngữ`/`## Language` section, then `~/.claude/CLAUDE.md`, else English (same resolution `repo-profile.md` §4 documents, doesn't require the file itself to be present) — no technical jargon, no code snippets in the specs; understandable by non-technical readers
 - If a technical concept must be mentioned → explain it immediately afterward in plain language, in parentheses
 - **No comparison** → drop the Compare field, focus on the gap between current code and expectation
 - **Verify before asking:** only ask a question when the code can't answer it — if the code already makes it clear, write it straight into Decisions

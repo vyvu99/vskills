@@ -11,7 +11,7 @@ Bộ skill Claude Code cá nhân — checklist theo phong cách riêng, đặt l
 | `vspecs` | Viết/cập nhật specs cho 1 tính năng qua vòng lặp brainstorm edge case | Bắt đầu feature mới, chưa có specs |
 | `vplan` | Lập plan implementation từ specs — so từng case với code hiện tại | Đã có specs, cần plan để code |
 | `vcook` | Implement theo checklist 9 bước: branch, test-first, SDK client, review, PR | Đã có plan (hoặc mô tả nhanh), cần code |
-| `vreview` | Code review 6-phase bằng subagent song song + adversarial pass | Cần review 1 branch/PR |
+| `vreview` | Code review 4-phase (+ pre-scan/lint-harvest tùy chọn) bằng subagent song song + adversarial pass | Cần review 1 branch/PR |
 | `vfix` | Fix issue từ report của `vreview` theo thứ tự ưu tiên cố định | Có report review cần fix |
 | `vcheck` | Typecheck + build song song cho JS/TS workspace (mọi package manager) | Check nhanh trước khi commit |
 | `vissues` | Tạo/update GitHub epic + sub-issues từ 1 plan | Cần track plan trên GitHub |
@@ -50,7 +50,7 @@ flowchart LR
 /vreview
 /vfix
 ```
-→ specs → plan (migration gộp 1 phase) → code + test + PR → review 6-phase → fix theo priority.
+→ specs → plan (migration gộp 1 phase) → code + test + PR → review 4-phase → fix theo priority.
 
 **Fix nhanh 1 bug, không cần plan:**
 ```bash
@@ -167,8 +167,9 @@ git add . && git commit -m "feat: add <skill-name> skill"
 ```
 
 **Thêm lint rule sau khi `vreview` Phase 5 harvest:**
+
+Phase 5 đã ghi (và chmod) rule script mới/cập nhật thẳng vào thư mục `~/.claude/scripts/lint-rules/rules/` — symlink từ `scripts/lint-rules/rules/` trong repo này khi cài với `--with-scripts`. Không cần bước `cp`, chỉ cần commit những gì đã có sẵn:
 ```bash
-cp .code-review/staged-lint-rules/*.sh scripts/lint-rules/rules/
 git add . && git commit -m "feat(lint): add <rule-name> rule"
 git push
 ```
