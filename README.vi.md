@@ -15,7 +15,7 @@ Bộ skill Claude Code cá nhân — checklist theo phong cách riêng, đặt l
 | `vfix` | Fix issue từ report của `vreview` theo thứ tự ưu tiên cố định | Có report review cần fix |
 | `vcheck` | Typecheck + build song song cho JS/TS workspace (mọi package manager) | Check nhanh trước khi commit |
 | `vissues` | Tạo/update GitHub epic + sub-issues từ 1 plan | Cần track plan trên GitHub |
-| `vdesign` | Redesign UI/UX theo thẩm mỹ cá nhân (5 mức độ sâu `--L1`-`--L5`, cộng thêm `--bold`) | Cần nâng cấp UI 1 page/component |
+| `vdesign` | Redesign UI/UX theo thẩm mỹ cá nhân (3 mức độ sâu `--L1`-`--L3`, cộng thêm `--bold`) | Cần nâng cấp UI 1 page/component |
 | `vrules` | Rút pattern từ PR review của bot → đề xuất rule mới cho CLAUDE.md | Bot vừa review xong 1 PR |
 | `vmigrate-rollback` | Rollback 1 migration trên DB local + xoá tracking record | Cần undo 1 migration ở local |
 

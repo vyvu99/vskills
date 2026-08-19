@@ -15,7 +15,7 @@ Personal Claude Code skills — opinionated checklists layered on top of everyda
 | `vfix` | Fix issues from a `vreview` report in a fixed priority order | Have a review report that needs fixing |
 | `vcheck` | Typecheck + build in parallel across a JS/TS workspace (any package manager) | Quick check before committing |
 | `vissues` | Create/update a GitHub epic + sub-issues from a plan | Need to track a plan on GitHub |
-| `vdesign` | Redesign UI/UX to a personal aesthetic (5 depth levels `--L1`-`--L5`, plus `--bold`) | Need to upgrade a page/component's UI |
+| `vdesign` | Redesign UI/UX to a personal aesthetic (3 depth levels `--L1`-`--L3`, plus `--bold`) | Need to upgrade a page/component's UI |
 | `vrules` | Extract patterns from a bot's PR review → propose a new CLAUDE.md rule | A bot just finished reviewing a PR |
 | `vmigrate-rollback` | Roll back a migration on a local DB + delete its tracking record | Need to undo a migration locally |
 
