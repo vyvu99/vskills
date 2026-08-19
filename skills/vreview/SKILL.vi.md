@@ -48,7 +48,22 @@ PHASE 1: THU THẬP CONTEXT (Main agent tự làm, KHÔNG review)
 ═══════════════════════════════════════════════════════
 
 **LUỒNG THỰC THI:**
-  Phase 1.1 (thu thập danh sách file) → spawn subagent Phase 0 → Phase 1.2–1.5 chạy song song với Phase 0
+  1.0 (check incremental) → Phase 1.1 (thu thập danh sách file) → spawn subagent Phase 0 → Phase 1.2–1.5 chạy song song với Phase 0
+
+1.0 Check review trước đó (incremental mode — chỉ Mode 3, xem 1.1)
+
+Trước khi build file list: nếu `.code-review/REPORT.md` đã tồn tại, đọc header tìm dòng `REVIEWED_COMMIT:`.
+  - Không có `REVIEWED_COMMIT` (report cũ, hoặc file chưa tồn tại) → full review, bỏ qua phần còn lại của 1.0.
+  - Có, `{prev_sha}` vẫn resolve được (`git cat-file -e {prev_sha} 2>/dev/null`), và `{prev_sha}` != HEAD hiện tại → incremental mode:
+      Copy report cũ trước khi bị ghi đè: `cp .code-review/REPORT.md .code-review/REPORT.prev.md`
+      `git diff --name-status {prev_sha}...HEAD` → file đã đổi KỂ TỪ lần review trước
+      Khi build file list ở 1.1, gắn tag mỗi file:
+        đổi kể từ `{prev_sha}` → `[NEW-SINCE-LAST-REVIEW]`
+        không đổi kể từ `{prev_sha}` nhưng vẫn nằm trong diff base...HEAD hiện tại → `[CARRIED-FORWARD]`
+      Phase 1.4 chỉ nhóm file `[NEW-SINCE-LAST-REVIEW]` (kèm dependency) cho Phase 2. File `[CARRIED-FORWARD]` bỏ qua Phase 2 — Phase 3.1b copy finding cũ từ `REPORT.prev.md` thay vì review lại.
+  - Có và `{prev_sha}` == HEAD hiện tại (chạy lại mà không có gì mới) → bỏ qua Phase 0/2/4 hoàn toàn, copy `REPORT.md` nguyên vẹn kèm note đầu file `No changes since last review ({prev_sha[:8]})`, dừng lại.
+
+Chỉ áp dụng cho MODE 3 (diff branch/commit). Mode `--path` và `--since` luôn review full — không có "commit trước đó" nào để diff.
 
 1.1 Xác định các thay đổi
 
@@ -126,8 +141,9 @@ Auto-detect `base_branch` khi thiếu `--base` (không áp dụng khi dùng `--p
 Lấy danh sách file:
 
   MODE 1 — `--path` (review theo domain/directory):
+    Extension cần scan = extension nguồn của mọi ngôn ngữ có mặt trong tally §3 repo-profile (vd: TypeScript(12) → *.ts *.tsx; Python(3) → *.py; Go → *.go; Rust → *.rs; Java/Kotlin → *.java *.kt). Chưa resolve tally → resolve trước (repo-profile §3), rồi mới dùng kết quả ở đây.
     Với MỖI path trong `--path`:
-      `find {path} -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \)`
+      `find {path} -type f \( -name "*.{ext1}" -o -name "*.{ext2}" ... \)`  (1 clause `-o -name` cho mỗi extension đã resolve ở trên)
     Union tất cả kết quả → loại trừ các pattern `--exclude`
     Đánh dấu STATUS của tất cả file là [EXISTING] (không phân biệt M/A/D)
     Header CONTEXT.txt: `PATH REVIEW: {paths}  (not using git diff)`
@@ -155,6 +171,14 @@ Khi union nhiều branch, ghi chú file đó đến từ branch nào:
 
 1.3 Xây dựng dependency graph
 
+Pattern tìm import theo ngôn ngữ (dựa vào tally §3 repo-profile đã resolve ở bước 1.1) — thay {module} bằng tên module/basename của file đã đổi (bỏ extension):
+  TypeScript/JavaScript → `from ['"].*{module}['"]` hoặc `require\(.*{module}\)`
+  Python                → `from .*{module} import` hoặc `^import {module}`
+  Go                    → `"{import_path}"` trong block `import (...)`
+  Rust                  → `use .*{module}`
+  Java/Kotlin           → `import .*\.{ClassName}`
+  Khác / không match    → bỏ qua grep theo cú pháp import, chỉ dùng grep exported-symbol bên dưới
+
 Với MỖI file thay đổi, xác định:
 - Upstream: các file nó import (kể cả type import)
 - Downstream: các file import nó
@@ -162,9 +186,15 @@ Với MỖI file thay đổi, xác định:
 - Type definitions: interface/type nó định nghĩa hoặc dùng
 
 Cách làm:
-- grep -r "from.*{filename}" --include="*.ts" --include="*.tsx" để tìm downstream
+- grep -r dùng pattern ở trên (khớp với ngôn ngữ của file) để tìm downstream
 - Đọc phần import của mọi file đã thay đổi để tìm upstream
 - Grep tên symbol được export để tìm nơi sử dụng
+
+Tag coverage-confidence (wiring dạng grep-based sẽ miss các case này — chỉ gắn tag, không cố resolve):
+  - File nằm trong directory có `index.ts`/`index.js`/`index.py` (barrel re-export) → tag `[heuristic-incomplete: barrel-reexport]`
+  - File/symbol mang marker DI/framework (`@Injectable`, `@Controller`, `@Component`, `@Service`, Spring `@Autowired`, đăng ký route bằng decorator) → tag `[heuristic-incomplete: DI-wiring]`
+  - Framework = Next.js/Nuxt/SvelteKit/Remix (file-based routing — không có import nào nối route với caller) → tag `[heuristic-incomplete: file-based-routing]`
+  Ghi tag cạnh dependency entry của file đó trong CONTEXT.txt (output 1.5). Subagent Phase 2 thấy file bị tag PHẢI đọc rộng hơn (kiểm tra barrel index / module DI / route registration) thay vì tin tuyệt đối vào edge list từ grep.
 
 1.3d Map rủi ro regression
 
@@ -190,6 +220,15 @@ Tự động loại trừ các file khớp pattern sau — KHÔNG review chúng:
 
 Ghi danh sách file bị auto-exclude vào phần "BOILERPLATE SKIPPED" của CONTEXT.txt (để minh bạch).
 
+1.3c Early exit cho diff trivial / rỗng sau khi filter
+
+Rỗng sau khi filter: nếu file list rỗng sau 1.3b (mọi file thay đổi đều là boilerplate, hoặc diff vốn rỗng) → bỏ qua Phase 0, 2, 3, 4 hoàn toàn. Ghi `.code-review/REPORT.md` chỉ với header block, `TOTAL ISSUES: 0`, và note 1 dòng "No reviewable files (all changes were boilerplate/docs)". Dừng lại — không spawn subagent nào.
+
+File chỉ đổi comment/whitespace: với mỗi file còn lại, check xem mọi hunk thay đổi có phải chỉ comment/whitespace không:
+  `git diff -U0 {base_branch}...{entry} -- {file} | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vE '^[+-]\s*(//|#|\*|/\*|"""|--)'`
+  Kết quả rỗng → diff của file đó chỉ đổi comment/whitespace. Tag `[COMMENT-ONLY]` trong CONTEXT.txt, loại khỏi grouping ở 1.4 (vẫn xuất hiện trong "FILES NOT REVIEWED" của báo cáo cuối, không âm thầm bỏ), và không tính vào ngưỡng >20-file / <5-file ở GENERAL RULES.
+  Chỉ best-effort — bỏ qua check này với ngôn ngữ không match cú pháp comment nào ở trên, không bao giờ block review vì nó.
+
 1.4 Group các file
 
 Group file theo các nguyên tắc sau:
@@ -210,6 +249,7 @@ BRANCHES REVIEWED: {branch1}, {branch2}, ...  →  BASE: {base_branch}
   [hoặc: SINCE: {duration}  |  hoặc: HEAD → {base_branch}]
 TOTAL CHANGED FILES: {count} (user-excluded: {excluded_patterns_or_none})
 PROFILE: lang={tally, vd TypeScript(12) Python(2)} · framework={framework} · host={host_mode} · pm={pm}
+INCREMENTAL: {no  |  yes, kể từ {prev_sha[:8]} — {N} mới, {M} carried forward}
 
 BOILERPLATE SKIPPED (auto):
   {danh sách file bị lọc tự động, hoặc "none"}
@@ -379,6 +419,10 @@ Sau khi TẤT CẢ subagent đã hoàn thành:
 
   Đọc MỌI file .code-review/{GROUP}.txt.
 
+3.1b Carry forward (chỉ incremental mode, theo 1.0)
+
+  Với mỗi file tag `[CARRIED-FORWARD]` trong CONTEXT.txt: đọc entry của nó từ `.code-review/REPORT.prev.md`, copy các item CRITICAL/WARNING/SUGGESTION vào working set của lần chạy này, append `(carried forward from previous review)` vào mỗi item. KHÔNG review lại các file này ở Phase 2 — đã bị skip từ 1.0.
+
 3.2 Cross-check
 
   Xác minh:
@@ -407,6 +451,7 @@ FILES CHANGED: X (excluded: {excluded_patterns_or_none})
 GROUPS REVIEWED: N
 TOTAL ISSUES: M (Critical: A, Warning: B, Suggestion: C)
 REVIEW CONFIDENCE: {HIGH/MEDIUM/LOW} — {lý do}
+REVIEWED_COMMIT: {sha HEAD hiện tại}  [previous: {prev_sha[:8] hoặc "none"}]
 
 ────────────────────────────────────────
 CRITICAL ISSUES (fix trước khi merge)
@@ -534,7 +579,22 @@ TUYỆT ĐỐI KHÔNG:
 
 
 ═══════════════════════════════════════════════════════
-PHASE 5: LINT HARVEST (1 subagent, sau Phase 4)
+PHASE 4.5: MAIN AGENT SPOT-CHECK (không cần subagent — chạy khi Phase 4 tìm được vấn đề MỚI)
+═══════════════════════════════════════════════════════
+
+Mục đích: ADVERSARIAL.txt là 1 pass duy nhất của 1 subagent — không có gì xác minh lại trước khi nó vào REPORT.md. Bịt lỗ hổng này mà không cần spawn thêm subagent.
+
+Với MỖI "NEW ISSUE" trong ADVERSARIAL.txt:
+  1. Main agent (không phải subagent) đọc trực tiếp file:line được trích dẫn.
+  2. Xác nhận code tại vị trí đó thực sự khớp với vấn đề được nêu — attack vector là thật và dòng code làm đúng như bị cáo buộc.
+  3. Khớp → merge vào REPORT.md như bình thường.
+  4. Không khớp (dòng không tồn tại, code không khớp claim, attack vector không áp dụng được) → bỏ finding đó, ghi chú vào CONFIDENCE NOTES của REPORT.md: "Adversarial finding '{title}' dropped — {lý do}".
+
+Đây là spot-check read-only (không phân tích lại, không grep mới) — chi phí chỉ vài lệnh Read, không phải spawn agent mới.
+
+
+═══════════════════════════════════════════════════════
+PHASE 5: LINT HARVEST (1 subagent, sau Phase 4.5)
 ═══════════════════════════════════════════════════════
 
 Mục đích: trích xuất các vi phạm có thể grep-detect + generic từ review vừa hoàn thành → tạo/cập nhật lint rule để tự động phát hiện chúng trong các lần review sau.
@@ -695,7 +755,10 @@ QUY TẮC CHUNG
    - Thực hiện đúng quy trình 3-pass như trong prompt subagent
    - Ghi kết quả vào .code-review/{GROUP_NAME}.txt với header: [REVIEWED BY: MAIN AGENT — subagent failed]
    - Ghi vào phần CONFIDENCE NOTES của REPORT.md: "Group X reviewed by main agent — lower confidence than subagent review"
-7. Phase 5 (Lint Harvest) KHÔNG block merge — chạy sau Phase 4, việc nó fail không ảnh hưởng đến kết quả review chính.
+7. Phase 5 (Lint Harvest) KHÔNG block merge — chạy sau Phase 4.5, việc nó fail không ảnh hưởng đến kết quả review chính.
+8. Diff rỗng-sau-khi-filter hoặc toàn comment-only (1.3c) → early exit, không spawn subagent nào.
+9. Incremental mode (1.0) chỉ áp dụng cho Mode 3 diff review; `--path`/`--since` luôn chạy full.
+10. Phase 4.5 spot-check chạy inline trong main agent — không bao giờ spawn subagent cho nó.
 
 ═══════════════════════════════════════════════════════
 BƯỚC TIẾP THEO
