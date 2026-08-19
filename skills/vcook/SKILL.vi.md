@@ -6,15 +6,14 @@ user-invocable: true
 when_to_use: "Invoke để implement một feature/fix từ plan có sẵn hoặc từ mô tả nhanh — tự động tạo branch, viết test, code, review, chạy test, commit, và tạo PR."
 category: workflow
 keywords: [cook, implement, workflow, plan, sdk, commit, pr]
-extends: cook
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
-Trước tiên, invoke skill `cook` (dùng Skill tool, tên chính xác, không prefix) để chạy workflow implementation nền tảng. Sau đó, bạn là một senior engineer áp dụng checklist 9 bước bắt buộc dưới đây bên trên nó. KHÔNG được bỏ qua bước nào.
+Bạn là một senior engineer implement task này từ đầu đến cuối qua checklist 9 bước bắt buộc dưới đây. KHÔNG được bỏ qua bước nào.
 
-**TRƯỚC KHI BẮT ĐẦU:** Tạo checklist 9 bước bằng `TodoWrite` (mỗi item ứng với 1 bước). Sau khi hoàn thành mỗi bước → đánh dấu `completed` trước khi chuyển sang bước tiếp theo. KHÔNG đánh dấu completed trước khi công việc thực sự xong.
+**TRƯỚC KHI BẮT ĐẦU:** Tạo checklist 9 bước bằng `TodoWrite` (mỗi item ứng với 1 bước). Sau khi hoàn thành mỗi bước → đánh dấu `completed` trước khi chuyển sang bước tiếp theo. KHÔNG đánh dấu completed trước khi công việc thực sự xong. Ngoại lệ: bước 1 là rule áp dụng xuyên suốt các bước khác, không phải task 1 lần — giữ `in_progress` đến khi bước 9 xong, không đánh dấu completed sớm.
 
 ═══════════════════════════════════════════════════════
 BƯỚC 1: SONG SONG HOÁ VÀO SUBAGENT
@@ -110,7 +109,7 @@ Resolve VCS profile trước: đọc `~/.claude/skills/_vskills-shared/repo-prof
 **PR:**
 - Đọc `.github/pull_request_template.md` của project (nếu có) → PR body PHẢI theo đúng template đó. Nếu không có → dùng format mặc định hợp lý (Summary / Changes / Test plan).
 - Title: tiếng Anh, ngắn gọn.
-- Description: viết bằng ngôn ngữ giao tiếp của project (resolve theo `repo-profile.md` §4: CLAUDE.md của project → `~/.claude/CLAUDE.md` → tiếng Anh; nếu file không tồn tại thì mặc định tiếng Việt), không thuật ngữ kỹ thuật — dành cho người đọc không phải engineer, tập trung vào tác động user/business, không dùng code jargon.
+- Description: viết bằng ngôn ngữ giao tiếp của project — kiểm tra section `## Ngôn ngữ`/`## Language` trong `CLAUDE.md` của project, rồi tới `~/.claude/CLAUDE.md`, cuối cùng tiếng Anh (đúng cách resolve mà `repo-profile.md` §4 mô tả, không cần file đó thực sự tồn tại) — không thuật ngữ kỹ thuật, dành cho người đọc không phải engineer, tập trung vào tác động user/business, không dùng code jargon.
 - Full gh mode (theo §2) → tạo PR bằng `gh` như bình thường. Degraded/local-only → push branch, in thông báo §2 của vcook kèm title + body đã soạn đầy đủ để user tự paste vào UI của host — luôn soạn body ở cả 2 chế độ, không bỏ qua.
 - Nếu có GitHub issue liên quan (từ plan hoặc user cung cấp số issue):
   - Thêm `Closes #<issue>` ở ĐẦU PR body (plain text, hoạt động ở cả 2 chế độ)
@@ -126,7 +125,7 @@ Resolve VCS profile trước: đọc `~/.claude/skills/_vskills-shared/repo-prof
 - **Commit** → squash hợp lý theo logical change, KHÔNG spam nhiều commit nhỏ
 - **API call phía client** → LUÔN dùng generated SDK, raw fetch/axios CẤM; thiếu response schema → thêm schema + regenerate SDK trước khi viết code FE
 - **Scope** → bám sát chặt scope của plan/mô tả; improvement thêm → đề xuất, không tự ý mở rộng scope
-- **PR description** → ngôn ngữ resolve theo §4 (CLAUDE.md project → CLAUDE.md global → tiếng Anh; tiếng Việt nếu `repo-profile.md` không tồn tại), không thuật ngữ kỹ thuật, theo đúng `.github/pull_request_template.md` nếu có
+- **PR description** → ngôn ngữ resolve theo `repo-profile.md` §4 (CLAUDE.md project → CLAUDE.md global → tiếng Anh), không thuật ngữ kỹ thuật, theo đúng `.github/pull_request_template.md` nếu có
 - **Test-first** → bắt buộc với API/backend logic, không bắt buộc với pure UI (phải ghi rõ lý do khi bỏ qua)
 
 ## Bước tiếp theo

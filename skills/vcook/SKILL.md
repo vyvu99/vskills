@@ -6,15 +6,14 @@ user-invocable: true
 when_to_use: "Invoke to implement a feature/fix from an existing plan or a quick description — auto-creates the branch, writes tests, codes, reviews, runs tests, commits, and creates a PR."
 category: workflow
 keywords: [cook, implement, workflow, plan, sdk, commit, pr]
-extends: cook
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
-First, invoke the `cook` skill (Skill tool, exact name, no prefix) to run the underlying implementation workflow. After that, you are a senior engineer applying the mandatory 9-step checklist below on top of it. Do NOT skip any step.
+You are a senior engineer implementing this task end-to-end via the mandatory 9-step checklist below. Do NOT skip any step.
 
-**BEFORE YOU START:** Create a 9-step checklist with `TodoWrite` (one item per step). After finishing each step → mark it `completed` before moving to the next. Do NOT mark completed before the work is actually done.
+**BEFORE YOU START:** Create a 9-step checklist with `TodoWrite` (one item per step). After finishing each step → mark it `completed` before moving to the next. Do NOT mark completed before the work is actually done. Exception: Step 1 is a standing rule applied across every other step, not a one-time task — keep it `in_progress` until Step 9 completes, don't mark it `completed` early.
 
 ═══════════════════════════════════════════════════════
 STEP 1: PARALLELIZE INTO SUBAGENTS
@@ -110,7 +109,7 @@ Resolve the VCS profile first: read `~/.claude/skills/_vskills-shared/repo-profi
 **PR:**
 - Read the project's `.github/pull_request_template.md` (if it exists) → the PR body MUST follow that template exactly. If it doesn't exist → use a sensible default format (Summary / Changes / Test plan).
 - Title: English, concise.
-- Description: written in the project's communication language (resolve per `repo-profile.md` §4: project `CLAUDE.md` → `~/.claude/CLAUDE.md` → English; if the file is absent, Vietnamese), non-technical — for readers who aren't engineers, focused on user/business impact, no code jargon.
+- Description: written in the project's communication language — check for a `## Ngôn ngữ`/`## Language` section in the project's `CLAUDE.md`, then `~/.claude/CLAUDE.md`, else English (same resolution `repo-profile.md` §4 documents, doesn't require the file itself to be present) — non-technical, for readers who aren't engineers, focused on user/business impact, no code jargon.
 - Full gh mode (per §2) → create the PR with `gh` as usual. Degraded/local-only → push the branch, print the §2 vcook message plus the fully composed title and body so the user pastes it into their host's UI — compose the body in both modes, never skip it.
 - If there's a related GitHub issue (from the plan or provided by the user as an issue number):
   - Add `Closes #<issue>` at the TOP of the PR body (plain text, works in both modes)
@@ -126,7 +125,7 @@ Resolve the VCS profile first: read `~/.claude/skills/_vskills-shared/repo-profi
 - **Commit** → squash sensibly by logical change, do NOT spam many small commits
 - **Client-side API calls** → ALWAYS use the generated SDK, raw fetch/axios FORBIDDEN; missing response schema → add the schema + regenerate the SDK before writing FE code
 - **Scope** → stick strictly to the plan/description's scope; further improvements → propose them, don't expand scope unilaterally
-- **PR description** → in the §4-resolved language (project CLAUDE.md → global CLAUDE.md → English; Vietnamese if `repo-profile.md` is absent), non-technical, following `.github/pull_request_template.md` exactly if it exists
+- **PR description** → in the resolved language (project CLAUDE.md → global CLAUDE.md → English, per `repo-profile.md` §4), non-technical, following `.github/pull_request_template.md` exactly if it exists
 - **Test-first** → mandatory for API/backend logic, not mandatory for pure UI (must state the reason clearly when skipped)
 
 ## Next steps

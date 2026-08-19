@@ -1,14 +1,14 @@
 ---
 name: vcheck
-description: "Chạy typecheck + build (+ test tùy chọn) song song cho toàn bộ hoặc một phần package trong repo JS/TS (monorepo hoặc single package). Tự động phát hiện package trong workspace và package manager, không hardcode tên package."
-argument-hint: "[package-names...]"
+description: "Chạy typecheck + build + format (+ test tùy chọn) song song cho toàn bộ hoặc một phần package trong repo JS/TS (monorepo hoặc single package). Tự động phát hiện package trong workspace và package manager, không hardcode tên package."
+argument-hint: "[package-names...] [--test]"
 user-invocable: true
 when_to_use: "Dùng khi cần typecheck/build (và test) nhanh cho toàn bộ repo hoặc một nhóm package trong monorepo JS/TS (hoặc single package) trước khi commit/PR."
 category: workflow
 keywords: [typecheck, build, tsc, pnpm, npm, yarn, bun, monorepo, ci]
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # vcheck
@@ -29,6 +29,7 @@ $ARGUMENTS
 
 ## Bước 0 — Xác định danh sách package
 
+- Nếu `$ARGUMENTS` chứa `--test`, coi đó là cờ yêu cầu chạy test (xem Bước 4) và loại bỏ nó trước khi parse tên package
 - Nếu `$ARGUMENTS` chứa danh sách tên package → dùng đúng danh sách đó, bỏ qua auto-detect
 - Nếu rỗng → auto-detect toàn bộ workspace:
   1. Dùng workspace shape từ Bước -1. **Single-package** → danh sách package chỉ là root package; bỏ qua resolve glob, đi thẳng sang Bước 1. **Monorepo** → tiếp tục với glob pattern từ `pnpm-workspace.yaml` (hoặc field `workspaces` trong `package.json` gốc):
@@ -53,6 +54,7 @@ Spawn tất cả package trước, rồi mới `wait` — KHÔNG chạy tuần t
 Sau `wait`, đọc từng `/tmp/tsc-<package>.log`:
 - Không có lỗi → báo pass
 - Có lỗi → trích xuất file:line + message cụ thể, fix, rồi recheck **chỉ package vừa fix** (chạy lại đúng 1 lệnh tsc cho package đó, không chạy lại toàn bộ danh sách)
+- Nếu package không có `tsconfig.json`, coi lỗi đó là "không có config typecheck" chứ không phải lỗi type, và skip/báo cáo tương ứng thay vì coi đó là bug trong code
 
 ## Bước 2 — Build song song
 
@@ -70,7 +72,7 @@ Spawn tất cả → `wait` → parse log từng package (pass/fail). Package fa
 
 Đọc scripts trong `package.json` gốc, tìm format script (`format`, `format:fix`, ...) theo thứ tự ưu tiên đó, chạy script đầu tiên tìm thấy qua root template từ Bước -1 (`pnpm exec <script>` / `npm exec -- <script>` / `yarn <script>` / `bun <script>`).
 
-## Bước 4 — Test (chỉ khi user yêu cầu hoặc chỉ định qua argument)
+## Bước 4 — Test (chỉ khi user yêu cầu hoặc `$ARGUMENTS` chứa `--test`)
 
 - Xác định test script trong `package.json` của từng package cần test — ưu tiên non-watch mode (`test:run`, `test:ci`, `test -- --run`, ...) hơn plain `test` nếu nghi ngờ mặc định là watch mode
 - Chạy background + `wait`, giống bước 1-2

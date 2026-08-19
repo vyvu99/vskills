@@ -1,6 +1,6 @@
 ---
 name: vissues
-description: "Create/update a GitHub epic issue + sub-issues from 1 plan directory, using gh CLI + GraphQL addSubIssue. Issue content is non-technical, migrations are consolidated into sub-issue 1. Idempotent — re-running does not create duplicates."
+description: "Create/update a GitHub epic issue + sub-issues from 1 plan directory, using gh CLI + GraphQL addSubIssue. Issue content is non-technical, migrations are consolidated into the sub-issue containing phase 1's content. Idempotent — re-running does not create duplicates."
 argument-hint: "<plan-path>"
 user-invocable: true
 when_to_use: "Invoke when you need to create or sync a GitHub epic + sub-issues from an existing plan (plan.md + phase-XX-*.md)."
@@ -8,7 +8,7 @@ category: workflow
 keywords: [github, issues, epic, sub-issues, graphql]
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # vissues
@@ -60,7 +60,7 @@ These commands assume full gh mode from Step 0; in degraded mode, follow the man
 
 ## Step 3 — Create/update sub-issues
 
-1. Group the plan's phases into sub-issues by area of work — **DO NOT** create one sub-issue per small phase; related phases (same layer, same feature slice) should be merged into a single sub-issue. Avoid creating too many issues.
+1. Group the plan's phases into sub-issues by area of work — **DO NOT** create one sub-issue per small phase; related phases (same layer, same feature slice) should be merged into a single sub-issue. Avoid creating too many issues. Derive each sub-issue's title **deterministically** from the phase numbers/area it covers (e.g. a fixed template such as `<Area name> (Phase N-M)`) — not free-form phrasing that can vary between runs, so the dedupe search in step 2 reliably matches the same title on a re-run.
 2. For EACH sub-issue you plan to create — search first to avoid duplicates when the skill is re-run (update mode):
    ```
    gh issue list --search "<planned title>" --state all --json number,title,url
@@ -73,8 +73,14 @@ These commands assume full gh mode from Step 0; in degraded mode, follow the man
    ```
    gh issue create --title "<title, in English>" --body "<content, see Step 4>"
    ```
-4. Get the sub-issue's node ID (GraphQL query similar to Step 2, swap in `<number>`; `<owner>`/`<repo>` per §2)
-5. Link it to the epic — **IMPORTANT: only call addSubIssue for NEWLY CREATED sub-issues or ones NOT YET linked**, skip this step for sub-issues already linked from a previous run:
+4. Get the sub-issue's node ID **and** its current parent link, in one GraphQL query (`<owner>`/`<repo>` per §2):
+   ```
+   gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id parent{id}}}}' -f owner=<owner> -f repo=<repo> -F number=<sub_issue_number>
+   ```
+   The response's `parent.id` (when present) is the node ID of whatever issue this sub-issue is currently linked under, if any.
+5. Link it to the epic — compare `parent.id` from step 4 to the epic's node ID (from Step 2.5):
+   - Newly created sub-issue (no `parent` in the response) OR `parent.id` != epic node ID → call `addSubIssue`
+   - `parent.id` == epic node ID → already linked from a previous run, **skip** — this is what makes re-runs idempotent
    ```
    gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId}){issue{title}subIssue{title}}}' -f issueId=<epic_node_id> -f subIssueId=<sub_issue_node_id>
    ```
@@ -96,16 +102,16 @@ Plain, non-technical language — no file names, function names, DB table names,
 
 ## Step 5 — Migration constraint
 
-If the plan includes database changes → put ALL migration-related content into the **first sub-issue** (corresponding to phase 1 of the plan). DO NOT scatter migration content across multiple sub-issues.
+If the plan includes database changes → put ALL migration-related content into **the sub-issue containing phase 1's content** (not necessarily the first sub-issue created — Step 3.1 groups by area of work, not phase order). DO NOT scatter migration content across multiple sub-issues.
 
 ---
 
 ## Hard rules
 
 - Always search before creating (`gh issue list --search`) — avoid duplicate epic/sub-issues when re-running the skill
-- Always get the node ID via a GraphQL query BEFORE calling `addSubIssue` — the mutation needs a global ID (base64 string), not the issue number
+- Always get the node ID via a GraphQL query BEFORE calling `addSubIssue` — the mutation needs a global ID (base64 string), not the issue number; the same query's `parent{id}` field tells you if the sub-issue is already linked to the epic — skip `addSubIssue` when it matches
 - Issue language must always be non-technical — no code jargon, no file/function/DB table names
-- Migrations always go into sub-issue 1, never scattered across multiple sub-issues
+- Migrations always go into the sub-issue containing phase 1's content, never scattered across multiple sub-issues
 - Never create a new label (`epic` or otherwise) without confirming with the user first
 - Merge related small phases into 1 sub-issue — don't create one issue per phase
 - Never abort because `gh` is unavailable or the remote isn't GitHub — degrade per §2 and still deliver the issue bodies

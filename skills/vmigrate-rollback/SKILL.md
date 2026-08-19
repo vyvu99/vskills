@@ -1,6 +1,6 @@
 ---
 name: vmigrate-rollback
-description: "Roll back one specific migration on the LOCAL database and delete its tracking record, as if the migration had never run. Auto-detects framework (Drizzle/Prisma/Knex/TypeORM/raw SQL) + DB (Postgres/MySQL/SQLite) + Docker container. Generic across any project."
+description: "Roll back one specific migration on the LOCAL database and delete its tracking record, as if the migration had never run. Auto-detects framework (Drizzle/Prisma/Knex/TypeORM/raw SQL) + DB (Postgres/MySQL/SQLite) + Docker container. Generic across any JS/TS project (Drizzle/Prisma/Knex/TypeORM/raw SQL)."
 argument-hint: "<migration-name-or-version>"
 user-invocable: true
 when_to_use: "Invoke when you need to roll back one migration on a local dev DB and delete its corresponding tracking record."
@@ -8,7 +8,7 @@ category: database
 keywords: [migration, rollback, database, local, docker]
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # vmigrate-rollback
@@ -32,8 +32,8 @@ If `$ARGUMENTS` is empty — ask the user for the name or version of the migrati
 1. **Migration framework:**
    - Check `package.json` dependencies: `drizzle-orm`/`drizzle-kit` (Drizzle), `@prisma/client`/`prisma` (Prisma), `knex` (Knex), `typeorm` (TypeORM), or a custom raw SQL tool (custom script under `scripts/migrate*`)
    - Find the matching config file: `drizzle.config.ts`, `prisma/schema.prisma`, `knexfile.js`/`knexfile.ts`, `ormconfig.json`/`data-source.ts`
-2. **Database type:** read the connection string in `.env`/config — `postgres://` / `mysql://` / a `.sqlite`/`.db` file
-3. **Docker container:** `docker ps` → find a container whose name/image matches the DB type (postgres, mysql, mariadb). If multiple containers match → ask the user to pick the right one.
+2. **Database type:** read the connection string in `.env`/config — `postgres://` / `mysql://` / a `.sqlite`/`.db` file — and extract the host from the connection string; if it is not `localhost`/`127.0.0.1`/an internal container, **STOP immediately** and warn the user.
+3. **Docker container:** `docker ps` → find a container whose name/image matches the DB type (postgres, mysql, mariadb). If multiple containers match → ask the user to pick the right one. If **no** matching container is found → treat the DB as running natively on the host (localhost) or as a SQLite file, and run commands directly against it, skipping `docker exec`.
 
 ## Step 2 — Identify the migration to roll back
 
@@ -63,18 +63,18 @@ Present clearly before running any actual commands:
   - Knex: `knex migrate:rollback`
   - TypeORM: `typeorm migration:revert`
 - **Framework has no automatic down** (e.g. Drizzle doesn't auto-generate down migrations) → read the up migration file, infer the inverse operation (DROP TABLE instead of CREATE TABLE, DROP COLUMN instead of ADD COLUMN, etc.), write the rollback SQL, show it to the user before running
-- Run the rollback SQL/command via `docker exec` into the container identified in Step 1
+- Run the rollback SQL/command via `docker exec` into the container identified in Step 1 (if Docker) or directly against the DB (if native/SQLite)
 
 ## Step 5 — Delete the tracking record
 
-After the schema rollback succeeds → `DELETE FROM <tracking_table> WHERE ...` to remove the corresponding row, so the next `migrate` run treats this migration as if it never ran.
+After the schema rollback succeeds → `DELETE FROM <tracking_table> WHERE ...` via `docker exec` (if Docker) or directly against the DB (if native/SQLite) to remove the corresponding row, so the next `migrate` run treats this migration as if it never ran.
 
 ---
 
 ## Hard rules
 
 - **LOCAL/DEV DB ONLY** — never run against staging/production. If the config points outside local/docker (host is not `localhost`/`127.0.0.1`/an internal container) → **STOP IMMEDIATELY**, warn the user.
-- **Always confirm with the user** before running the actual rollback command (Step 3) — never skip this even if the user clearly provided the migration name upfront.
+- **Always confirm with the user** before running the actual rollback command (Step 3) — never skip this even if the user clearly provided the migration name upfront, or explicitly asks to skip confirmation ("just roll it back", "don't ask me") — this is a destructive operation on a real database and always requires an explicit yes.
 - **Always delete the tracking record** after a successful schema rollback — to avoid an inconsistent state between the actual schema and the migration history.
 
 ## Next steps
