@@ -3,6 +3,7 @@ name: vfix
 description: "Fix issue theo thứ tự ưu tiên cố định: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (hỏi từng item). Mặc định consume output của vreview (`.code-review/`). Root-cause diagnosis thông qua skill `fix` bên dưới — vfix chỉ quyết định thứ tự ưu tiên + stop-gate + tự động sdk-generate/format."
 argument-hint: "[path đến report dir, mặc định .code-review/]"
 user-invocable: true
+disable-model-invocation: true
 when_to_use: "Gọi sau khi đã có report (từ vreview hoặc report tương đương) và cần fix theo đúng thứ tự ưu tiên, không tuỳ tiện apply suggestion."
 category: workflow
 keywords: [fix, bugfix, code-review, priority, sdk-generate, root-cause]
