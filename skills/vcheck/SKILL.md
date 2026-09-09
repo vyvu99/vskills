@@ -39,32 +39,36 @@ Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (if present) to reso
 
 ## Step 1 — Parallel typecheck
 
+Sanitize the package name for use as a filesystem path first: replace `/` and `@` with `_` (e.g. `@app/api` → `_app_api`) — a scoped package name written raw into `/tmp/tsc-<package>.log` breaks (creates an unintended subdirectory, or fails outright).
+
 For EACH package in the list, spawn a background command:
 
 ```
-<pm workspace/root exec template from Step -1> <typecheck cmd> > /tmp/tsc-<package>.log 2>&1 &
+timeout 600s <pm workspace/root exec template from Step -1> <typecheck cmd> > /tmp/tsc-<sanitized-package>.log 2>&1 &
 ```
 
 `<typecheck cmd>` = the resolved script from Step -1 (`typecheck` → `type-check` → `tsc --noEmit`). Worked examples:
-- pnpm + workspace, no `typecheck` script → `pnpm --filter <package> exec tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &` (today's default, byte-identical)
-- npm + single-package → `npm exec -- tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &`
+- pnpm + workspace, no `typecheck` script → `timeout 600s pnpm --filter <package> exec tsc --noEmit > /tmp/tsc-<sanitized-package>.log 2>&1 &` (today's default, byte-identical)
+- npm + single-package → `timeout 600s npm exec -- tsc --noEmit > /tmp/tsc-<sanitized-package>.log 2>&1 &`
 
 Spawn all packages first, then `wait` — do not run them sequentially one by one.
 
-After `wait`, read each `/tmp/tsc-<package>.log`:
+After `wait`, read each `/tmp/tsc-<sanitized-package>.log`:
 - No errors → report pass
 - Errors → extract the specific file:line + message, fix, then recheck **only the package just fixed** (rerun exactly 1 tsc command for that package, do not re-run the whole list)
 - If the package has no `tsconfig.json`, treat the failure as "no typecheck config" rather than a type error, and skip/report it accordingly instead of treating it as a code bug
 
 ## Step 2 — Parallel build
 
+Sanitize the package name for use as a filesystem path first: replace `/` and `@` with `_` (e.g. `@app/api` → `_app_api`) — a scoped package name written raw into `/tmp/build-<package>.log` breaks (creates an unintended subdirectory, or fails outright).
+
 Same as step 1, spawn a background command for each package:
 
 ```
-<pm workspace/root exec template from Step -1> <build script> > /tmp/build-<package>.log 2>&1 &
+timeout 600s <pm workspace/root exec template from Step -1> <build script> > /tmp/build-<sanitized-package>.log 2>&1 &
 ```
 
-`<build script>` = the package's declared `build` script (Step -1 — no raw fallback; a package with no `build` script is skipped, not run with a substitute). Worked example: pnpm + workspace → `pnpm --filter <package> build > /tmp/build-<package>.log 2>&1 &` (today's default, byte-identical).
+`<build script>` = the package's declared `build` script (Step -1 — no raw fallback; a package with no `build` script is skipped, not run with a substitute). Worked example: pnpm + workspace → `timeout 600s pnpm --filter <package> build > /tmp/build-<sanitized-package>.log 2>&1 &` (today's default, byte-identical).
 
 Spawn all → `wait` → parse each package's log (pass/fail). Failing package → fix, recheck only that package.
 
@@ -75,7 +79,7 @@ Read the scripts in the root `package.json`, look for a format script (`format`,
 ## Step 4 — Test (only when the user requests it or `$ARGUMENTS` contains `--test`)
 
 - Determine the test script in each package's `package.json` that needs testing — prefer non-watch mode (`test:run`, `test:ci`, `test -- --run`, ...) over plain `test` if you suspect the default is watch mode
-- Run in background + `wait`, same as steps 1-2
+- Run in background + `wait`, same as steps 1-2 (prefix with `timeout 600s`)
 - Failure → fix, recheck only that package, repeat until it passes — **never skip a test failure** for any reason
 
 ---
@@ -86,6 +90,7 @@ Read the scripts in the root `package.json`, look for a format script (`format`,
 - Never hardcode any specific package name in the logic — every list must come from the argument or workspace auto-detect
 - Failing package → recheck only that package after fixing, don't re-run the whole list
 - Never skip a test failure to move past a step — must fix and recheck until it passes
+- Wrap every background command in `timeout 600s` (or `gtimeout` on macOS) — a hung package must not hang the whole `wait`.
 
 ## Next steps
 
