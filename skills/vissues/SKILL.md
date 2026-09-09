@@ -3,6 +3,7 @@ name: vissues
 description: "Create/update a GitHub epic issue + sub-issues from 1 plan directory, using gh CLI + GraphQL addSubIssue. Issue content is non-technical, migrations are consolidated into the sub-issue containing phase 1's content. Idempotent — re-running does not create duplicates."
 argument-hint: "<plan-path>"
 user-invocable: true
+disable-model-invocation: true
 when_to_use: "Invoke when you need to create or sync a GitHub epic + sub-issues from an existing plan (plan.md + phase-XX-*.md)."
 category: workflow
 keywords: [github, issues, epic, sub-issues, graphql]

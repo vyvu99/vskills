@@ -255,5 +255,46 @@
   "fe-dialog-finally-close": {
     "category": "frontend", "severity": "warning", "confidence": "high",
     "message": "`setOpen(false)` trong `finally` block — dialog đóng kể cả khi lỗi, user mất input; move sang `onSuccess` callback"
+  },
+
+  "backend-response-schema-mismatch-candidate": {
+    "category": "backend", "severity": "warning", "confidence": "candidate",
+    "scope": "[-.](route|routes|handler|controller|router)\\.(ts|tsx)$",
+    "message": "`c.json(rawVariable)` trong route file có thể expose field DB không thuộc response schema — dùng `.parse()`/`.pick()`/`.omit()` trước khi trả về"
+  },
+  "be-audit-unknown-fallback": {
+    "category": "backend", "severity": "error", "confidence": "high",
+    "scope": "(route|service)",
+    "message": "Field nhạy cảm cho audit trail (signerName, unlockerName...) fallback về `'Unknown'` hardcode — audit trail không phân biệt được các lần ký khác nhau; throw ValidationError khi không resolve được identity"
+  },
+  "be-update-no-org-scope": {
+    "category": "backend", "severity": "error", "confidence": "high",
+    "scope": "repository\\.(ts|tsx)$",
+    "message": "`.update().set().where(eq(table.id, ...))` không có org scope filter — multi-tenant IDOR: bất kỳ org nào có thể update record của org khác"
+  },
+  "fe-json-stringify-memo-deps": {
+    "category": "frontend", "severity": "warning", "confidence": "high",
+    "message": "`JSON.stringify()` trong dependency array của useMemo/useCallback/useEffect tạo string mới mỗi render — defeat memoization; dùng stable reference hoặc field cụ thể"
+  },
+  "form-schema-not-shared-candidate": {
+    "category": "frontend", "severity": "warning", "confidence": "candidate",
+    "scope": "[Ff]orm\\.(ts|tsx)$|-(form|modal|dialog|sheet)\\.(ts|tsx)$",
+    "message": "`z.object({...})` định nghĩa inline trong form file thay vì import từ shared schema — có thể thiếu constraint so với shared schema"
+  },
+  "shared-constant-maybe-redefined-candidate": {
+    "category": "typescript", "severity": "warning", "confidence": "candidate",
+    "message": "Constant UPPER_CASE định nghĩa lại trong file trong khi đã export từ `packages/shared` — cân nhắc import thay vì duplicate"
+  },
+  "ts-infer-select-model-duplicate": {
+    "category": "typescript", "severity": "warning", "confidence": "high",
+    "message": "`InferSelectModel<typeof X>` xuất hiện nhiều hơn 1 lần cho cùng table trong schema file — chỉ infer 1 lần, export ra, nơi khác import type"
+  },
+  "ts-json-parse-cast-without-safeParse-candidate": {
+    "category": "typescript", "severity": "warning", "confidence": "candidate",
+    "message": "`JSON.parse()` trong file không có `safeParse` — kết quả có thể bị cast `as T` mà không validate shape"
+  },
+  "ts-rhf-generic-constraint-candidate": {
+    "category": "typescript", "severity": "warning", "confidence": "candidate",
+    "message": "RHF component cast `field.value as T[]` nhưng thiếu generic constraint trên `TName` — thêm `TName extends FieldPath<T>`"
   }
 }

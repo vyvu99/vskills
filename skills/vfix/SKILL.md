@@ -3,6 +3,7 @@ name: vfix
 description: "Fix issues in a fixed priority order: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (ask per item). Consumes vreview output (`.code-review/`) by default. Root-cause diagnosis via the underlying `fix` skill — vfix only decides priority order + stop-gate + auto sdk-generate/format."
 argument-hint: "[path to report dir, default .code-review/]"
 user-invocable: true
+disable-model-invocation: true
 when_to_use: "Invoke after a report (from vreview or an equivalent report) exists and needs to be fixed in the correct priority order, without arbitrarily applying suggestions."
 category: workflow
 keywords: [fix, bugfix, code-review, priority, sdk-generate, root-cause]

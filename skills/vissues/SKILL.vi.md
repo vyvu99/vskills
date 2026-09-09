@@ -3,6 +3,7 @@ name: vissues
 description: "Tạo/đồng bộ 1 GitHub epic issue + sub-issues từ 1 plan directory, dùng gh CLI + GraphQL addSubIssue. Nội dung issue phi kỹ thuật, migration được gộp vào sub-issue chứa nội dung phase 1. Idempotent — chạy lại không tạo trùng."
 argument-hint: "<plan-path>"
 user-invocable: true
+disable-model-invocation: true
 when_to_use: "Dùng khi cần tạo hoặc đồng bộ GitHub epic + sub-issues từ 1 plan có sẵn (plan.md + phase-XX-*.md)."
 category: workflow
 keywords: [github, issues, epic, sub-issues, graphql]

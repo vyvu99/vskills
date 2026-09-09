@@ -58,7 +58,6 @@ Sau khi user xác nhận, bắt đầu vòng lặp. Mỗi vòng:
 1. Đọc lại toàn bộ `plans/specs/[feature-slug].md`
 2. Đọc lại code liên quan để nắm hành vi hiện tại
 3. Tự mình verify mọi thứ chưa rõ bằng cách đối chiếu với code — **KHÔNG BAO GIỜ viết "cần verify" hoặc "chưa rõ" hoặc "có thể"** nếu code tồn tại và đọc được; nếu đã tìm thật sự mà không thấy → nói rõ "đã tìm, không thấy" + cách khác để verify
-
 4. Trình bày tối đa **5 case**, sắp xếp theo mức độ quan trọng
 
 **Format cho mỗi case:**

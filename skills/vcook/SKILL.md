@@ -3,6 +3,7 @@ name: vcook
 description: "Mandatory 9-step checklist when implementing a feature/fix: parallel subagents → determine branch → identify plan/no-plan mode → write tests first → implement BE+FE fully → mandatory use of generated SDK client → review against CLAUDE.md → test until passing → squash commits + create PR from template. Do NOT skip any step."
 argument-hint: "[plan-path | task description] [--issue <number>]"
 user-invocable: true
+disable-model-invocation: true
 when_to_use: "Invoke to implement a feature/fix from an existing plan or a quick description — auto-creates the branch, writes tests, codes, reviews, runs tests, commits, and creates a PR."
 category: workflow
 keywords: [cook, implement, workflow, plan, sdk, commit, pr]
