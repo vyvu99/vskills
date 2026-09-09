@@ -1,3 +1,4 @@
 scripts/lint-rules/staged/
 scripts/lint-rules/violation-history.jsonl
 .DS_Store
+plans/
