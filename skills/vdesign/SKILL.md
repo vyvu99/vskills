@@ -5,26 +5,19 @@ user-invocable: true
 when_to_use: "Invoke when you want to redesign or upgrade the UI/UX of a page, component, feature, or an entire existing diff/PR."
 category: frontend
 keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
-argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--L1 | --L2 | --L3] [--bold]"
+argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--wow]"
 metadata:
   author: vyvu
-  version: "5.3.0"
+  version: "6.0.0"
 ---
 
 # vdesign — Personal UI/UX Redesign Skill
 
 Upgrade or redesign UI/UX with a consistent aesthetic: **refined · harmonious · modern · elegant · consistent with the system**.
 
-Three cumulative depth levels, plus an independent `--bold` flag:
+No depth-level flags. `vdesign <target>` is the only base mode — audit-driven: it fixes everything Phase 2 finds, regardless of depth (spacing → structural → visual-direction change). No artificial ceiling, no "found it but can't fix it, wrong level" outcome.
 
-| Flag | Level | Unlocks (cumulative on top of the previous level) |
-|------|-------|------|
-| `--L1` | Light | Spacing/alignment, icon size, text-overflow, missing states (loading/empty/error/hover/focus/active/disabled), color/token alignment, typography hierarchy. Does NOT touch layout/structure. |
-| `--L2` | Structural | + swap/extract/merge components, change grid/flex structure, section order, density — visual direction stays the same (a card stays a card) |
-| `--L3` | Full redesign | + change visual direction entirely (card→list, sidebar→top nav), rewrite JSX/TSX from scratch |
-| _(none)_ | Ask | If wording is ambiguous, ask 1 question via `AskUserQuestion` listing the 3 levels — do not silently guess |
-
-`--bold` (optional, requires `--L2` or `--L3`) — unlocks Awwwards-tier creative freedom; see Phase 3.
+`--wow` (optional) — unlocks Awwwards-tier creative freedom on top of the base mode; see the Vibe Archetype Catalog and Phase 3 below.
 
 Do not change the tech stack. Do not break logic/state/API.
 
@@ -46,7 +39,7 @@ Do not change the tech stack. Do not break logic/state/API.
 
 ## Personal Aesthetic (Non-negotiable)
 
-This is the user's vocabulary — **ALL** must be met by default, not just a few picked at random. Suspended only when `--bold` is explicitly passed (see Phase 3):
+This is the user's vocabulary — **ALL** must be met by default, not just a few picked at random. Suspended only when `--wow` is explicitly passed (see Phase 3):
 
 | Keyword | Practical meaning in code |
 |---------|--------------------------|
@@ -62,6 +55,31 @@ This is the user's vocabulary — **ALL** must be met by default, not just a few
 
 ---
 
+## Vibe Archetype Catalog (`--wow`)
+
+16 named, current (2025-2026) design philosophies to commit to in Phase 0's Vibe Commitment step. Pick ONE — never blend 3+ philosophies on one page (see anti-slop gate). Ratings assume this skill's B2B "clarity > impressiveness" default context; ignore B2B-viability when the target project is explicitly consumer/portfolio.
+
+| # | Archetype | Core Aesthetic | B2B-Viable | Motion | Risk |
+|---|---|---|---|---|---|
+| 1 | Neo-Brutalist Bold | Thick lines, high contrast, raw geometry | Yes | Low | Low |
+| 2 | Maximalist Editorial | Layered, vibrant, dense composition | Selective | Medium | Medium |
+| 3 | Ethereal Glass | Frosted, translucent, soft depth | Yes | Low | Very Low |
+| 4 | Soft Neumorphic | Subtle shadows, tactile, 3D-subtle | Yes | Low | Very Low |
+| 5 | Kinetic/Motion-First | Animated reveals, micro-interactions | Yes | High | Medium |
+| 6 | Chromatic Dopamine | Bold saturated color, exuberant | Accent only | Medium | High |
+| 7 | Surreal Narrative | Photo-real + impossible, dreamlike | Hero only | Low | High |
+| 8 | Organic Asymmetric | Curves, biophilic, natural forms | Yes | Low | Very Low |
+| 9 | Maximal Minimal | White + 1-2 bold focal elements | Yes (best) | Low | Very Low |
+| 10 | Flow-First System | Journey-driven, progressive disclosure | Yes | Medium | Very Low |
+| 11 | Bento Interactive | Modular grid, playful blocks | Yes | Medium | Low |
+| 12 | Typography-Dominant | Oversized, custom typeface, hierarchy | Yes | Low | Very Low |
+| 13 | Authentic Humanist | Custom craft, genuine voice, anti-stock | Yes (critical) | Low | Very Low |
+| 14 | Data-Adaptive | Personalized, context-aware, intelligent | Yes | Medium | Medium |
+| 15 | Retro-Nostalgic | 70s/80s, warm, vintage textures | Niche | Low | High |
+| 16 | Spatial 3D | Depth, parallax, layered storytelling | Yes | High | Medium |
+
+---
+
 ## Workflow: Scan → Audit → Fix → Verify
 
 ### Phase 0: Determine scope
@@ -71,13 +89,13 @@ This is the user's vocabulary — **ALL** must be met by default, not just a few
 3. If there's `--pr` → resolve the VCS profile per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 first (if the file is absent, assume full gh mode — today's default). Full gh mode → `gh pr diff --name-only` to get the list of files. Degraded (no gh / non-GitHub) → print the §2 message and ask the user for a branch name, or fall back to `--diff` (`git diff --name-only`, needs no gh) — then continue into Phase 1 normally.
 4. Resolve the Project Profile: check `.vdesign/profile.md` at the target project's git root (`git rev-parse --show-toplevel`). Present → read and use it. Absent → infer UI library/design tokens from `package.json` dependencies, `tailwind.config.*`, and the components folder. Still ambiguous → ask 1 question, then offer (don't force) to save the answer to `.vdesign/profile.md` for next time.
 5. If empty → ask the user via `AskUserQuestion` — **exactly 1 question**
-6. If `--bold` is set → **Domain Research**, before Vibe Commitment:
+6. If `--wow` is set → **Domain Research**, before Vibe Commitment:
    - Domain slug = the domain from the Project Profile's context (e.g. "B2B Healthcare") + the target feature/page name resolved in step 1 (e.g. "booking form") — slugify (e.g. `healthcare-booking-form`)
    - Aspect list is fixed, always these 8: `ui` (UI/Visual), `ux` (UX/Interaction), `animation` (Animation/Motion), `layout` (Layout/Responsive), `3d` (3D/WebGL/spatial-depth patterns), `text` (Typography/microcopy/tone-of-voice patterns), `features` (competitor/domain feature patterns for the target feature — informational only, never expands redesign scope), `flow` (competitor/domain user-journey patterns for the target feature — informational only, never expands redesign scope)
    - Cache check per aspect, independently: look in `plans/reports/` for `researcher-vdesign-bold-<slug>-<aspect>*.md` created earlier this session/today — hit → reuse that aspect's report; miss → mark the aspect for fresh research
    - Spawn all cache-missed aspects in parallel — one Task/Agent call per aspect, up to 8, in the same message. Design-pattern aspects (`ui`/`ux`/`animation`/`layout`/`3d`/`text`) each find current (2025-2026) patterns specific to `<target feature>` in `<domain>` product context, scoped to their one assigned aspect, staying inside the B2B "clarity > impressiveness" bias (not pure Awwwards/portfolio inspiration); report concrete named patterns with sources. `features`/`flow` agents instead find current competitor/domain feature or flow patterns for `<target feature>` in `<domain>` — framed explicitly as context only, NOT scope to implement; the agent must not propose adding these to the redesign. Save each to `plans/reports/researcher-vdesign-bold-<slug>-<aspect>-<HHMMSS>.md`
    - An aspect whose agent fails or is unavailable: `ui`/`ux`/`animation`/`layout`/`text` fall back silently to their matching static catalog section (Cards and Containers / Micro-Interactions / Scroll Animations / Layout and Grids / Typography and Text in `premium-design-patterns.md`); `3d`/`features`/`flow` have no static catalog to fall back to — that aspect is simply absent from downstream steps, noted as "unavailable" (not "fallback"). The other aspects (cached, freshly researched, or fallback) still proceed; never fail the whole domain-research step because one aspect failed
-7. If `--bold` is set → **Vibe Commitment**, before touching any code: pick ONE aesthetic direction — an archetype from `~/.claude/skills/frontend-design/references/premium-design-patterns.md` (Ethereal Glass / Editorial Luxury / Soft Structuralism), a named 2025-2026 movement (Neo-Brutalism, Immersive 3D/WebGL, Kinetic Typography, Bento-interactive, Maximalist editorial), a custom vibe from the user's own reference/mood keywords, or a vibe informed by whichever of step 6's per-aspect domain research reports exist (cached and/or fresh, up to 8 — `features`/`flow` reports, when present, inform the pick as context only, e.g. "competitors use a guided step-by-step flow → vibe should support that," and must never expand the redesign's scope to new features or flow steps). If the user didn't specify one, propose the best-fit vibe for the project's domain and state it out loud before implementing — say which aspects grounded the pick and their status (cached/fresh/fallback to static catalog/unavailable). An un-anchored `--bold` run (no committed vibe) is the single biggest reason bold output still reads as generic/safe.
+7. If `--wow` is set → **Vibe Commitment**, before touching any code: pick ONE archetype from the Vibe Archetype Catalog above, a custom vibe from the user's own reference/mood keywords, or a vibe informed by whichever of step 6's per-aspect domain research reports exist (cached and/or fresh, up to 8 — `features`/`flow` reports, when present, inform the pick as context only, e.g. "competitors use a guided step-by-step flow → vibe should support that," and must never expand the redesign's scope to new features or flow steps). If the user didn't specify one, propose the best-fit archetype for the project's domain and state it out loud before implementing — say which aspects grounded the pick and their status (cached/fresh/fallback to static catalog/unavailable). An un-anchored `--wow` run (no committed vibe) is the single biggest reason output still reads as generic/safe.
 
 ---
 
@@ -170,7 +188,7 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Animation duration: subtle (150-300ms), not too flashy for a B2B app
 - [ ] Has a `prefers-reduced-motion` guard if using CSS animation
 
-#### Decorative Images & Illustrations (banner, hero character, background art)
+#### Media & Images (banner, hero character, background art, video)
 - [ ] If an image needs to be full-bleed (spanning the full container width) using `object-contain` → the container MUST set `aspect-ratio` (or `style={{ aspectRatio: 'W/H' }}`) matching the image file's actual width/height ratio (read via PIL/`sips -g pixelWidth -g pixelHeight`, don't guess) — if the container and image aspect ratios mismatch, `object-contain` will letterbox on both sides even if width is declared full
 - [ ] For full-bleed with acceptable minor cropping instead of computing aspect-ratio → use `object-cover` with `mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)` to fade the edges and hide the hard crop marks
 - [ ] If an illustration needs to "grow" without taking up sibling (text/button) layout space → set `position: absolute` (not a normal flex/grid item); but still must reserve room for the adjacent text via `max-width: calc(100% - Npx)` or matching padding for the image size, to avoid overlapping text
@@ -178,6 +196,9 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Multiple cards in the same row with illustrations that need to align on the top or bottom edge → anchor the container with `top-0`/`bottom-0` (not both) AND set matching `object-position` on the same side (`object-top`/`object-bottom`) — do not rely on the images' natural aspect ratios happening to align, since each source image usually has a different content margin/bbox
 - [ ] Equal-height cards in a `grid` (grid auto-stretches items equally) but the inner visual frame (border/bg/shadow) only auto-sizes to content → must set `h-full` on BOTH the outer wrapper (grid item) AND the inner visual frame, otherwise cards still end up mismatched in height even though the grid item stretched correctly
 - [ ] A dynamic overlay (shine border, border beam, glow, floating badge) without an explicit `z-index` → a sibling with `position: relative` that appears LATER in the DOM will cover the overlay, because `z-index: auto` among positioned elements stacks by DOM order, not by "which one is intended to be on top"; always assign an explicit `z-index` to animation/decoration overlays
+- [ ] **Illustration slop check**: unmodified unDraw/Storyset/DrawKit/Blush/Icons8-Ouch/ManyPixels/Open-Peeps illustration in hero/empty-state/onboarding → flag as slop, same tier as purple-gradient/Inter-only (see anti-slop gate). Fix by tier: custom hand-drawn > line-art/sketch > isometric 3D > heavily-customized flat (own palette + custom poses, not stock scenes) > geometric/abstract > skip illustration entirely.
+- [ ] **Hero video** (when present): `muted autoplay loop playsinline` + static poster fallback (JPEG); swap to static image on mobile (`max-width: 768px`) to protect LCP.
+- [ ] **Responsive art direction** (when mobile/desktop need different compositions, not just a scaled-down size): use `<picture>` + media-query `<source>` for different crops, not one image stretched/shrunk by CSS alone.
 
 #### Form/Wizard Specific
 - [ ] Stepper: compact height, no wasted vertical space
@@ -273,41 +294,49 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 
 ### Phase 3: Fix
 
-Apply fixes only within the current level's unlocked scope (cumulative):
+Fix everything Phase 2 found — spacing, states, component swaps, grid/layout restructure, and full visual-direction changes are all in scope by default; there is no depth ceiling to stay under. Depth should still be *proportional* to what's actually broken: a spacing-only audit finding does not license a full JSX rewrite (see Anti-Patterns — "rewrite the entire layout when only a tweak was needed").
 
-| Level | Fix scope unlocked |
-|-------|------|
-| `--L1` Light | Spacing & alignment, icon size, text-overflow, missing states (empty/loading/error/hover/focus/active/disabled), color/token alignment, typography hierarchy — grid/flex structure stays as-is |
-| `--L2` Structural | + swap/extract/merge components, replace grid/flex structure, section order, density — visual direction stays the same |
-| `--L3` Full redesign | + fully change visual direction (card → list, sidebar → top nav), rewrite JSX/TSX from scratch — reuse existing data/hooks/handlers |
+**`--wow` (optional)**
 
-Findings outside the current level's scope are still reported to the user (never silently dropped), with a note on which `--L` would unlock the fix.
-
-**`--bold` (optional, requires `--L2` or `--L3`)**
-If passed with no level, or with `--L1`, bump to `--L3` and tell the user why. Suspends for this run only: "DO NOT apply portfolio/avant-garde aesthetics", the "clarity > impressiveness" default bias, and the anti-pattern "Copy creative design from a landing page/portfolio into product UI" — allows bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion.
+Suspends for this run only: "DO NOT apply portfolio/avant-garde aesthetics", the "clarity > impressiveness" default bias, and the anti-pattern "Copy creative design from a landing page/portfolio into product UI" — allows bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion.
 
 Requires the Vibe Commitment from Phase 0 step 7 first — pick the vibe, then pull patterns. Never pull patterns first and rationalize a vibe after the fact.
 
-**Pattern-pull, not audit-fix.** Once the vibe is committed, pull 3-5 concrete named patterns from that vibe's arsenal — see `~/.claude/skills/frontend-design/references/premium-design-patterns.md` for the full catalog (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction patterns) — plus any domain-specific patterns/insights from whichever of Phase 0 step 6's design-pattern aspect reports exist for this run (`ui`/`ux`/`animation`/`layout`/`3d`/`text`, up to 6 — `features`/`flow` reports are excluded here, they're informational-only for Vibe Commitment, not pattern-pull material). Merge all of them, don't replace the catalog. Phase 2's audit still runs (it catches broken states/a11y/responsive) but under `--bold` it's a floor, not a ceiling — bold output is judged by how distinctive the pulled patterns are, not just by absence of defects.
+**One signature element, not scattered boldness.** Commit to ONE bold move — a color discipline, a custom typeface, a motion language, an illustration style, or an asymmetric layout gesture — and keep everything else restrained around it. Half-committed boldness (a little bit of everything) reads *more* generic than full commitment to one thing; this is the #1 reason `--wow` output has read as safe in practice. Boldness must be **structural** (typography scale, contrast, motion-as-clarity, custom voice), never purely decorative.
+
+Pull from these 6 named patterns (award-winning B2B, not portfolio/consumer):
+
+| Pattern | How it works | B2B-safe because |
+|---|---|---|
+| Strategic Accent Boldness | Neutral baseline + 1-2 committed bold focal points | Clarity stays primary; boldness reads intentional |
+| Authentic Voice + Human Craft | Custom photography/illustration, genuine copy, anti-stock | Authenticity signals credibility, not decoration |
+| Bold Typography-First | Oversized custom/variable type; hierarchy via size/weight alone | Boldness lives in the skeleton, not ornament |
+| High-Contrast Disciplined | Black/white or deep saturation, thick lines, no gradient/blur | Directness reads confident, not reckless |
+| Motion-First Clarity | Every animation clarifies (state change, hierarchy); 1-2 sophisticated interactions per page max | Motion signals sophistication, doesn't distract |
+| Product-Centric Hero | Real product UI/screenshot as the hero, not illustration | Confidence + transparency, not showmanship |
+
+CSS/SVG grain-texture overlay (opacity <10%, `<feTurbulence>` or CSS `filter`) is also available as a `--wow` texture technique — no dependency needed.
+
+**Pattern-pull, not audit-fix.** Once the vibe is committed, pull from the 6 patterns above plus that vibe's arsenal — see `~/.claude/skills/frontend-design/references/premium-design-patterns.md` for the full catalog (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction patterns) — plus any domain-specific patterns/insights from whichever of Phase 0 step 6's design-pattern aspect reports exist for this run (`ui`/`ux`/`animation`/`layout`/`3d`/`text`, up to 6 — `features`/`flow` reports are excluded here, they're informational-only for Vibe Commitment, not pattern-pull material). Merge all of them, don't replace the catalog. Phase 2's audit still runs (it catches broken states/a11y/responsive) but under `--wow` it's a floor, not a ceiling — output is judged by how distinctive the ONE committed signature element is, not just absence of defects.
 
 **Dependency allowlist — add directly, no need to ask:** GSAP (+ ScrollTrigger), Motion (Framer Motion), Lenis (smooth scroll), native CSS scroll-driven animations / View Transitions API, Rive, Lottie — the de-facto standard toolkit on 2025-2026 award-winning sites.
 **Still stop-and-ask:** React Three Fiber/Three.js (650KB+ — only if 3D is genuinely core to the concept), Barba.js, any paid/SaaS tool beyond Rive, custom WebGL/GLSL shaders.
 
-**Anti-slop gate before reporting done** — see `~/.claude/skills/frontend-design/references/anti-slop-rules.md` for the full checklist; at minimum fail the run on: Inter/Roboto as the only typeface, purple-to-blue gradient as the dominant aesthetic, 3+ visually-identical cards in a row, placeholder names/numbers ("John Doe", round 50%/$100), generic startup copy ("Elevate", "Seamless", "Next-Gen"), pure `#000000` background, missing hover/focus states.
+**Anti-slop gate before reporting done** — see `~/.claude/skills/frontend-design/references/anti-slop-rules.md` for the full checklist; at minimum fail the run on: Inter/Roboto as the only typeface, purple-to-blue gradient as the dominant aesthetic, 3+ visually-identical cards in a row, placeholder names/numbers ("John Doe", round 50%/$100), generic startup copy ("Elevate", "Seamless", "Next-Gen"), pure `#000000` background, missing hover/focus states, **unmodified stock flat illustration** (unDraw/Storyset/DrawKit/Blush/Icons8-Ouch/ManyPixels/Open-Peeps without custom palette/poses — same tier as purple-gradient; fix by tier: custom hand-drawn > line-art/sketch > isometric 3D > heavily-customized flat > geometric/abstract > skip illustration).
 
-Still mandatory even under `--bold`: accessibility (contrast, focus rings, all required states), no tech-stack migration, no logic/state/API changes, GPU-safe motion only (`transform`/`opacity` — never animate `width`/`height`/`top`/`left`; B2B mobile LCP is already tight, bold must not blow the budget).
+Still mandatory even under `--wow`: accessibility (contrast, focus rings, all required states), no tech-stack migration, no logic/state/API changes, GPU-safe motion only (`transform`/`opacity` — never animate `width`/`height`/`top`/`left`; B2B mobile LCP is already tight, bold must not blow the budget).
 
-**Hard rules (apply to every level, including `--bold`):**
+**Hard rules (apply to every run, including `--wow`):**
 - ✅ Work with the existing tech stack — DO NOT migrate framework
 - ✅ DO NOT break logic/state/API — only change the presentation layer
-- ✅ Check `package.json` before adding a dependency — except the `--bold` allowlist above, which may be added directly
+- ✅ Check `package.json` before adding a dependency — except the `--wow` allowlist above, which may be added directly
 - ✅ When hiding (not deleting) → use opacity/visibility, don't unmount
 - ✅ Use Tailwind tokens — no hardcoded hex
 - ✅ Use the best-looking component in the project (booking form, notes UI) as the reference standard
 - ✅ **Responsive is mandatory**: every layout change MUST be verified at 3 viewports — mobile (375px), tablet (768px), desktop (1280px); write mobile-first, then override with sm:/lg:
 - ✅ Third-party styled component (has `import 'lib/*.css'`) wrapped in a wrapper div → wrapper owns ALL visual state (border, ring, disabled opacity); null out all border/shadow inside the component via CSS var override + scoped `!important`
-- ❌ DO NOT add complex animation if Motion/Framer isn't already in the project — exception: under `--bold`, the dependency allowlist above applies instead
-- ❌ DO NOT add new brand colors — only use existing tokens (exception: `--bold` may introduce a new accent if the committed vibe requires it)
+- ❌ DO NOT add complex animation if Motion/Framer isn't already in the project — exception: under `--wow`, the dependency allowlist above applies instead
+- ❌ DO NOT add new brand colors — only use existing tokens (exception: `--wow` may introduce a new accent if the committed vibe requires it)
 - ❌ DO NOT use the component library's default color (shadcn blue) if the project has its own primary color
 - ❌ DO NOT add unnecessary toast notifications
 - ❌ DO NOT change logic/API/state management
@@ -320,10 +349,12 @@ Still mandatory even under `--bold`: accessibility (contrast, focus rings, all r
 2. If there was an image input → verify the code matches the image's intent
 3. Run `pnpm format` (if the project has it)
 4. If you just edited an image file directly under `public/` (overwritten at the same path, name unchanged) and the user reports "not seeing the change" → don't rush to edit the code/image again; tell the user to hard-refresh or clear `.next/cache/images` + restart the dev server first — Next.js Image Optimizer caches by URL+size, not by file content, so the fix is likely already correct but an old cached version is still being served
-5. **Short report**: "Redesigned [X]. Main changes: [list 3-5 bullet points]"
+5. **Adversarial Verify** (subagent — only when Fix actually touched structural/JSX-level code: component swap, grid/layout restructure, visual-direction change — OR `--wow` was used): spawn 1 fresh subagent with the diff, Phase 2's audit checklist, and (if `--wow`) the anti-slop gate. It re-audits the final state independently — no access to this run's reasoning — and reports PASS or a list of remaining issues (audit items still broken, fixes that overstepped what was actually needed, anti-slop violations). Issues found → return to Phase 3, fix, re-run this step once. Mirrors `vreview`'s Phase 4 Adversarial Pass in this same skill pack.
+6. **Self-Check** (inline, every run, no subagent): before writing the short report, confirm — (a) fix depth was proportional to what Phase 2 actually found, no unrequested rewrites beyond that; (b) every applicable Phase 2 category was addressed or explicitly marked not-applicable; (c) if `--wow` ran, the anti-slop gate (including the illustration check) was actually checked off, not just implied.
+7. **Short report**: "Redesigned [X]. Main changes: [list 3-5 bullet points]"
    - No long summary
    - Only mention significant changes
-   - If `--bold` ran: 1 line per aspect (all 8) noting Phase 0 step 6's status — e.g. "ui: fresh, ux: cached, animation: fallback (agent unavailable), layout: fresh, 3d: unavailable, text: cached, features: fresh, flow: unavailable"
+   - If `--wow` ran: 1 line per aspect (all 8) noting Phase 0 step 6's status, plus Adversarial Verify's PASS/issues-found outcome — e.g. "ui: fresh, ux: cached, animation: fallback (agent unavailable), layout: fresh, 3d: unavailable, text: cached, features: fresh, flow: unavailable; Adversarial Verify: PASS"
 
 ---
 
@@ -377,8 +408,7 @@ Resolve in this order before Phase 1:
 - ❌ Full-bleed image using `object-contain` without matching the container's `aspect-ratio` to the image file's actual ratio — gets letterboxed on both sides even though the container is full width
 - ❌ Setting `h-full` only on the grid item wrapper while forgetting to set it on the inner visual frame (border/bg/shadow) too — cards still end up mismatched in height even though the grid stretched items equally
 - ❌ Forcing `line-clamp`/fixed height onto copy of varying length across parallel cards instead of rebalancing the text length — line-clamp is a band-aid, rebalancing the copy is the actual root fix for "harmoniousness"
-- ❌ Run a low level (e.g. `--L1`) but change layout/visual direction anyway — stay within the current level's unlocked scope, report out-of-scope findings instead of fixing them
-- ❌ Run `--bold` without committing to a vibe first (Phase 0 step 7) — un-anchored boldness still reads as generic/safe; picking patterns before picking a direction produces a grab-bag, not a coherent design
+- ❌ Run `--wow` without committing to a vibe first (Phase 0 step 7) — un-anchored boldness still reads as generic/safe; picking patterns before picking a direction produces a grab-bag, not a coherent design
 - ❌ Re-run domain research for an aspect already cached this session/day for the same domain-slug (Phase 0 step 6) — check `plans/reports/` per-aspect first, reuse instead of re-researching; only cache-missed aspects get a fresh agent
 
 ## Next steps
