@@ -10,6 +10,12 @@ const { execSync } = require('child_process');
 
 const HISTORY_FILE = path.join(__dirname, 'violation-history.jsonl');
 
+// KNOWN LIMITATION: mọi `message` field trong rule-registry.json hardcode tiếng
+// Việt — không resolve theo pr_language. repo-profile.md §4 chỉ định nghĩa
+// resolution order cho prose do skill/LLM viết (đọc CLAUDE.md, chọn ngôn ngữ khi
+// viết PR/issue body), không phải cơ chế lập trình mà script Node.js này gọi
+// được để dịch message tại read-time. Bilingual registry message là scope của
+// 1 phase i18n riêng, không phải cleanup nhỏ ở đây.
 const registryPath = path.join(__dirname, 'config', 'rule-registry.json');
 const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
 
@@ -23,11 +29,11 @@ function getBlame(file, line) {
     const author = (out.match(/^author (.+)$/m) || [])[1];
     const ts = (out.match(/^author-time (\d+)$/m) || [])[1];
     if (!author || !ts) return null;
-    const date = new Date(parseInt(ts, 10) * 1000).toLocaleString('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh',
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: false,
-    });
+    // ISO-8601 UTC (offset "Z") thay vì hardcode vi-VN/Asia/Ho_Chi_Minh — không
+    // phụ thuộc locale máy chạy, không ambiguous; không có cơ chế locale-detection
+    // nào tái dùng được ở đây (repo-profile.md §4 chỉ resolve pr_language cho prose
+    // do skill/LLM viết, không phải cho code Node.js).
+    const date = new Date(parseInt(ts, 10) * 1000).toISOString();
     return { author, date };
   } catch {
     return null;

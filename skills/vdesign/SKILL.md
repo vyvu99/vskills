@@ -83,7 +83,7 @@ This is the user's vocabulary — **ALL** must be met by default, not just a few
 ### Phase 0: Determine scope
 
 1. Parse the argument to determine the input mode (see table above)
-2. If there's a URL/localhost → **take a screenshot immediately** using `mcp__mimo__vision` or Playwright
+2. If there's a URL/localhost → **take a screenshot immediately** using whatever screenshot tool is available (Playwright MCP, browser tool, etc.); if none is available, ask the user to paste a screenshot directly
 3. If there's `--pr` → resolve the VCS profile per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 first (if the file is absent, assume full gh mode — today's default). Full gh mode → `gh pr diff --name-only` to get the list of files. Degraded (no gh / non-GitHub) → print the §2 message and ask the user for a branch name, or fall back to `--diff` (`git diff --name-only`, needs no gh) — then continue into Phase 1 normally.
 4. Resolve the Project Profile: check `.vdesign/profile.md` at the target project's git root (`git rev-parse --show-toplevel`). Present → read and use it. Absent → infer UI library/design tokens from `package.json` dependencies, `tailwind.config.*`, and the components folder. Still ambiguous → ask 1 question, then offer (don't force) to save the answer to `.vdesign/profile.md` for next time.
 5. If empty → ask the user via `AskUserQuestion` — **exactly 1 question**
@@ -177,6 +177,11 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] **Focus**: visible focus ring for keyboard navigation
 - [ ] **Active/Selected**: selected item has a visual indicator
 - [ ] **Disabled**: disabled button has a visually distinct look + cursor-not-allowed
+
+#### Accessibility (WCAG 2.2)
+- [ ] **2.4.11 Focus Not Obscured**: is a focused element ever fully hidden behind a sticky header/cookie banner/other overlay?
+- [ ] **2.5.7 Dragging Movements**: does every drag-and-drop interaction have a click/tap alternative (not drag-only)?
+- [ ] **3.3.8 Accessible Authentication**: does the login flow avoid blocking password paste, and avoid requiring a cognitive puzzle with no alternative?
 
 #### Animation & Motion
 - [ ] Animation only where it has **meaning**: hover reveal, state transition, page enter
@@ -333,6 +338,7 @@ Still mandatory even under `--wow`: accessibility (contrast, focus rings, all re
 - ✅ Use the best-looking component in the project (booking form, notes UI) as the reference standard
 - ✅ **Responsive is mandatory**: every layout change MUST be verified at 3 viewports — mobile (375px), tablet (768px), desktop (1280px); write mobile-first, then override with sm:/lg:
 - ✅ Third-party styled component (has `import 'lib/*.css'`) wrapped in a wrapper div → wrapper owns ALL visual state (border, ring, disabled opacity); null out all border/shadow inside the component via CSS var override + scoped `!important`
+- ✅ **ARIA discipline**: prefer native HTML (`<button>`, `<dialog>`, `<details>`, `<label for>`) over ARIA. Only add `role`/`aria-*` when native HTML can't express the interaction, and when added, ensure the full role+state+property set is present — never add ARIA attributes "just in case"
 - ❌ DO NOT add complex animation if Motion/Framer isn't already in the project — exception: under `--wow`, the dependency allowlist above applies instead
 - ❌ DO NOT add new brand colors — only use existing tokens (exception: `--wow` may introduce a new accent if the committed vibe requires it)
 - ❌ DO NOT use the component library's default color (shadcn blue) if the project has its own primary color
@@ -346,10 +352,11 @@ Still mandatory even under `--wow`: accessibility (contrast, focus rings, all re
 1. If there was an initial URL/localhost → take an after screenshot, compare before/after
 2. If there was an image input → verify the code matches the image's intent
 3. Run `pnpm format` (if the project has it)
-4. If you just edited an image file directly under `public/` (overwritten at the same path, name unchanged) and the user reports "not seeing the change" → don't rush to edit the code/image again; tell the user to hard-refresh or clear `.next/cache/images` + restart the dev server first — Next.js Image Optimizer caches by URL+size, not by file content, so the fix is likely already correct but an old cached version is still being served
-5. **Adversarial Verify** (subagent — only when Fix actually touched structural/JSX-level code: component swap, grid/layout restructure, visual-direction change — OR `--wow` was used): spawn 1 fresh subagent with the diff, Phase 2's audit checklist, and (if `--wow`) the anti-slop gate. It re-audits the final state independently — no access to this run's reasoning — and reports PASS or a list of remaining issues (audit items still broken, fixes that overstepped what was actually needed, anti-slop violations). Issues found → return to Phase 3, fix, re-run this step once. Mirrors `vreview`'s Phase 4 Adversarial Pass in this same skill pack.
-6. **Self-Check** (inline, every run, no subagent): before writing the short report, confirm — (a) fix depth was proportional to what Phase 2 actually found, no unrequested rewrites beyond that; (b) every applicable Phase 2 category was addressed or explicitly marked not-applicable; (c) if `--wow` ran, the anti-slop gate (including the illustration check) was actually checked off, not just implied.
-7. **Short report**: "Redesigned [X]. Main changes: [list 3-5 bullet points]"
+4. **Accessibility verify**: if the project has (or the user allows adding) `@axe-core/playwright` or plain `axe-core`, run a short script against the audited route/component and print violations. If unavailable, print the equivalent manual-check command for the user to run themselves — visual/manual review should not be the only verification for accessibility.
+5. If you just edited an image file directly under `public/` (overwritten at the same path, name unchanged) and the user reports "not seeing the change" → don't rush to edit the code/image again; tell the user to hard-refresh or clear `.next/cache/images` + restart the dev server first — Next.js Image Optimizer caches by URL+size, not by file content, so the fix is likely already correct but an old cached version is still being served
+6. **Adversarial Verify** (subagent — only when Fix actually touched structural/JSX-level code: component swap, grid/layout restructure, visual-direction change — OR `--wow` was used): spawn 1 fresh subagent with the diff, Phase 2's audit checklist, and (if `--wow`) the anti-slop gate. It re-audits the final state independently — no access to this run's reasoning — and reports PASS or a list of remaining issues (audit items still broken, fixes that overstepped what was actually needed, anti-slop violations). Issues found → return to Phase 3, fix, re-run this step once. Mirrors `vreview`'s Phase 4 Adversarial Pass in this same skill pack.
+7. **Self-Check** (inline, every run, no subagent): before writing the short report, confirm — (a) fix depth was proportional to what Phase 2 actually found, no unrequested rewrites beyond that; (b) every applicable Phase 2 category was addressed or explicitly marked not-applicable; (c) if `--wow` ran, the anti-slop gate (including the illustration check) was actually checked off, not just implied.
+8. **Short report**: "Redesigned [X]. Main changes: [list 3-5 bullet points]"
    - No long summary
    - Only mention significant changes
    - If `--wow` ran: 1 line per aspect (all 8) noting Phase 0 step 6's status, plus Adversarial Verify's PASS/issues-found outcome — e.g. "ui: fresh, ux: cached, animation: fallback (agent unavailable), layout: fresh, 3d: unavailable, text: cached, features: fresh, flow: unavailable; Adversarial Verify: PASS"

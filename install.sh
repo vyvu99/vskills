@@ -94,6 +94,27 @@ fi
 # ── Shared reference docs (always installed — skills read these at runtime) ──
 [[ -d "$SKILLS_SRC/_vskills-shared" ]] && link "$SKILLS_SRC/_vskills-shared" "$SKILLS_DST/_vskills-shared"
 
+# ── Post-install health-check summary ───────────────────────────────────────
+# Quick sanity table over what actually landed in ~/.claude/skills — no lint,
+# just surfaces anything obviously oversized or missing at a glance.
+print_health_check() {
+  [[ -d "$SKILLS_DST" ]] || return
+  log "post-install health check:"
+  printf '  %-30s %10s %10s %12s\n' "skill" "desc-chars" "body-lines" "references"
+  for skill_dir in "$SKILLS_DST"/*/; do
+    skill_name="$(basename "${skill_dir%/}")"
+    [[ "$skill_name" == _* ]] && continue
+    md="${skill_dir}SKILL.md"
+    [[ -f "$md" ]] || continue
+    total_lines=$(wc -l < "$md" | tr -d ' ')
+    close_line=$(awk '/^---$/{n++; if (n==2) { print NR; exit }}' "$md")
+    body_lines=$(( ${close_line:-0} > 0 ? total_lines - close_line : total_lines ))
+    desc=$(awk '/^---$/{n++; next} n==1' "$md" | grep '^description:' | head -1 | sed -E 's/^description:[[:space:]]*//; s/^"(.*)"$/\1/')
+    refs="no"; [[ -d "${skill_dir}references" ]] && refs="yes"
+    printf '  %-30s %10s %10s %12s\n' "$skill_name" "${#desc}" "$body_lines" "$refs"
+  done
+}
+
 # ── Scripts (opt-in — personal lint rules, may not fit your codebase) ──────
 if $WITH_SCRIPTS; then
   SCRIPTS_SRC="$REPO_DIR/scripts"
@@ -125,5 +146,7 @@ if $WITH_CLAUDE_MD; then
 else
   log "skipped CLAUDE.md starter — pass --with-claude-md to install (only applies if you don't already have one)"
 fi
+
+$DRY_RUN || print_health_check
 
 log "Done. (lang: $LANG_CHOICE)"

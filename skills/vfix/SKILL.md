@@ -36,8 +36,8 @@ Why this goes first: already confirmed by lint rules, grep-detectable, clearest,
 
 1. Read `SCRIPT_SCAN.json`. If empty/`{"error":...}` → skip this step.
 2. Group violations by `rule_id`.
-3. For EACH rule_id: read the rule script (`~/.claude/scripts/lint-rules/rules/{rule_id}.sh` — the `## PROBLEM` + `## FIX` sections) to understand the rule's intent correctly before fixing.
-4. Fix EACH violation exactly as suggested in the `## FIX` section of the rule script — do not invent a different fix approach if the rule already spells it out.
+3. For EACH rule_id: read the rule script (`~/.claude/scripts/lint-rules/rules/{rule_id}.sh` — the `## PROBLEM` + `## FIX` sections) to understand the rule's intent correctly before fixing. If the rule script is missing, fall back to inferring intent from the `message` field for that `rule_id` in `~/.claude/scripts/lint-rules/config/rule-registry.json`; if that's also absent, skip the rule_id and note it in the report instead of failing the whole step.
+4. Fix EACH violation exactly as suggested in the `## FIX` section of the rule script — do not invent a different fix approach if the rule already spells it out. If applying the `## FIX` exactly as suggested causes a test/typecheck failure, do NOT invent a different fix — stop, report "rule `<rule_id>`'s FIX guidance appears wrong for this case," and suggest running `vreview --harvest` to tighten that rule, rather than silently patching around it.
 5. After fixing all violations for 1 rule_id → re-run that same rule against the files just fixed to confirm no violations remain, then move to the next rule_id.
 6. After STEP 1 is done → commit once: `fix: resolve {N} script-detected lint violations`.
 
@@ -60,7 +60,7 @@ Repeat the exact same process as STEP 2 (group by dependency → batch → stop-
 ──────────────────────────────────────────────────────
 STEP 4 — CROSS-GROUP ISSUES (REPORT.md)
 ──────────────────────────────────────────────────────
-0. Before fixing, check STOP-GATE (same 3 conditions as Step 2/3).
+0. Before fixing, check STOP-GATE (same 4 conditions as Step 2/3).
 1. Read the separate "CROSS-GROUP ISSUES" section in REPORT.md — issues spanning ≥2 groups/files that don't fit neatly into a single CRITICAL/WARNING batch above.
 2. Each cross-group issue is its own batch (since by definition it already spans multiple files/groups).
 3. Fix → verify ALL files involved on BOTH sides → commit separately: `fix: {cross-group issue description}`.
@@ -82,13 +82,14 @@ DIFFERENT from the 4 steps above: do NOT apply arbitrarily.
 STOP-GATE — STOP AND ASK THE USER (applies to steps 2-4, do NOT decide on your own)
 ═══════════════════════════════════════════════════════
 
-Before fixing any issue, check the following 3 conditions — if ANY condition matches → stop, use `AskUserQuestion`, do NOT fix on your own:
+Before fixing any issue, check the following 4 conditions — if ANY condition matches → stop, use `AskUserQuestion`, do NOT fix on your own:
 
 a. The report notes "verify with product" / "needs business-logic confirmation" / equivalent phrasing indicating the fix depends on an unclear business decision.
 b. The fix requires a database migration (adding/changing/removing a column, constraint, or enum value at the DB level).
 c. The fix affects a shared package (a package used by ≥2 apps in the monorepo — check whether `packages/` is imported by ≥2 `apps/`).
+d. The fix requires an `UPDATE`/`DELETE` on existing data (not just a schema change) — treat this with the same stop-and-ask weight as a migration, since it's equally risky.
 
-Any issue that matches none of the 3 conditions → fix directly following the corresponding step's process.
+Any issue that matches none of the 4 conditions → fix directly following the corresponding step's process.
 
 ═══════════════════════════════════════════════════════
 SDK GENERATE (after EVERY batch that changes a shared schema / API route)
@@ -107,8 +108,10 @@ WRAP-UP — FORMAT + CLEANUP
 
 1. After all steps are done (including SUGGESTION items already asked about) → auto-detect and run the project's format command: look in `package.json` scripts in this order `format` → `format:fix` → `lint:fix`. If none found → skip.
 2. Append one line per item in `.code-review/REPORT.md` to `.code-review-history.jsonl` at the repo root (create if absent) — JSON per line: `{date, rule_or_source, file, status}`, reading each item's final `Status:` value. Do this regardless of whether the user later confirms or declines deletion — it's the persistent record that survives either way.
-3. Before deleting `.code-review/` (or the report path used): ask the user for confirmation — always default to assuming the user has NOT necessarily finished reading the report; always ask, never assume.
-4. User confirms → delete the report directory. User wants to keep it → leave it as-is, done.
+3. Run `vcheck` (typecheck + build) on the package(s) touched during this run — fixing many violations across multiple batches easily leaves a stray type error. If it reports failures, fix them before moving to the next step.
+4. Before deleting `.code-review/` (or the report path used): ask the user for confirmation — always default to assuming the user has NOT necessarily finished reading the report; always ask, never assume.
+5. User confirms → delete the report directory. User wants to keep it → leave it as-is, done.
+6. Check `~/.claude/scripts/lint-rules/violation-history.jsonl`: if any `rule_id` involved in this run shows a high rate of being rejected/skipped across historical entries, note it in the final summary as a candidate for tightening or retiring that rule (via `vreview --harvest` or editing the rule directly).
 
 ═══════════════════════════════════════════════════════
 HARD RULES

@@ -67,11 +67,24 @@ Follow the exact structure of the overview `plan.md` + detailed `phase-XX-*.md` 
 2. Each entry in a phase's Implementation Steps MUST spell out 3 parts, no vagueness allowed:
    - **File:** the specific path
    - **Logic:** exactly what changes (don't write generic "update logic" — must state the exact condition/branch/field being changed)
-   - **Validate:** which test case covers it (if a test framework exists in the repo) or a specific manual verification step (which API to call, which UI to check, which DB field to check)
-3. **Migration constraint (MANDATORY):** if any case (including cases added in Step 3) requires a database schema change → ALL related migrations must be consolidated into a single **first Phase**. Do not create separate migrations in phase 2, 3, etc. If a later phase needs an additional schema change discovered while writing the plan → go back and update Phase 1, don't split off a new migration phase.
-4. At the top of `plan.md`, add a **"Case Summary"** section — a table summarizing every case from Step 2 + Step 3, each row: Case ID | Status (PASS/FAIL/MISSING) | Handling Phase (phase number, or "—" if PASS and nothing needs to change).
+   - **Validate:** if a test framework exists in the repo — name the specific test (existing or new) and state that it must fail before the change (red) and pass after the change (green); if no test framework exists — a specific manual verify command/step with the expected observation stated explicitly (not "check the UI" — the exact result that confirms success)
+3. **Migration grouping:** migrations go into a single **first Phase** by default. A migration may be split into its own case's phase only when it is genuinely independent (no shared table/key) from Phase 1's other migrations — state that independence explicitly when splitting. If a later phase needs an additional schema change discovered while writing the plan and it isn't independent → go back and update Phase 1, don't split off a new migration phase.
+4. At the top of `plan.md`, add a **"Case Summary"** section — a table summarizing every case from Step 2 + Step 3, each row: Case ID | Status (PASS/FAIL/MISSING) | Handling Phase (phase number, or "—" if PASS and nothing needs to change) | Effort (the handling phase's `effort` frontmatter value, e.g. "2h"; "—" for PASS rows).
+5. `plan.md`'s template must include a **`## Risks / Rollback`** section: for each phase, state what state (code/DB) is left behind if that phase fails partway through, and how to roll it back.
 
-After finishing plan.md + phase files: continue with the exact Post-Plan Handoff of the underlying `plan` skill — use `AskUserQuestion` to offer running the validate/red-team gate of `plan`, implementing right away with `vcook <plan-path>`, or ending the session.
+---
+
+## Step 5 — Cross-check the plan
+
+After generating plan.md + phase files, before handoff, verify:
+
+1. Every Case ID from Step 2 + Step 3 appears exactly once in the Case Summary table.
+2. Every FAIL/MISSING case has a Handling Phase.
+3. Every phase traces back to at least one case in the Case Summary — a phase that doesn't trace to any case is flagged as possible scope creep.
+
+Fix plan.md/phase files for any check that fails before proceeding.
+
+Then continue with the exact Post-Plan Handoff of the underlying `plan` skill — use `AskUserQuestion` to offer running the validate/red-team gate of `plan`, implementing right away with `vcook <plan-path>`, or ending the session.
 
 ## Next steps
 
@@ -83,7 +96,7 @@ Look at what actually happened in this run and suggest ONE sensible next action 
 
 - Never write "needs verification", "unclear", "possibly" for any case if the code can be read and answer that question — you must read the code yourself before concluding a status.
 - If you genuinely searched and found no related code → state clearly "searched at {path/pattern}, not found" instead of leaving it blank.
-- Migrations must be consolidated into a single Phase 1 — no exceptions, no separate migration files in other phases.
+- Migrations go into a single Phase 1 by default — only split one into its own phase when it is genuinely independent (no shared table/key) from Phase 1's other migrations, and say so explicitly.
 - Every entry in Implementation Steps must have complete, specific File + Logic + Validate — never write generic phrases like "fix it properly" or "test again".
 - Never create or edit the specs file yourself — if you find the specs are missing an important case that requires a user decision (something that can't be inferred from the code), stop and suggest running `/vspecs` to add it before continuing.
 - Never skip Step 1 (scout the codebase) even if a case looks simple — a PASS/FAIL/MISSING status is only valid once you've actually read the real code.
