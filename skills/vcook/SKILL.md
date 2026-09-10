@@ -15,7 +15,7 @@ You are a senior engineer implementing this task end-to-end via the mandatory 9-
 **BEFORE YOU START:** Create a 9-step checklist with `TodoWrite` (one item per step). After finishing each step → mark it `completed` before moving to the next. Do NOT mark completed before the work is actually done. Exception: Step 1 is a standing rule applied across every other step, not a one-time task — keep it `in_progress` until Step 9 completes, don't mark it `completed` early.
 
 ═══════════════════════════════════════════════════════
-STEP 1: PARALLELIZE INTO SUBAGENTS
+STEP 1: PARALLELIZE READ-ONLY WORK INTO SUBAGENTS
 ═══════════════════════════════════════════════════════
 
 Before doing each step below, evaluate which parts are independent → delegate them to subagents running in parallel within the SAME message (not sequential if there's no dependency). Apply this throughout, not just once at the start:
@@ -23,7 +23,11 @@ Before doing each step below, evaluate which parts are independent → delegate 
 - Researching patterns/docs for the libraries in use → parallel subagents
 - Reviewing against CLAUDE.md (step 7) across multiple independent files → parallel subagents
 
+Scope: subagents in this step are READ-ONLY (research, reading plan/codebase, reviewing against CLAUDE.md). Implementation code-writing (step 5) is NOT delegated to parallel subagents in this step — write the actual code yourself, sequentially, in this session.
+
 Purpose: reduce main-agent token usage — the main agent only synthesizes results.
+
+If genuinely parallel *implementation* work is needed (multiple independent writers touching different files/features at once, not just parallel read-only research) → each parallel writer should use its own git worktree to avoid working-tree collisions.
 
 ═══════════════════════════════════════════════════════
 STEP 2: DETERMINE THE BRANCH
@@ -32,6 +36,7 @@ STEP 2: DETERMINE THE BRANCH
 1. Check the current branch: if its name/content already matches the task at hand (the user is intentionally continuing on that branch) → SKIP the branch-creation step, use the current branch.
 2. If it doesn't match:
    - Auto-detect the default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'` → if empty, try `git rev-parse --verify main 2>/dev/null` → use `main`; if `main` doesn't exist → use `master`.
+   - Run `git status --porcelain`; if it prints anything (working tree dirty) → STOP, ask the user (stash / commit / continue on the current branch instead) before proceeding.
    - `git checkout <default_branch>` → `git pull` → `git checkout -b <descriptive-branch-name>`
    - Branch name: kebab-case, English, accurately describing the scope of change (no tool/agent-based prefix unless the repo enforces its own convention).
 
@@ -57,7 +62,10 @@ Input is one of 2 forms — auto-detect from `$ARGUMENTS`:
 STEP 4: WRITE TEST CASES + EDGE CASES BEFORE CODING
 ═══════════════════════════════════════════════════════
 
-- **Mandatory** for API/backend logic: for every new or modified function/endpoint, list the test cases BEFORE writing the implementation — happy path + edge cases (null/undefined/empty/0/negative/boundary/concurrent).
+- **Mandatory** for API/backend logic: for every new or modified function/endpoint —
+  1. List existing tests that touch the code about to change (grep test files / follow the import graph for the module).
+  2. Write the new test covering happy path + edge cases (null/undefined/empty/0/negative/boundary/concurrent).
+  3. Run it and confirm it FAILS before writing the implementation — paste the failing output into the task's progress notes. A test that passes immediately is invalid — rewrite it.
 - **Not mandatory** for pure UI (style/layout only, no business logic). If skipped → state the reason clearly in the checklist ("pure UI, skipping test-first").
 
 ═══════════════════════════════════════════════════════
@@ -91,9 +99,10 @@ STEP 7: REVIEW AGAINST CLAUDE.md
 STEP 8: RUN TESTS, FIX UNTIL PASSING
 ═══════════════════════════════════════════════════════
 
-- Run the relevant test suite (unit/integration per project convention).
+- Run the FULL test suite of the package(s) touched (unit/integration per project convention) — not just the tests "relevant" to the change. If the repo tracks coverage → report the coverage delta.
 - On failure → fix the root cause (don't patch the symptom) → re-run.
 - Repeat until 100% pass. Do NOT skip failing tests to commit faster, do NOT use mocks/fake data/tricks to fake a pass.
+- Once tests pass, if the change is reachable via HTTP/CLI → actually call it once (curl the new/changed endpoint, run the new/changed CLI command) and include the real output in the completion report — "tests pass" alone is not sufficient verification.
 
 ═══════════════════════════════════════════════════════
 STEP 9: COMMIT + CREATE PR
@@ -103,7 +112,7 @@ Resolve the VCS profile first: read `~/.claude/skills/_vskills-shared/repo-profi
 
 **Commit:**
 - English message, conventional commit format (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`).
-- Squash into a reasonable number of commits grouped by logical change — do NOT create many small, scattered commits.
+- One commit per logical group of changes. If more than 5 commits result, consider squashing related ones. Always print `git log --oneline <base>..HEAD` before pushing so the user sees the final commit list.
 
 **PR:**
 - Read the project's `.github/pull_request_template.md` (if it exists) → the PR body MUST follow that template exactly. If it doesn't exist → use a sensible default format (Summary / Changes / Test plan).
@@ -121,7 +130,7 @@ Resolve the VCS profile first: read `~/.claude/skills/_vskills-shared/repo-profi
 - **Do NOT skip any step** of the 9 — even when the task looks "simple"
 - **Codebase diverges from the plan** → stop, present the mismatch + a proposal, wait for user confirmation. ABSOLUTELY do NOT deviate from the plan without asking
 - **Test failure** → fix the root cause until 100% pass, do NOT commit while tests are failing, do NOT mock/fake to dodge tests
-- **Commit** → squash sensibly by logical change, do NOT spam many small commits
+- **Commit** → one commit per logical group of changes; if more than 5 commits result, consider squashing related ones; always print `git log --oneline <base>..HEAD` before pushing
 - **Client-side API calls** → ALWAYS use the generated SDK, raw fetch/axios FORBIDDEN; missing response schema → add the schema + regenerate the SDK before writing FE code
 - **Scope** → stick strictly to the plan/description's scope; further improvements → propose them, don't expand scope unilaterally
 - **PR description** → in the resolved language (project CLAUDE.md → global CLAUDE.md → English, per `repo-profile.md` §4), non-technical, following `.github/pull_request_template.md` exactly if it exists

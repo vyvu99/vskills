@@ -15,7 +15,7 @@ Bạn là một senior engineer implement task này từ đầu đến cuối qu
 **TRƯỚC KHI BẮT ĐẦU:** Tạo checklist 9 bước bằng `TodoWrite` (mỗi item ứng với 1 bước). Sau khi hoàn thành mỗi bước → đánh dấu `completed` trước khi chuyển sang bước tiếp theo. KHÔNG đánh dấu completed trước khi công việc thực sự xong. Ngoại lệ: bước 1 là rule áp dụng xuyên suốt các bước khác, không phải task 1 lần — giữ `in_progress` đến khi bước 9 xong, không đánh dấu completed sớm.
 
 ═══════════════════════════════════════════════════════
-BƯỚC 1: SONG SONG HOÁ VÀO SUBAGENT
+BƯỚC 1: SONG SONG HOÁ CÔNG VIỆC READ-ONLY VÀO SUBAGENT
 ═══════════════════════════════════════════════════════
 
 Trước khi thực hiện mỗi bước dưới đây, đánh giá phần nào độc lập → delegate cho các subagent chạy song song trong CÙNG 1 message (không tuần tự nếu không có dependency). Áp dụng xuyên suốt, không chỉ ở đầu:
@@ -23,7 +23,11 @@ Trước khi thực hiện mỗi bước dưới đây, đánh giá phần nào 
 - Research pattern/docs cho các thư viện đang dùng → subagent song song
 - Review đối chiếu CLAUDE.md trên nhiều file độc lập (bước 7) → subagent song song
 
+Phạm vi: subagent ở bước này là READ-ONLY (research, đọc plan/codebase, review đối chiếu CLAUDE.md). Việc viết code implementation (bước 5) KHÔNG được delegate cho subagent song song ở bước này — tự viết code thật, tuần tự, trong session này.
+
 Mục đích: giảm token usage của main agent — main agent chỉ tổng hợp kết quả.
+
+Nếu cần công việc *implementation* song song thực sự (nhiều writer độc lập chạm vào file/feature khác nhau cùng lúc, không chỉ research read-only song song) → mỗi parallel writer nên dùng git worktree riêng để tránh xung đột working-tree.
 
 ═══════════════════════════════════════════════════════
 BƯỚC 2: XÁC ĐỊNH BRANCH
@@ -32,6 +36,7 @@ BƯỚC 2: XÁC ĐỊNH BRANCH
 1. Kiểm tra branch hiện tại: nếu tên/nội dung đã khớp với task đang làm (user đang chủ ý tiếp tục trên branch đó) → BỎ QUA bước tạo branch, dùng branch hiện tại.
 2. Nếu không khớp:
    - Tự động detect default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'` → nếu rỗng, thử `git rev-parse --verify main 2>/dev/null` → dùng `main`; nếu `main` không tồn tại → dùng `master`.
+   - Chạy `git status --porcelain`; nếu có output (working tree dirty) → DỪNG LẠI, hỏi user (stash / commit / tiếp tục trên branch hiện tại) trước khi tiếp tục.
    - `git checkout <default_branch>` → `git pull` → `git checkout -b <descriptive-branch-name>`
    - Tên branch: kebab-case, tiếng Anh, mô tả chính xác phạm vi thay đổi (không gắn prefix theo tool/agent trừ khi repo bắt buộc theo convention riêng).
 
@@ -57,7 +62,10 @@ Input là 1 trong 2 dạng — tự động detect từ `$ARGUMENTS`:
 BƯỚC 4: VIẾT TEST CASE + EDGE CASE TRƯỚC KHI CODE
 ═══════════════════════════════════════════════════════
 
-- **Bắt buộc** với API/backend logic: với mỗi function/endpoint mới hoặc sửa đổi, liệt kê test case TRƯỚC khi viết implementation — happy path + edge case (null/undefined/empty/0/negative/boundary/concurrent).
+- **Bắt buộc** với API/backend logic: với mỗi function/endpoint mới hoặc sửa đổi —
+  1. Liệt kê test hiện có đang chạm vào đoạn code sắp thay đổi (grep file test / theo import graph của module).
+  2. Viết test mới bao phủ happy path + edge case (null/undefined/empty/0/negative/boundary/concurrent).
+  3. Chạy test và xác nhận nó FAIL trước khi viết implementation — paste output fail vào progress notes của task. Test pass ngay lập tức là không hợp lệ — viết lại.
 - **Không bắt buộc** với pure UI (chỉ style/layout, không business logic). Nếu bỏ qua → ghi rõ lý do trong checklist ("pure UI, skipping test-first").
 
 ═══════════════════════════════════════════════════════
@@ -91,9 +99,10 @@ BƯỚC 7: REVIEW ĐỐI CHIẾU CLAUDE.md
 BƯỚC 8: CHẠY TEST, FIX ĐẾN KHI PASS
 ═══════════════════════════════════════════════════════
 
-- Chạy test suite liên quan (unit/integration theo convention của project).
+- Chạy TOÀN BỘ test suite của (các) package bị chạm tới (unit/integration theo convention của project) — không chỉ test "liên quan". Nếu project có track coverage → báo cáo coverage delta.
 - Nếu fail → fix root cause (không patch triệu chứng) → chạy lại.
 - Lặp lại đến khi pass 100%. KHÔNG được skip test fail để commit nhanh hơn, KHÔNG dùng mock/fake data/tricks để giả vờ pass.
+- Sau khi test pass, nếu thay đổi có thể gọi qua HTTP/CLI → thực sự gọi thử một lần (curl endpoint mới/đã sửa, chạy CLI command mới/đã sửa) và đưa output thật vào completion report — chỉ nói "tests pass" là chưa đủ.
 
 ═══════════════════════════════════════════════════════
 BƯỚC 9: COMMIT + TẠO PR
@@ -103,7 +112,7 @@ Resolve VCS profile trước: đọc `~/.claude/skills/_vskills-shared/repo-prof
 
 **Commit:**
 - Message tiếng Anh, conventional commit format (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`).
-- Squash thành số lượng commit hợp lý, gom theo logical change — KHÔNG tạo nhiều commit nhỏ lẻ rải rác.
+- Mỗi logical group thay đổi = 1 commit. Nếu kết quả nhiều hơn 5 commit, cân nhắc squash các commit liên quan. Luôn in `git log --oneline <base>..HEAD` trước khi push để user thấy danh sách commit cuối cùng.
 
 **PR:**
 - Đọc `.github/pull_request_template.md` của project (nếu có) → PR body PHẢI theo đúng template đó. Nếu không có → dùng format mặc định hợp lý (Summary / Changes / Test plan).
@@ -121,7 +130,7 @@ Resolve VCS profile trước: đọc `~/.claude/skills/_vskills-shared/repo-prof
 - **KHÔNG được bỏ qua bước nào** trong 9 bước — kể cả khi task trông "đơn giản"
 - **Codebase lệch so với plan** → dừng lại, trình bày mismatch + đề xuất, chờ user xác nhận. TUYỆT ĐỐI KHÔNG lệch khỏi plan mà không hỏi
 - **Test fail** → fix root cause đến khi pass 100%, KHÔNG commit khi test đang fail, KHÔNG mock/fake để né test
-- **Commit** → squash hợp lý theo logical change, KHÔNG spam nhiều commit nhỏ
+- **Commit** → mỗi logical group thay đổi = 1 commit; nếu nhiều hơn 5 commit thì cân nhắc squash các commit liên quan; luôn in `git log --oneline <base>..HEAD` trước khi push
 - **API call phía client** → LUÔN dùng generated SDK, raw fetch/axios CẤM; thiếu response schema → thêm schema + regenerate SDK trước khi viết code FE
 - **Scope** → bám sát chặt scope của plan/mô tả; improvement thêm → đề xuất, không tự ý mở rộng scope
 - **PR description** → ngôn ngữ resolve theo `repo-profile.md` §4 (CLAUDE.md project → CLAUDE.md global → tiếng Anh), không thuật ngữ kỹ thuật, theo đúng `.github/pull_request_template.md` nếu có
