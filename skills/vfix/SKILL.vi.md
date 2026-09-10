@@ -36,8 +36,8 @@ Vì sao bước này đi trước: đã được lint rule xác nhận, grep-det
 
 1. Đọc `SCRIPT_SCAN.json`. Nếu rỗng/`{"error":...}` → bỏ qua bước này.
 2. Gom violation theo `rule_id`.
-3. Với MỖI rule_id: đọc rule script (`~/.claude/scripts/lint-rules/rules/{rule_id}.sh` — phần `## PROBLEM` + `## FIX`) để hiểu đúng ý đồ của rule trước khi fix.
-4. Fix MỖI violation đúng như hướng dẫn trong phần `## FIX` của rule script — không tự nghĩ ra cách fix khác nếu rule đã nói rõ.
+3. Với MỖI rule_id: đọc rule script (`~/.claude/scripts/lint-rules/rules/{rule_id}.sh` — phần `## PROBLEM` + `## FIX`) để hiểu đúng ý đồ của rule trước khi fix. Nếu rule script không tồn tại, fallback sang suy luận ý đồ từ field `message` của rule_id đó trong `~/.claude/scripts/lint-rules/config/rule-registry.json`; nếu field đó cũng không có, bỏ qua rule_id đó và ghi chú vào report thay vì làm fail cả bước.
+4. Fix MỖI violation đúng như hướng dẫn trong phần `## FIX` của rule script — không tự nghĩ ra cách fix khác nếu rule đã nói rõ. Nếu áp dụng đúng `## FIX` như hướng dẫn mà gây fail test/typecheck, KHÔNG tự nghĩ ra cách fix khác — dừng lại, báo cáo "FIX guidance của rule `<rule_id>` có vẻ sai với case này," và đề xuất chạy `vreview --harvest` để siết lại rule đó, thay vì tự vá vòng qua nó.
 5. Sau khi fix xong tất cả violation của 1 rule_id → chạy lại chính rule đó trên các file vừa fix để xác nhận không còn violation, rồi mới chuyển sang rule_id tiếp theo.
 6. Sau khi BƯỚC 1 xong → commit 1 lần: `fix: resolve {N} script-detected lint violations`.
 
@@ -60,7 +60,7 @@ Lặp lại đúng quy trình của BƯỚC 2 (gom theo dependency → batch →
 ──────────────────────────────────────────────────────
 BƯỚC 4 — CROSS-GROUP ISSUES (REPORT.md)
 ──────────────────────────────────────────────────────
-0. Trước khi fix, kiểm tra STOP-GATE (3 điều kiện giống Bước 2/3).
+0. Trước khi fix, kiểm tra STOP-GATE (4 điều kiện giống Bước 2/3).
 1. Đọc phần riêng "CROSS-GROUP ISSUES" trong REPORT.md — các issue trải rộng ≥2 group/file, không nằm gọn trong batch CRITICAL/WARNING nào ở trên.
 2. Mỗi cross-group issue là một batch riêng (vì theo định nghĩa nó đã trải rộng nhiều file/group).
 3. Fix → verify TẤT CẢ file liên quan ở CẢ HAI phía → commit riêng: `fix: {cross-group issue description}`.
@@ -82,13 +82,14 @@ KHÁC với 4 bước trên: KHÔNG tự ý apply.
 STOP-GATE — DỪNG LẠI VÀ HỎI USER (áp dụng cho bước 2-4, KHÔNG tự quyết định)
 ═══════════════════════════════════════════════════════
 
-Trước khi fix bất kỳ issue nào, kiểm tra 3 điều kiện sau — nếu KHỚP bất kỳ điều kiện nào → dừng lại, dùng `AskUserQuestion`, KHÔNG tự fix:
+Trước khi fix bất kỳ issue nào, kiểm tra 4 điều kiện sau — nếu KHỚP bất kỳ điều kiện nào → dừng lại, dùng `AskUserQuestion`, KHÔNG tự fix:
 
 a. Report ghi chú "verify with product" / "needs business-logic confirmation" / cách diễn đạt tương đương cho thấy fix phụ thuộc vào một quyết định business chưa rõ ràng.
 b. Fix cần database migration (thêm/sửa/xoá column, constraint, hoặc enum value ở tầng DB).
 c. Fix ảnh hưởng đến shared package (package được ≥2 app trong monorepo dùng — kiểm tra xem `packages/` có được ≥2 `apps/` import không).
+d. Fix cần `UPDATE`/`DELETE` trên data đã tồn tại (không chỉ đổi schema) — coi trọng ngang với migration, vì rủi ro tương đương.
 
-Issue nào không khớp cả 3 điều kiện → fix trực tiếp theo đúng quy trình của bước tương ứng.
+Issue nào không khớp cả 4 điều kiện → fix trực tiếp theo đúng quy trình của bước tương ứng.
 
 ═══════════════════════════════════════════════════════
 SDK GENERATE (sau MỖI batch làm thay đổi shared schema / API route)
@@ -107,8 +108,10 @@ WRAP-UP — FORMAT + DỌN DẸP
 
 1. Sau khi tất cả các bước đã xong (kể cả các item SUGGESTION đã hỏi) → tự động phát hiện và chạy format command của project: tìm trong scripts của `package.json` theo thứ tự `format` → `format:fix` → `lint:fix`. Nếu không tìm thấy → bỏ qua.
 2. Append mỗi item trong `.code-review/REPORT.md` thành 1 dòng vào `.code-review-history.jsonl` ở repo root (tạo file nếu chưa có) — mỗi dòng JSON: `{date, rule_or_source, file, status}`, đọc giá trị `Status:` cuối cùng của từng item. Làm bước này bất kể sau đó user xác nhận hay từ chối xoá — đây là bản ghi bền vững tồn tại độc lập với cả hai lựa chọn.
-3. Trước khi xoá `.code-review/` (hoặc report path đã dùng): hỏi user xác nhận — luôn mặc định là user CHƯA CHẮC đã đọc xong report; luôn hỏi, không bao giờ tự cho là đã đọc xong.
-4. User xác nhận → xoá report directory. User muốn giữ lại → để nguyên, xong.
+3. Chạy `vcheck` (typecheck + build) trên (các) package đã bị đụng tới trong lần chạy này — fix nhiều violation qua nhiều batch rất dễ để sót một type error lẻ. Nếu vcheck báo lỗi, fix trước khi qua bước tiếp theo.
+4. Trước khi xoá `.code-review/` (hoặc report path đã dùng): hỏi user xác nhận — luôn mặc định là user CHƯA CHẮC đã đọc xong report; luôn hỏi, không bao giờ tự cho là đã đọc xong.
+5. User xác nhận → xoá report directory. User muốn giữ lại → để nguyên, xong.
+6. Kiểm tra `~/.claude/scripts/lint-rules/violation-history.jsonl`: nếu `rule_id` nào liên quan trong lần chạy này có tỷ lệ bị reject/skip cao qua các lần lịch sử, ghi chú vào summary cuối cùng như một ứng viên cần siết lại hoặc retire rule đó (qua `vreview --harvest` hoặc sửa trực tiếp rule).
 
 ═══════════════════════════════════════════════════════
 QUY TẮC CỨNG
