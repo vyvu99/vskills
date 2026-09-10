@@ -5,8 +5,6 @@ argument-hint: "[plan-path | mô tả task] [--issue <number>]"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Invoke để implement một feature/fix từ plan có sẵn hoặc từ mô tả nhanh — tự động tạo branch, viết test, code, review, chạy test, commit, và tạo PR."
-category: workflow
-keywords: [cook, implement, workflow, plan, sdk, commit, pr]
 metadata:
   author: vyvu
   version: "1.1.0"

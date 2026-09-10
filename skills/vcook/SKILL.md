@@ -5,8 +5,6 @@ argument-hint: "[plan-path | task description] [--issue <number>]"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Invoke to implement a feature/fix from an existing plan or a quick description — auto-creates the branch, writes tests, codes, reviews, runs tests, commits, and creates a PR."
-category: workflow
-keywords: [cook, implement, workflow, plan, sdk, commit, pr]
 metadata:
   author: vyvu
   version: "1.1.0"

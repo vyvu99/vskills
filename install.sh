@@ -57,6 +57,10 @@ if [[ -d "$SKILLS_SRC" ]]; then
     # clean up an older dir-level symlink from a previous install.sh version
     [[ -L "$dst_dir" ]] && run "rm '$dst_dir'"
     link "$src_file" "$dst_dir/SKILL.md"
+    # references/ (if the skill has one) is symlinked whole — unlike SKILL.md,
+    # it isn't subject to --lang per-file selection, so any skill with a
+    # references/ dir gets it (generic, not hardcoded to a specific skill).
+    [[ -d "${skill_dir}references" ]] && link "${skill_dir}references" "$dst_dir/references"
   done
 fi
 

@@ -5,8 +5,6 @@ argument-hint: "<số-PR>"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Dùng sau khi Claude bot đã review xong một PR, khi muốn chắt lọc các pattern lặp lại thành rule mới cho CLAUDE.md."
-category: meta
-keywords: [claude-md, rules, pr-review, self-improvement]
 metadata:
   author: vyvu
   version: "1.0.0"

@@ -1,5 +1,6 @@
 scripts/lint-rules/staged/
 scripts/lint-rules/violation-history.jsonl
+SCRIPT_SCAN.json
 .DS_Store
 plans/
 .code-review/

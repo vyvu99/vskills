@@ -5,9 +5,6 @@ argument-hint: "[path to report dir, default .code-review/]"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Invoke after a report (from vreview or an equivalent report) exists and needs to be fixed in the correct priority order, without arbitrarily applying suggestions."
-category: workflow
-keywords: [fix, bugfix, code-review, priority, sdk-generate, root-cause]
-extends: fix
 metadata:
   author: vyvu
   version: "1.1.0"

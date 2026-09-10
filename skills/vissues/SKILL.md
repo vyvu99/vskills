@@ -1,12 +1,10 @@
 ---
 name: vissues
-description: "Create/update a GitHub epic issue + sub-issues from 1 plan directory, using gh CLI + GraphQL addSubIssue. Issue content is non-technical, migrations are consolidated into the sub-issue containing phase 1's content. Idempotent — re-running does not create duplicates."
+description: "Create/update a GitHub epic issue + sub-issues from 1 plan directory, using gh CLI + REST sub_issues API (GraphQL addSubIssue as fallback). Issue content is non-technical, migrations are consolidated into the sub-issue containing phase 1's content. Idempotent — re-running does not create duplicates."
 argument-hint: "<plan-path>"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Invoke when you need to create or sync a GitHub epic + sub-issues from an existing plan (plan.md + phase-XX-*.md)."
-category: workflow
-keywords: [github, issues, epic, sub-issues, graphql]
 metadata:
   author: vyvu
   version: "1.1.0"
@@ -28,7 +26,7 @@ If `$ARGUMENTS` is empty — ask the user for the path to the plan directory (e.
 
 ## Step 0 — Resolve the VCS profile
 
-Read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (if present; if absent, assume GitHub + gh — today's default). Full gh mode → continue as written below. Degraded/local-only → print the §2 vissues message (`addSubIssue` is GitHub's own GraphQL mutation, no equivalent elsewhere), then still do Step 1 (read the plan) and Step 4 (compose issue content), and print the epic + sub-issue bodies ready to paste — marking which sub-issue holds the migrations per Step 5. Never abort the run because `gh` is unavailable.
+Read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (if present; if absent, assume GitHub + gh — today's default). Full gh mode → continue as written below. Degraded/local-only → print the §2 vissues message (sub-issue linking — REST `sub_issues` and its GraphQL `addSubIssue` fallback alike — is GitHub's own API, no equivalent elsewhere), then still do Step 1 (read the plan) and Step 4 (compose issue content), and print the epic + sub-issue bodies ready to paste — marking which sub-issue holds the migrations per Step 5. Never abort the run because `gh` is unavailable.
 
 ## Step 1 — Read the plan
 
@@ -54,7 +52,7 @@ These commands assume full gh mode from Step 0; in degraded mode, follow the man
    ```
    gh issue create --title "<feature name, in English>" --body "<epic description, see Step 4>" --label epic
    ```
-5. Get the epic's node ID (required before linking sub-issues in Step 3; `<owner>`/`<repo>` resolved per §2):
+5. Get the epic's node ID — only needed for the GraphQL fallback in Step 3, not for the REST path (`<owner>`/`<repo>` resolved per §2):
    ```
    gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id}}}' -f owner=<owner> -f repo=<repo> -F number=<epic_number>
    ```
@@ -74,17 +72,31 @@ These commands assume full gh mode from Step 0; in degraded mode, follow the man
    ```
    gh issue create --title "<title, in English>" --body "<content, see Step 4>"
    ```
-4. Get the sub-issue's node ID **and** its current parent link, in one GraphQL query (`<owner>`/`<repo>` per §2):
+4. Before linking any sub-issue, fetch the epic's current sub-issues **once per skill invocation** (REST, `<owner>`/`<repo>` per §2) — cache this list and reuse it for every sub-issue's already-linked check below AND for the count check, don't re-fetch per sub-issue:
    ```
-   gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id parent{id}}}}' -f owner=<owner> -f repo=<repo> -F number=<sub_issue_number>
+   gh api repos/<owner>/<repo>/issues/<epic_number>/sub_issues --paginate --jq '.[].id'
    ```
-   The response's `parent.id` (when present) is the node ID of whatever issue this sub-issue is currently linked under, if any.
-5. Link it to the epic — compare `parent.id` from step 4 to the epic's node ID (from Step 2.5):
-   - Newly created sub-issue (no `parent` in the response) OR `parent.id` != epic node ID → call `addSubIssue`
-   - `parent.id` == epic node ID → already linked from a previous run, **skip** — this is what makes re-runs idempotent
-   ```
-   gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId}){issue{title}subIssue{title}}}' -f issueId=<epic_node_id> -f subIssueId=<sub_issue_node_id>
-   ```
+   - If this call fails outright → do not assume the epic has 0 sub-issues. Warn the user explicitly that the current count/links couldn't be verified, and ask whether to proceed before linking anything.
+   - If it succeeds → count check: if the list already has 100 or more entries (GitHub's documented per-parent limit — reconfirm live if this skill is revisited later, don't trust a stale number), **STOP** and tell the user the epic is at GitHub's sub-issue limit; they must close/reorganize existing sub-issues before adding more. Do this once for the whole run, not per sub-issue.
+5. For each sub-issue to link (found or newly created in step 3):
+   a. Fetch its numeric `id` — **NOT** `number`, **NOT** node ID:
+      ```
+      gh api repos/<owner>/<repo>/issues/<sub_issue_number> --jq .id
+      ```
+   b. If that numeric id is already in the cached list from step 4 → already linked to this epic from a previous run, **skip silently** — this is the expected, common outcome on every re-run, not an error.
+   c. Otherwise, attempt REST linking (this also covers moving a sub-issue that currently belongs to a different parent, via `replace_parent`):
+      ```
+      gh api repos/<owner>/<repo>/issues/<epic_number>/sub_issues -F sub_issue_id=<numeric_id> -F replace_parent=true
+      ```
+      - **201** → linked, done for this sub-issue.
+      - **401/403** (permission/auth error) → **STOP** and report the exact error to the user directly — do **NOT** fall back to GraphQL; the same token/permission problem will very likely also break the GraphQL mutation, so a silent fallback would mask a token-scope misconfiguration instead of surfacing it.
+      - **Any other failure** (404, 410, 422, network error, etc.) → fall back to GraphQL: look up both node IDs, then call `addSubIssue` with `replaceParent: true`:
+        ```
+        gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id}}}' -f owner=<owner> -f repo=<repo> -F number=<sub_issue_number>
+        ```
+        ```
+        gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!,$replaceParent:Boolean){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId,replaceParent:$replaceParent}){issue{title}subIssue{title}}}' -f issueId=<epic_node_id> -f subIssueId=<sub_issue_node_id> -F replaceParent=true
+        ```
 
 ## Step 4 — Issue content (both epic and sub-issues follow this format)
 
@@ -110,7 +122,9 @@ If the plan includes database changes → put ALL migration-related content into
 ## Hard rules
 
 - Always search before creating (`gh issue list --search`) — avoid duplicate epic/sub-issues when re-running the skill
-- Always get the node ID via a GraphQL query BEFORE calling `addSubIssue` — the mutation needs a global ID (base64 string), not the issue number; the same query's `parent{id}` field tells you if the sub-issue is already linked to the epic — skip `addSubIssue` when it matches
+- REST `sub_issues` is the primary linking path; fetch the epic's sub-issues list once per run (cached) and skip linking a sub-issue whose numeric `id` is already in that list — this is the idempotent no-op, never a REST failure requiring fallback
+- Only fall back to the GraphQL `addSubIssue` mutation (with `replaceParent: true`) on a genuine non-permission REST failure; on a 401/403 from REST, stop and report it to the user directly — never silently fall back
+- Never link a sub-issue when the epic's cached sub-issue count is already ≥ 100 (GitHub's per-parent limit) — stop and tell the user to close/reorganize existing sub-issues first; if the count-fetch itself fails, warn the user and ask before proceeding, don't assume 0
 - Issue language must always be non-technical — no code jargon, no file/function/DB table names
 - Migrations always go into the sub-issue containing phase 1's content, never scattered across multiple sub-issues
 - Never create a new label (`epic` or otherwise) without confirming with the user first

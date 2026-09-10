@@ -4,8 +4,6 @@ description: "Run typecheck + build + format (+ optional test) in parallel for a
 argument-hint: "[package-names...] [--test]"
 user-invocable: true
 when_to_use: "Invoke when you need a fast typecheck/build (and test) of the whole repo or a group of packages in a JS/TS monorepo (or single package) before commit/PR."
-category: workflow
-keywords: [typecheck, build, tsc, pnpm, npm, yarn, bun, monorepo, ci]
 metadata:
   author: vyvu
   version: "1.1.0"

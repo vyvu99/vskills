@@ -5,8 +5,6 @@ argument-hint: "<PR-number>"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Invoke after Claude bot has finished reviewing a PR, when you want to distill recurring patterns into new rules for CLAUDE.md."
-category: meta
-keywords: [claude-md, rules, pr-review, self-improvement]
 metadata:
   author: vyvu
   version: "1.0.0"

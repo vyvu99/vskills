@@ -5,8 +5,6 @@ argument-hint: "<migration-name-or-version>"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Dùng khi cần rollback một migration trên local dev DB và xóa tracking record tương ứng của nó."
-category: database
-keywords: [migration, rollback, database, local, docker]
 metadata:
   author: vyvu
   version: "1.1.0"

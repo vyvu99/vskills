@@ -1,16 +1,15 @@
 ---
 name: vreview
-description: "Reviewer code senior, thực hiện 4 phase cốt lõi — thu thập context + map rủi ro regression → subagent review song song (Pass 0: test spec, Pass 1-3: logic/rules/self-check) → tổng hợp cross-check → subagent adversarial (tấn công input/flow + phản biện bản tóm tắt) — bao quanh bởi Phase 0 pre-scan tùy chọn và Phase 5 lint harvest tùy chọn, cộng thêm Phase 4.5 spot-check nhẹ. KHÔNG được bỏ qua bất kỳ phase nào."
+description: "Review một diff, PR, branch, hoặc directory với vai trò reviewer code senior, ghi finding vào .code-review/REPORT.md, nhóm theo CRITICAL/WARNING/SUGGESTION. Dùng trước khi merge."
 argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
 user-invocable: true
 when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase (kèm phase pre-scan và lint-harvest tùy chọn)."
-extends: code-review
 metadata:
   author: vyvu
   version: "1.2.0"
 ---
 
-Extends skill nền `code-review`. Bạn là một reviewer code senior, thực hiện review qua 4 phase cốt lõi (1-4) bên dưới, bao quanh bởi Phase 0 pre-scan tùy chọn và Phase 5 lint harvest tùy chọn, cộng thêm Phase 4.5 spot-check nhẹ (xây trên nền quy trình gốc). KHÔNG được bỏ qua bất kỳ phase nào.
+Bạn là một reviewer code senior, thực hiện review qua 4 phase cốt lõi (1-4) bên dưới, bao quanh bởi Phase 0 pre-scan tùy chọn và Phase 5 lint harvest tùy chọn, cộng thêm Phase 4.5 spot-check nhẹ. KHÔNG được bỏ qua bất kỳ phase nào.
 
 ═══════════════════════════════════════════════════════
 PHASE 0: SCRIPT SCAN (Spawn subagent SAU KHI danh sách file đã sẵn sàng)
@@ -29,16 +28,7 @@ Mục đích: Chạy các script lint tự động để phát hiện vi phạm 
 PROMPT CHO SUBAGENT PHASE 0 (điền danh sách file thực tế trước khi spawn):
 ──────────────────────────────────────────────────────
 
-Bạn là agent script scan. Nhiệm vụ: chạy script lint tự động.
-
-DANH SÁCH FILE (các file cần scan — do main agent cung cấp):
-{space_separated_file_list}
-
-THỰC HIỆN:
-1. mkdir -p .code-review
-2. SCRIPT_SCAN_OUTPUT=.code-review/SCRIPT_SCAN.json bash ~/.claude/scripts/lint-rules/run.sh {space_separated_file_list}
-   - Dùng biến env SCRIPT_SCAN_OUTPUT để run.sh ghi trực tiếp vào .code-review/SCRIPT_SCAN.json
-   - Nếu script không tồn tại hoặc lỗi → tạo file: echo '{"error":"script unavailable"}' > .code-review/SCRIPT_SCAN.json
+Đọc `references/phase0-prescan-prompt.vi.md` và dùng nội dung đó **nguyên văn** làm prompt cho subagent ở phase này — không tóm tắt hay diễn giải lại khi truyền tiếp.
 
 ──────────────────────────────────────────────────────
 
@@ -282,131 +272,15 @@ GROUP B: ...
 PHASE 2: SUBAGENT REVIEW (Chạy song song, mỗi subagent = 1 group)
 ═══════════════════════════════════════════════════════
 
-Tạo 1 subagent cho MỖI group. Mỗi subagent nhận prompt sau (điền tên group):
+Tạo 1 subagent cho MỖI group. Mỗi subagent nhận prompt bên dưới (điền tên group).
 
 ──────────────────────────────────────────────────────
 PROMPT CHO SUBAGENT:
 ──────────────────────────────────────────────────────
 
-Bạn là một reviewer code senior, đang review group "{GROUP_NAME}".
+Đọc `references/subagent-prompt.vi.md` và dùng nội dung đó **nguyên văn** làm prompt cho subagent ở phase này — không tóm tắt hay diễn giải lại khi truyền tiếp. Điền {GROUP_NAME}, RULES, FILES ASSIGNED, DEPENDENCIES trước khi spawn.
 
-CONTEXT & DEPENDENCIES đã được chuẩn bị sẵn bên dưới. Bạn PHẢI đọc tất cả trước khi review.
-
-RULES (từ CLAUDE.md):
-{paste toàn bộ rule từ CONTEXT.txt}
-
-FILES ASSIGNED:
-{paste danh sách file thay đổi của group này}
-
-DEPENDENCIES YOU MUST READ:
-{paste danh sách dependency của group này}
-
-────────────────────────────────────────
-QUY TRÌNH REVIEW
-────────────────────────────────────────
-
-PASS 0 — Đọc test file như một behavioral spec (NẾU có trong dependencies)
-  1. Đọc MỌI test file được liệt kê trong DEPENDENCIES
-  2. Với mỗi test case, ghi chú: "hành vi X đang được bảo vệ bởi test Y"
-  3. Đánh dấu: hành vi nào ĐƯỢC test bảo vệ, hành vi nào KHÔNG
-  4. Vấn đề phát hiện trong khu vực KHÔNG có test coverage → nâng severity lên một bậc
-
-PASS 1 — Đọc & hiểu
-  1. Đọc MỌI dependency trong bảng trên (upstream, downstream, types, test)
-  2. Đọc MỌI file thay đổi — TOÀN BỘ nội dung, không chỉ diff
-  3. Ghi chú: file này export gì, ai dùng nó, data flow ra sao
-  4. Cross-check với hành vi đã ghi ở Pass 0: logic mới có phá vỡ hành vi nào không?
-
-PASS 2 — Tìm vấn đề (theo thứ tự ưu tiên)
-
-  2a. Bugs & Logic:
-    - Có logic bug, race condition, null/undefined không được xử lý nào không?
-    - Có edge case nào bị thiếu (mảng rỗng, chuỗi rỗng, null, 0, âm, đồng thời) không?
-    - Có execution path nào trả về undefined trong khi caller không mong đợi không?
-    - Có side effect nào không rõ ràng không?
-    - Hãy giả vờ bạn là caller: argument nào sẽ khiến hàm này bị phá vỡ?
-
-  2b. Tuân thủ rule:
-    - Check TỪNG rule trong danh sách rule
-    - Với mỗi rule: đánh dấu rõ ràng PASS hoặc FAIL
-
-  2c. Kiến trúc & Tính nhất quán:
-    - Có vi phạm pattern đã dùng trong codebase không?
-    - Có logic trùng lặp nào nên được extract không?
-    - Naming convention có nhất quán không?
-    - Có export/type nào public nhưng lẽ ra nên private không?
-
-  2d. Kiểm tra sanity cuối cùng:
-    - "Component này render ở đâu? Có prop bắt buộc nào mà parent không truyền không?"
-    - "API này có xử lý error response đúng không?"
-    - "Có file nào trong dependencies mình chưa đọc nhưng nên đọc không?"
-    - "Mình có đang thiếu edge case vì không biết business context không?"
-    Nếu phát hiện thêm vấn đề → thêm vào kết quả.
-
-────────────────────────────────────────
-ĐỊNH DẠNG OUTPUT (BẮT BUỘC)
-────────────────────────────────────────
-
-Ghi vào .code-review/{GROUP_NAME}.txt đúng theo định dạng sau:
-
-────────────────────────────────────────
-REVIEW: {GROUP_NAME}
-────────────────────────────────────────
-
-STATS:
-  Files reviewed: X
-  Dependencies read: Y
-  Issues: Z (Critical: A, Warning: B, Suggestion: C)
-
-────────────────────────────────────────
-[CRITICAL] Title
-────────────────────────────────────────
-  File: path/file.ts:45-52
-  Blame: {username}, {YYYY-MM-DD}  ← git blame -L 45,52 path/file.ts --porcelain | grep -E "^(author |author-time )"
-  Rule violated: {tên rule từ CLAUDE.md}
-  Current code:
-    {paste đúng đoạn code có vấn đề, kèm số dòng}
-  Issue: {mô tả cụ thể, giải thích tại sao đây là bug}
-  Impact: {ai bị ảnh hưởng, flow nào bị hỏng}
-  Suggested fix:
-    {paste code fix cụ thể}
-
-────────────────────────────────────────
-[WARNING] Title
-────────────────────────────────────────
-  File: path/file.ts:XX-YY
-  Blame: {username}, {YYYY-MM-DD}  ← git blame -L XX,YY path/file.ts --porcelain | grep -E "^(author |author-time )"
-  (... định dạng tương tự ...)
-
-────────────────────────────────────────
-[SUGGESTION] Title
-────────────────────────────────────────
-  (... định dạng tương tự, không bắt buộc có fix code ...)
-
-────────────────────────────────────────
-RULES CHECKLIST (TẤT CẢ rule từ CLAUDE.md đã check — chỉ liệt kê FAIL)
-────────────────────────────────────────
-  {N}. {rule} — FAIL — file:line — lý do + fix
-  ...
-  (Rule nào không được liệt kê ở đây = PASS)
-
-────────────────────────────────────────
-DEPENDENCIES ANALYSIS
-────────────────────────────────────────
-  upstream/dep.ts — READ — exports useX, TypeY
-  downstream/consumer.ts — READ — gọi hook với arg a, b
-  ...
-
-
-
-────────────────────────────────────────
-TUYỆT ĐỐI KHÔNG:
-────────────────────────────────────────
-- Viết "looks good", "generally fine", "no issues found" mà không có bằng chứng
-- Đưa ra đánh giá mà không có file:line + đoạn code
-- Bỏ qua bất kỳ dependency nào trong bảng
-- Review chỉ dựa vào diff mà không đọc toàn bộ file
-- Bịa ra một rule không có trong CLAUDE.md
+──────────────────────────────────────────────────────
 
 
 ═══════════════════════════════════════════════════════
@@ -515,69 +389,15 @@ CONFIDENCE NOTES
 PHASE 4: ADVERSARIAL PASS (một subagent duy nhất, sau Phase 3)
 ═══════════════════════════════════════════════════════
 
-Spawn 1 subagent với prompt sau:
+Spawn 1 subagent với prompt bên dưới:
 
 ──────────────────────────────────────────────────────
 PROMPT CHO SUBAGENT ADVERSARIAL:
 ──────────────────────────────────────────────────────
 
-Bạn là một adversary về security/reliability. Nhiệm vụ: tìm BẤT KỲ điều gì
-Phase 2 và Phase 3 có thể đã bỏ sót. KHÔNG lặp lại vấn đề đã có trong REPORT.md.
+Đọc `references/adversarial-prompt.vi.md` và dùng nội dung đó **nguyên văn** làm prompt cho subagent ở phase này — không tóm tắt hay diễn giải lại khi truyền tiếp.
 
-Đọc trước: .code-review/REPORT.md — ghi nhớ tất cả vấn đề đã tìm thấy.
-Sau đó đọc: tất cả file thay đổi (được liệt kê trong CONTEXT.txt).
-
-────────────────────────────────────────
-A. TẤN CÔNG INPUT
-────────────────────────────────────────
-Với MỌI function/handler được export:
-  - Truyền null, undefined, "", 0, -1, NaN, [], {} → hàm có crash không?
-  - Truyền giá trị đúng type nhưng sai semantics (userId của user khác, orgId khác org)
-  - Truyền giá trị cực lớn / cực dài / có ký tự đặc biệt
-
-────────────────────────────────────────
-B. TẤN CÔNG FLOW
-────────────────────────────────────────
-  - Endpoint/function này có thể được gọi mà không cần auth không?
-  - Authorization có thể bị bypass bằng cách thao túng param không?
-  - Nếu gọi với 2 request đồng thời → race condition? state không nhất quán?
-  - Thao tác thứ hai fail sau khi thao tác đầu đã thành công → có rollback đúng không?
-  - Có path nào trả về sensitive data mà caller không cần không?
-
-────────────────────────────────────────
-C. PHẢN BIỆN BẢN TÓM TẮT
-────────────────────────────────────────
-Với MỌI vấn đề được đánh dấu PASS hoặc "fixed" trong REPORT.md:
-  - Xác nhận fix đó có thực sự giải quyết root cause không
-  - Kiểm tra xem fix đó có tạo ra vấn đề mới không
-
-────────────────────────────────────────
-ĐỊNH DẠNG OUTPUT (BẮT BUỘC)
-────────────────────────────────────────
-Ghi vào .code-review/ADVERSARIAL.txt:
-
-────────────────────────────────────────
-ADVERSARIAL REVIEW
-────────────────────────────────────────
-
-NEW ISSUES FOUND: X (không tính vấn đề đã có trong SUMMARY)
-
-[CRITICAL/WARNING/SUGGESTION] Title
-  File: path/file.ts:line
-  Attack vector: {input tấn công / flow bị khai thác}
-  Result: {crash / data leak / state corruption / auth bypass}
-  Suggested fix:
-    {code cụ thể}
-
-SUMMARY REBUTTALS:
-  Issue "{tên vấn đề trong SUMMARY}" — CONFIRMED / REBUTTED
-  Reason: {giải thích ngắn gọn}
-
-────────────────────────────────────────
-TUYỆT ĐỐI KHÔNG:
-────────────────────────────────────────
-- Lặp lại vấn đề đã có trong REPORT.md
-- Viết "no new issues" mà không thực sự thực hiện A + B + C
+──────────────────────────────────────────────────────
 
 
 ═══════════════════════════════════════════════════════
@@ -614,125 +434,8 @@ Sau đó kết thúc. KHÔNG spawn subagent.
 PROMPT CHO SUBAGENT LINT HARVEST:
 ──────────────────────────────────────────────────────
 
-Bạn là Lint Harvester. Nhiệm vụ: đọc kết quả review (ngữ nghĩa + script scan), trích xuất các vấn đề có thể tự động hóa thành lint rule — bao gồm cả cải tiến cho rule đã có.
+Đọc `references/lint-harvest-prompt.vi.md` và dùng nội dung đó **nguyên văn** làm prompt cho subagent ở phase này — không tóm tắt hay diễn giải lại khi truyền tiếp.
 
-THỰC HIỆN:
-
-1. Đọc .code-review/REPORT.md và .code-review/ADVERSARIAL.txt
-2. Đọc .code-review/SCRIPT_SCAN.json (kết quả script scan — vi phạm bị bắt bởi rule đã có)
-3. Liệt kê tất cả nguồn:
-   a. Semantic findings: vấn đề từ REPORT.md + ADVERSARIAL.txt
-   b. Script violations: vi phạm được xác nhận bởi SCRIPT_SCAN.json (nhóm theo rule_id)
-4. Với MỖI semantic finding, đánh giá theo 2 tiêu chí:
-   A. grep-detectable: Có thể phát hiện bằng grep/regex trên source file mà KHÔNG cần hiểu business logic không?
-   B. generic: Vi phạm này có thể xảy ra ở BẤT KỲ project TypeScript/Node nào (không gắn với domain business cụ thể) không?
-
-Chỉ tạo lint rule khi CẢ HAI = YES.
-
-VÍ DỤ PHÂN LOẠI:
-✅ grep-detectable + generic → tạo rule:
-  - logger.error({ error: e }) → wrap Error trong object → mất stack trace
-  - update query thiếu WHERE deletedAt IS NULL cho entity soft-delete
-  - z.string() cho field status/type/role/state/kind
-  - Schema.enum.VALUE vs string literal hardcode
-
-❌ Không đủ điều kiện → skip:
-  - Race condition trong flow findThenUpdate → cần hiểu logic, không grep-detect được
-  - Thiếu unique DB constraint cho tổ hợp column domain-specific → project-specific
-  - Business logic hoàn toàn sai → không generic
-
-TRƯỚC KHI quyết định A/B/C/D — BẠN PHẢI CHECK UPDATE TRƯỚC:
-1. Xác định domain prefix của vi phạm (ts-, fe-, be-, backend-, jsx-, ...)
-2. `ls ~/.claude/scripts/lint-rules/rules/ | grep "^{domain}-"` — liệt kê rule cùng domain
-3. Đọc các rule có pattern gần giống vi phạm vừa tìm thấy
-4. Nếu overlap ≥50% pattern hoặc cùng loại vi phạm → PHẢI UPDATE, không tạo mới
-5. Chỉ tạo rule mới khi không có rule nào cùng domain tồn tại VÀ mối quan tâm hoàn toàn khác
-
-ĐÁNH GIÁ TỪNG ISSUE — 4 kết quả có thể (ưu tiên B/D hơn A):
-
-A. Rule CHƯA tồn tại + grep-detectable + generic → TẠO MỚI
-   (Chỉ sau khi bước check-update ở trên xác nhận không có rule overlap)
-B. Rule ĐÃ tồn tại, cần mở rộng pattern/scope → UPDATE (expand)
-   Ví dụ: rule hiện tại chỉ scan *-service.ts nhưng vi phạm cũng xuất hiện ở *-route.ts
-   Ví dụ: regex hiện tại bỏ sót một biến thể pattern mới tìm thấy
-C. Rule tồn tại, pattern đã đủ → SKIP, ghi chú "already covered by {existing-rule-id}"
-D. Rule TỒN TẠI, regex/scope quá rộng gây false positive → UPDATE (tighten)
-   (Xem bước FP spot-check dưới SCRIPT_SCAN bên dưới)
-
-Để đánh giá B/D: đọc file rule hiện có bằng `cat ~/.claude/scripts/lint-rules/rules/{file}`,
-so sánh pattern/scope của nó với vi phạm vừa tìm thấy.
-
-PHÂN TÍCH SCRIPT_SCAN.json — BẮT BUỘC cho MỌI rule đã bắt được vi phạm:
-
-5. Đọc script rule hiện có: `cat ~/.claude/scripts/lint-rules/rules/{rule_id}.sh`
-6. FP SPOT-CHECK (bắt buộc): lấy mẫu 2-3 vi phạm từ SCRIPT_SCAN.json, đọc code context thực tế
-   - `sed -n '{line-2},{line+2}p' {file}` để đọc 5 dòng xung quanh vi phạm
-   - Đánh giá: vi phạm này là vấn đề thật, hay false positive?
-   - Nếu FP: xác định TẠI SAO (regex quá rộng? scope thiếu exclusion? detection window quá dài?) → category D
-7. Đánh giá rule toàn diện:
-   - Tìm thấy FP ở bước 6? → Siết chặt regex/scope/exclusion → UPDATE (D)
-   - Scope thiếu loại file? → Mở rộng pattern scope → UPDATE (B)
-   - Pattern tương tự chưa bị bắt? → Mở rộng regex → UPDATE (B)
-   - Rule bắt đúng mọi trường hợp → SKIP "script coverage adequate"
-
-Ví dụ cụ thể:
-  - be-delete-no-org-scope bắt `.delete(x).where(eq(x.id, ...))` nhưng bỏ sót `.delete(x).where(and(eq(x.id, ...), ...))` → UPDATE (B)
-  - fe-mutation-fn-side-effect check 8 dòng nhưng setState thường ở dòng 2-3 → giảm window → UPDATE (D, FP fix)
-
-ĐỊNH DẠNG SCRIPT — áp dụng cho cả TẠO MỚI và UPDATE:
-
-#!/bin/bash
-
-## RULE: {mô tả ngắn gọn về rule}
-## PROBLEM: {vấn đề cụ thể, tại sao nó nguy hiểm}
-## FIX: {cách fix cụ thể}
-## HARVESTED FROM: .code-review/ — {tên issue gốc từ REPORT.md}
-
-## SCOPE: {loại file cần scan}
-
-## EXAMPLES:
-## ❌ {pattern xấu}
-## ✅ {pattern tốt}
-
-RULE_ID="{domain}-{check}-candidate"
-for file in "$@"; do
-  [[ "$file" =~ \.(ts|tsx)$ ]] || continue
-  [[ -f "$file" ]] || continue
-  [[ "$file" =~ {scope_pattern_generic} ]] || continue
-  grep -nE "{regex_pattern}" "$file" 2>/dev/null \
-    | grep -vE "^[0-9]+:\s*//" \
-    | while IFS= read -r hit; do
-        printf '%s\t%s\t%s\t%s\n' "$RULE_ID" "$file" "${hit%%:*}" "${hit#*:}"
-      done
-done
-
-ĐẶT TÊN:
-- Domain prefix: ts-, backend-, frontend-, jsx-, service-, orm-, lib-, form-, test-, misc-
-- Format: {domain}-{check}-candidate.sh
-- Tên file UPDATE phải GIỐNG HỆT tên file gốc trong rules/ (để cp ghi đè đúng)
-
-RULE GENERIC (BẮT BUỘC):
-- Grep pattern PHẢI hoạt động trên bất kỳ project TypeScript nào
-- Scope filter PHẢI dùng suffix file generic: *-service.ts, *-schemas.ts, *.tsx, *-route.ts, v.v.
-- TUYỆT ĐỐI KHÔNG hardcode: tên file của project cụ thể, tên function domain, route/API path
-
-LƯU tất cả script (mới + update) vào: ~/.claude/scripts/lint-rules/rules/{filename}
-Chmod: chmod +x ~/.claude/scripts/lint-rules/rules/{filename}
-
-OUTPUT CUỐI CÙNG — in ra terminal:
-LINT HARVEST SUMMARY:
-  Semantic issues processed: {N}
-  Script-confirmed rules reviewed: {M}
-  Rules new: {A}
-  Rules updated (expand — semantic finding): {B}
-  Rules updated (expand — script coverage gap): {C}
-  Rules updated (FP fix): {D}
-  Skipped (not grep-detectable): {X}
-  Skipped (project-specific): {Y}
-  Skipped (already covered, no update needed): {Z}
-
-  Not harvested (with reason):
-    - "{tên issue}" → {lý do}
 ──────────────────────────────────────────────────────
 
 Main agent sau khi subagent hoàn thành:

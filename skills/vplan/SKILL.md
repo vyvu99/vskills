@@ -4,15 +4,12 @@ description: "Create an implementation plan from an existing specs file: read sp
 argument-hint: "[specs-file-path]"
 user-invocable: true
 when_to_use: "Invoke when you already have a specs file (created by vspecs, in the form plans/specs/<feature-slug>.md) and want to build an implementation plan from it."
-category: workflow
-keywords: [plan, specs, implementation, phases, migration, gap-analysis]
-extends: plan
 metadata:
   author: vyvu
   version: "1.0.0"
 ---
 
-> Extends the underlying `plan` skill — inherits the entire base workflow (mode detection, plan.md + phase-XX-*.md structure, red-team, validate, task hydration, post-plan handoff). The difference: the input must be an existing specs file, and before generating the plan you must run a comparison step (gap analysis) between the specs and the current code to know exactly what needs to change.
+> The input must be an existing specs file, and before generating the plan you must run a comparison step (gap analysis) between the specs and the current code to know exactly what needs to change.
 
 Read input from the user:
 

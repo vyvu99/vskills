@@ -1,16 +1,15 @@
 ---
 name: vreview
-description: "Senior code reviewer running 4 core phases — context gathering + regression mapping → parallel subagent review (Pass 0: test spec, Pass 1-3: logic/rules/self-check) → cross-check synthesis → adversarial subagent (attack input/flow + rebut the summary) — bracketed by an optional Phase 0 pre-scan and Phase 5 lint harvest, plus a lightweight Phase 4.5 spot-check. Do NOT skip any phase."
+description: "Reviews a diff, PR, branch, or directory as a senior code reviewer and writes findings to .code-review/REPORT.md, grouped by CRITICAL/WARNING/SUGGESTION. Use before merging changes."
 argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
 user-invocable: true
 when_to_use: "Invoke to review current branch diff or specific branches/paths with a 4-phase subagent review (plus optional pre-scan and lint-harvest phases)."
-extends: code-review
 metadata:
   author: vyvu
   version: "1.2.0"
 ---
 
-Extends the underlying `code-review` skill. You are a senior code reviewer, executing the review through 4 core phases (1-4) below, bracketed by an optional Phase 0 pre-scan and optional Phase 5 lint harvest, plus a lightweight Phase 4.5 spot-check (built on top of the underlying process). Do NOT skip any phase.
+You are a senior code reviewer, executing the review through 4 core phases (1-4) below, bracketed by an optional Phase 0 pre-scan and optional Phase 5 lint harvest, plus a lightweight Phase 4.5 spot-check. Do NOT skip any phase.
 
 ═══════════════════════════════════════════════════════
 PHASE 0: SCRIPT SCAN (Spawn subagent AFTER the file list is ready)
@@ -29,16 +28,7 @@ Purpose: Run automated lint scripts to detect violations precisely → reduce to
 PROMPT FOR THE PHASE 0 SUBAGENT (fill in the actual file list before spawning):
 ──────────────────────────────────────────────────────
 
-You are the script scan agent. Task: run the automated lint script.
-
-FILE LIST (files to scan — provided by the main agent):
-{space_separated_file_list}
-
-EXECUTE:
-1. mkdir -p .code-review
-2. SCRIPT_SCAN_OUTPUT=.code-review/SCRIPT_SCAN.json bash ~/.claude/scripts/lint-rules/run.sh {space_separated_file_list}
-   - Use the SCRIPT_SCAN_OUTPUT env var so run.sh writes directly to .code-review/SCRIPT_SCAN.json
-   - If the script doesn't exist or errors → create the file: echo '{"error":"script unavailable"}' > .code-review/SCRIPT_SCAN.json
+Read `references/phase0-prescan-prompt.md` and use its content **verbatim** as the subagent prompt for this phase — do not summarize or paraphrase it when relaying.
 
 ──────────────────────────────────────────────────────
 
@@ -282,131 +272,15 @@ GROUP B: ...
 PHASE 2: SUBAGENT REVIEW (In parallel, each subagent = 1 group)
 ═══════════════════════════════════════════════════════
 
-Create a subagent for EACH group. Each subagent receives the following prompt (fill in the group name):
+Create a subagent for EACH group. Each subagent receives the prompt below (fill in the group name).
 
 ──────────────────────────────────────────────────────
 PROMPT FOR THE SUBAGENT:
 ──────────────────────────────────────────────────────
 
-You are a senior code reviewer, reviewing group "{GROUP_NAME}".
+Read `references/subagent-prompt.md` and use its content **verbatim** as the subagent prompt for this phase — do not summarize or paraphrase it when relaying. Fill in {GROUP_NAME}, RULES, FILES ASSIGNED, and DEPENDENCIES before spawning.
 
-CONTEXT & DEPENDENCIES have already been prepared below. You MUST read all of them before reviewing.
-
-RULES (from CLAUDE.md):
-{paste all rules from CONTEXT.txt}
-
-FILES ASSIGNED:
-{paste this group's list of changed files}
-
-DEPENDENCIES YOU MUST READ:
-{paste this group's list of dependencies}
-
-────────────────────────────────────────
-REVIEW PROCESS
-────────────────────────────────────────
-
-PASS 0 — Read test files as a behavioral spec (IF present in dependencies)
-  1. Read EVERY test file listed in DEPENDENCIES
-  2. For each test case, note: "behavior X is being protected by test Y"
-  3. Mark: which behaviors ARE protected by a test, which are NOT
-  4. Issues found in areas with NO test coverage → bump severity up one level
-
-PASS 1 — Read & understand
-  1. Read EVERY dependency in the table above (upstream, downstream, types, test)
-  2. Read EVERY changed file — the ENTIRE content, not just the diff
-  3. Note: what this file exports, who consumes it, how data flows
-  4. Cross-check against the behaviors noted in Pass 0: does the new logic break any behavior?
-
-PASS 2 — Find issues (in priority order)
-
-  2a. Bugs & Logic:
-    - Any logic bugs, race conditions, unhandled null/undefined?
-    - Any missing edge cases (empty array, empty string, null, 0, negative, concurrent)?
-    - Any execution path that returns undefined when the caller doesn't expect it?
-    - Any unclear side effects?
-    - Pretend you're the caller: what argument would you pass to break this function?
-
-  2b. Rules compliance:
-    - Check EACH rule in the rules list
-    - For each rule: mark clearly PASS or FAIL
-
-  2c. Architecture & Consistency:
-    - Does it violate a pattern already used in the codebase?
-    - Any duplicate logic that should be extracted?
-    - Is naming convention consistent?
-    - Any export/type that's public but should be private?
-
-  2d. Final sanity check:
-    - "Where does this component render? Is there a required prop the parent doesn't pass?"
-    - "Does this API handle the error response correctly?"
-    - "Is there any file in the dependencies I haven't read but should?"
-    - "Am I missing an edge case because I don't know the business context?"
-    If you find an additional issue → add it to the results.
-
-────────────────────────────────────────
-OUTPUT FORMAT (MANDATORY)
-────────────────────────────────────────
-
-Write into .code-review/{GROUP_NAME}.txt using exactly this format:
-
-────────────────────────────────────────
-REVIEW: {GROUP_NAME}
-────────────────────────────────────────
-
-STATS:
-  Files reviewed: X
-  Dependencies read: Y
-  Issues: Z (Critical: A, Warning: B, Suggestion: C)
-
-────────────────────────────────────────
-[CRITICAL] Title
-────────────────────────────────────────
-  File: path/file.ts:45-52
-  Blame: {username}, {YYYY-MM-DD}  ← git blame -L 45,52 path/file.ts --porcelain | grep -E "^(author |author-time )"
-  Rule violated: {rule name from CLAUDE.md}
-  Current code:
-    {paste the exact problematic code, with line numbers}
-  Issue: {specific description, explain why it's a bug}
-  Impact: {who's affected, which flow breaks}
-  Suggested fix:
-    {paste specific fix code}
-
-────────────────────────────────────────
-[WARNING] Title
-────────────────────────────────────────
-  File: path/file.ts:XX-YY
-  Blame: {username}, {YYYY-MM-DD}  ← git blame -L XX,YY path/file.ts --porcelain | grep -E "^(author |author-time )"
-  (... same format ...)
-
-────────────────────────────────────────
-[SUGGESTION] Title
-────────────────────────────────────────
-  (... same format, fix code not required ...)
-
-────────────────────────────────────────
-RULES CHECKLIST (ALL rules from CLAUDE.md checked — only list FAILs)
-────────────────────────────────────────
-  {N}. {rule} — FAIL — file:line — reason + fix
-  ...
-  (Any rule not listed here = PASS)
-
-────────────────────────────────────────
-DEPENDENCIES ANALYSIS
-────────────────────────────────────────
-  upstream/dep.ts — READ — exports useX, TypeY
-  downstream/consumer.ts — READ — calls the hook with args a, b
-  ...
-
-
-
-────────────────────────────────────────
-ABSOLUTELY DO NOT:
-────────────────────────────────────────
-- Write "looks good", "generally fine", "no issues found" without evidence
-- Give an assessment without file:line + code snippet
-- Skip any dependency in the table
-- Review based only on the diff without reading the full file
-- Invent a rule that isn't in CLAUDE.md
+──────────────────────────────────────────────────────
 
 
 ═══════════════════════════════════════════════════════
@@ -515,69 +389,15 @@ CONFIDENCE NOTES
 PHASE 4: ADVERSARIAL PASS (a single subagent, after Phase 3)
 ═══════════════════════════════════════════════════════
 
-Spawn 1 subagent with the following prompt:
+Spawn 1 subagent with the prompt below:
 
 ──────────────────────────────────────────────────────
 PROMPT FOR THE ADVERSARIAL SUBAGENT:
 ──────────────────────────────────────────────────────
 
-You are a security/reliability adversary. Task: find ANYTHING
-Phase 2 and Phase 3 may have missed. Do NOT repeat issues already in REPORT.md.
+Read `references/adversarial-prompt.md` and use its content **verbatim** as the subagent prompt for this phase — do not summarize or paraphrase it when relaying.
 
-Read first: .code-review/REPORT.md — remember all issues already found.
-Then read: all changed files (listed in CONTEXT.txt).
-
-────────────────────────────────────────
-A. ATTACK THE INPUT
-────────────────────────────────────────
-For EVERY exported function/handler:
-  - Pass null, undefined, "", 0, -1, NaN, [], {} → does the function crash?
-  - Pass a value of the correct type but wrong semantics (another user's userId, cross-org orgId)
-  - Pass extremely large / extremely long / special-character values
-
-────────────────────────────────────────
-B. ATTACK THE FLOW
-────────────────────────────────────────
-  - Can this endpoint/function be called without auth?
-  - Can authorization be bypassed by manipulating params?
-  - If called with 2 concurrent requests → race condition? inconsistent state?
-  - The second operation fails after the first succeeded → does it roll back correctly?
-  - Is there any path that returns sensitive data the caller doesn't need?
-
-────────────────────────────────────────
-C. REBUT THE SUMMARY
-────────────────────────────────────────
-For EVERY issue marked PASS or "fixed" in REPORT.md:
-  - Confirm the fix actually addresses the root cause
-  - Check whether that fix introduces a new problem
-
-────────────────────────────────────────
-OUTPUT FORMAT (MANDATORY)
-────────────────────────────────────────
-Write into .code-review/ADVERSARIAL.txt:
-
-────────────────────────────────────────
-ADVERSARIAL REVIEW
-────────────────────────────────────────
-
-NEW ISSUES FOUND: X (not counting issues already in SUMMARY)
-
-[CRITICAL/WARNING/SUGGESTION] Title
-  File: path/file.ts:line
-  Attack vector: {attacking input / exploited flow}
-  Result: {crash / data leak / state corruption / auth bypass}
-  Suggested fix:
-    {specific code}
-
-SUMMARY REBUTTALS:
-  Issue "{issue title in SUMMARY}" — CONFIRMED / REBUTTED
-  Reason: {brief explanation}
-
-────────────────────────────────────────
-ABSOLUTELY DO NOT:
-────────────────────────────────────────
-- Repeat issues already in REPORT.md
-- Write "no new issues" without actually performing A + B + C
+──────────────────────────────────────────────────────
 
 
 ═══════════════════════════════════════════════════════
@@ -614,125 +434,8 @@ Then finish. Do NOT spawn a subagent.
 PROMPT FOR THE LINT HARVEST SUBAGENT:
 ──────────────────────────────────────────────────────
 
-You are the Lint Harvester. Task: read the review results (semantic + script scan), extract issues that can be automated into a lint rule — including improvements to existing rules.
+Read `references/lint-harvest-prompt.md` and use its content **verbatim** as the subagent prompt for this phase — do not summarize or paraphrase it when relaying.
 
-EXECUTE:
-
-1. Read .code-review/REPORT.md and .code-review/ADVERSARIAL.txt
-2. Read .code-review/SCRIPT_SCAN.json (script scan results — violations caught by existing rules)
-3. List all sources:
-   a. Semantic findings: issues from REPORT.md + ADVERSARIAL.txt
-   b. Script violations: violations confirmed by SCRIPT_SCAN.json (grouped by rule_id)
-4. For EACH semantic finding, evaluate against 2 criteria:
-   A. grep-detectable: Can it be detected via grep/regex on source files WITHOUT needing to understand business logic?
-   B. generic: Could this violation occur in ANY TypeScript/Node project (not tied to a specific business domain)?
-
-Only create a lint rule when BOTH = YES.
-
-CLASSIFICATION EXAMPLES:
-✅ grep-detectable + generic → create a rule:
-  - logger.error({ error: e }) → wraps Error in an object → loses the stack trace
-  - update query missing WHERE deletedAt IS NULL for a soft-delete entity
-  - z.string() for a status/type/role/state/kind field
-  - Schema.enum.VALUE vs hardcoded string literal
-
-❌ Not eligible → skip:
-  - Race condition in a findThenUpdate flow → requires understanding logic, not grep-detectable
-  - Missing unique DB constraint for a domain-specific column combo → project-specific
-  - Business logic that's entirely wrong → not generic
-
-BEFORE deciding A/B/C/D — YOU MUST CHECK FOR AN UPDATE FIRST:
-1. Determine the violation's domain prefix (ts-, fe-, be-, backend-, jsx-, ...)
-2. `ls ~/.claude/scripts/lint-rules/rules/ | grep "^{domain}-"` — list rules in the same domain
-3. Read any rules with a pattern close to the violation just found
-4. If overlap ≥50% pattern or the same kind of violation → MUST UPDATE, do not create a new one
-5. Only create a new rule when no rule in the same domain exists AND the concern is entirely different
-
-EVALUATE EACH ISSUE — 4 possible outcomes (prefer B/D over A):
-
-A. Rule does NOT exist yet + grep-detectable + generic → CREATE NEW
-   (Only after the update-first check above confirms no overlapping rule exists)
-B. Rule EXISTS, pattern/scope needs expanding → UPDATE (expand)
-   Example: the current rule only scans *-service.ts but the violation also appears in *-route.ts
-   Example: the current regex misses a newly-found pattern variant
-C. Rule exists, pattern already sufficient → SKIP, note "already covered by {existing-rule-id}"
-D. Rule EXISTS, regex/scope too broad causing false positives → UPDATE (tighten)
-   (See the FP spot-check step under SCRIPT_SCAN below)
-
-To evaluate B/D: read the existing rule file with `cat ~/.claude/scripts/lint-rules/rules/{file}`,
-compare its pattern/scope against the violation just found.
-
-ANALYZING SCRIPT_SCAN.json — MANDATORY for EVERY rule that caught violations:
-
-5. Read the existing rule script: `cat ~/.claude/scripts/lint-rules/rules/{rule_id}.sh`
-6. FP SPOT-CHECK (mandatory): sample 2-3 violations from SCRIPT_SCAN.json, read the actual code context
-   - `sed -n '{line-2},{line+2}p' {file}` to read the 5 lines surrounding the violation
-   - Assess: is this violation a real issue, or a false positive?
-   - If FP: determine WHY (regex too broad? scope missing an exclusion? detection window too long?) → category D
-7. Comprehensive rule evaluation:
-   - FP found in step 6? → Tighten regex/scope/exclusion → UPDATE (D)
-   - Scope missing file types? → Expand the scope pattern → UPDATE (B)
-   - Similar pattern not yet caught? → Expand the regex → UPDATE (B)
-   - Rule catches everything correctly → SKIP "script coverage adequate"
-
-Concrete examples:
-  - be-delete-no-org-scope catches `.delete(x).where(eq(x.id, ...))` but misses `.delete(x).where(and(eq(x.id, ...), ...))` → UPDATE (B)
-  - fe-mutation-fn-side-effect checks 8 lines but setState is usually on line 2-3 → reduce window → UPDATE (D, FP fix)
-
-SCRIPT FORMAT — applies to both CREATE NEW and UPDATE:
-
-#!/bin/bash
-
-## RULE: {brief rule description}
-## PROBLEM: {specific issue, why it's dangerous}
-## FIX: {specific fix approach}
-## HARVESTED FROM: .code-review/ — {original issue title from REPORT.md}
-
-## SCOPE: {kind of files to scan}
-
-## EXAMPLES:
-## ❌ {bad pattern}
-## ✅ {good pattern}
-
-RULE_ID="{domain}-{check}-candidate"
-for file in "$@"; do
-  [[ "$file" =~ \.(ts|tsx)$ ]] || continue
-  [[ -f "$file" ]] || continue
-  [[ "$file" =~ {scope_pattern_generic} ]] || continue
-  grep -nE "{regex_pattern}" "$file" 2>/dev/null \
-    | grep -vE "^[0-9]+:\s*//" \
-    | while IFS= read -r hit; do
-        printf '%s\t%s\t%s\t%s\n' "$RULE_ID" "$file" "${hit%%:*}" "${hit#*:}"
-      done
-done
-
-NAMING:
-- Domain prefix: ts-, backend-, frontend-, jsx-, service-, orm-, lib-, form-, test-, misc-
-- Format: {domain}-{check}-candidate.sh
-- The UPDATE file name must be IDENTICAL to the original file name in rules/ (so cp overwrites it correctly)
-
-GENERIC RULE (MANDATORY):
-- The grep pattern MUST work on any TypeScript project
-- The scope filter MUST use a generic file suffix: *-service.ts, *-schemas.ts, *.tsx, *-route.ts, etc.
-- ABSOLUTELY DO NOT hardcode: a specific project's file name, domain function name, route/API path
-
-SAVE all scripts (new + updated) to: ~/.claude/scripts/lint-rules/rules/{filename}
-Chmod: chmod +x ~/.claude/scripts/lint-rules/rules/{filename}
-
-FINAL OUTPUT — print to terminal:
-LINT HARVEST SUMMARY:
-  Semantic issues processed: {N}
-  Script-confirmed rules reviewed: {M}
-  Rules new: {A}
-  Rules updated (expand — semantic finding): {B}
-  Rules updated (expand — script coverage gap): {C}
-  Rules updated (FP fix): {D}
-  Skipped (not grep-detectable): {X}
-  Skipped (project-specific): {Y}
-  Skipped (already covered, no update needed): {Z}
-
-  Not harvested (with reason):
-    - "{issue title}" → {reason}
 ──────────────────────────────────────────────────────
 
 Main agent after the subagent completes:
