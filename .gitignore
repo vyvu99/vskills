@@ -3,4 +3,6 @@ scripts/lint-rules/violation-history.jsonl
 .DS_Store
 plans/
 .code-review/
+.code-review-history.jsonl
 .vdesign/
+node_modules/

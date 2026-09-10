@@ -1,0 +1,22 @@
+[
+  { "query": "review this PR before merge", "should_trigger": true },
+  { "query": "review my current branch diff for bugs", "should_trigger": true },
+  { "query": "code review the changes since yesterday", "should_trigger": true },
+  { "query": "review PR #482", "should_trigger": true },
+  { "query": "run a senior-level code review on this feature branch", "should_trigger": true },
+  { "query": "review the diff against main before I push", "should_trigger": true },
+  { "query": "check my changes for security issues and IDOR before merging", "should_trigger": true },
+  { "query": "review the files under apps/api/src/services for bugs", "should_trigger": true },
+  { "query": "give me a thorough review of this commit", "should_trigger": true },
+  { "query": "run vreview on this branch", "should_trigger": true },
+  { "query": "explain what this function does", "should_trigger": false },
+  { "query": "run typecheck and build on this repo", "should_trigger": false },
+  { "query": "write unit tests for the auth service", "should_trigger": false },
+  { "query": "create a new GitHub issue for this bug", "should_trigger": false },
+  { "query": "what's the difference between REST and GraphQL?", "should_trigger": false },
+  { "query": "redesign this settings page to look more modern", "should_trigger": false },
+  { "query": "roll back the last database migration", "should_trigger": false },
+  { "query": "summarize the changes in the last 3 commits", "should_trigger": false },
+  { "query": "deploy the app to production", "should_trigger": false },
+  { "query": "add a new endpoint for exporting invoices as CSV", "should_trigger": false }
+]

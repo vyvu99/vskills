@@ -1,0 +1,8 @@
+{
+  "name": "@fixture-yarn/pkg-b",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

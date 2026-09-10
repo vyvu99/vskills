@@ -1,0 +1,22 @@
+[
+  { "query": "run typecheck and build across the whole repo", "should_trigger": true },
+  { "query": "check if the project compiles before I commit", "should_trigger": true },
+  { "query": "run tsc and build on all packages", "should_trigger": true },
+  { "query": "typecheck the api and web packages", "should_trigger": true },
+  { "query": "make sure everything still builds after this refactor", "should_trigger": true },
+  { "query": "run vcheck", "should_trigger": true },
+  { "query": "run typecheck, build, and tests on the whole monorepo", "should_trigger": true },
+  { "query": "does this package still typecheck?", "should_trigger": true },
+  { "query": "build and format the project before I open a PR", "should_trigger": true },
+  { "query": "run a full type check across every workspace package", "should_trigger": true },
+  { "query": "explain what this function does", "should_trigger": false },
+  { "query": "review this PR before merge", "should_trigger": false },
+  { "query": "write unit tests for the auth service", "should_trigger": false },
+  { "query": "create a new GitHub issue for this bug", "should_trigger": false },
+  { "query": "what's the difference between pnpm and yarn workspaces?", "should_trigger": false },
+  { "query": "redesign this settings page to look more modern", "should_trigger": false },
+  { "query": "roll back the last database migration", "should_trigger": false },
+  { "query": "summarize the changes in the last 3 commits", "should_trigger": false },
+  { "query": "fix the failing login test", "should_trigger": false },
+  { "query": "add a new endpoint for exporting invoices as CSV", "should_trigger": false }
+]
