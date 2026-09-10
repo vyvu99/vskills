@@ -83,7 +83,7 @@ Không đổi tech stack. Không phá logic/state/API.
 ### Phase 0: Xác định phạm vi
 
 1. Parse argument để xác định input mode (xem bảng trên)
-2. Nếu có URL/localhost → **chụp screenshot ngay** bằng `mcp__mimo__vision` hoặc Playwright
+2. Nếu có URL/localhost → **chụp screenshot ngay** bằng bất kỳ screenshot tool nào khả dụng (Playwright MCP, browser tool, v.v.); nếu không có tool nào khả dụng, hỏi user paste screenshot trực tiếp
 3. Nếu có `--pr` → xác định VCS profile theo `~/.claude/skills/_vskills-shared/repo-profile.md` §2 trước (nếu file không tồn tại, coi như full gh mode — đúng hành vi mặc định hiện tại). Full gh mode → `gh pr diff --name-only` để lấy danh sách file. Degraded (thiếu gh / không phải GitHub) → in thông báo §2 và hỏi user tên branch, hoặc fallback sang `--diff` (`git diff --name-only`, không cần gh) — rồi tiếp tục vào Phase 1 bình thường.
 4. Xác định Project Profile: kiểm tra `.vdesign/profile.md` tại git root của project đích (`git rev-parse --show-toplevel`). Có → đọc và dùng luôn. Không có → suy luận UI library/design tokens từ dependency trong `package.json`, `tailwind.config.*`, và cấu trúc thư mục components. Vẫn mơ hồ → hỏi 1 câu, rồi đề nghị (không ép) lưu câu trả lời vào `.vdesign/profile.md` cho lần sau.
 5. Nếu rỗng → hỏi user qua `AskUserQuestion` — **đúng 1 câu**
@@ -177,6 +177,11 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 - [ ] **Focus**: focus ring hiển thị rõ cho keyboard navigation
 - [ ] **Active/Selected**: item được chọn có chỉ báo thị giác
 - [ ] **Disabled**: button disabled có look phân biệt rõ + cursor-not-allowed
+
+#### Accessibility (WCAG 2.2)
+- [ ] **2.4.11 Focus Not Obscured**: element đang focus có bao giờ bị che khuất hoàn toàn sau sticky header/cookie banner/overlay khác không?
+- [ ] **2.5.7 Dragging Movements**: mọi tương tác drag-and-drop có phương án thay thế bằng click/tap không (không chỉ drag)?
+- [ ] **3.3.8 Accessible Authentication**: flow đăng nhập có tránh chặn paste password, và tránh yêu cầu giải câu đố nhận thức mà không có phương án thay thế không?
 
 #### Animation & Motion
 - [ ] Animation chỉ dùng khi có **ý nghĩa**: hover reveal, chuyển state, vào trang
@@ -333,6 +338,7 @@ Vẫn bắt buộc kể cả khi `--wow`: accessibility (contrast, focus ring, �
 - ✅ Dùng component đẹp nhất trong project (booking form, notes UI) làm chuẩn tham chiếu
 - ✅ **Responsive là bắt buộc**: mọi thay đổi layout PHẢI verify ở 3 viewport — mobile (375px), tablet (768px), desktop (1280px); viết mobile-first, rồi override bằng sm:/lg:
 - ✅ Component styled bởi bên thứ ba (có `import 'lib/*.css'`) bọc trong wrapper div → wrapper sở hữu TOÀN BỘ visual state (border, ring, disabled opacity); null hết border/shadow bên trong component qua override CSS var + scoped `!important`
+- ✅ **Kỷ luật ARIA**: ưu tiên native HTML (`<button>`, `<dialog>`, `<details>`, `<label for>`) hơn ARIA. Chỉ thêm `role`/`aria-*` khi native HTML không diễn đạt được tương tác, và khi đã thêm phải đảm bảo đủ bộ role+state+property — không bao giờ thêm ARIA attribute "phòng khi"
 - ❌ KHÔNG thêm animation phức tạp nếu Motion/Framer chưa có sẵn trong project — ngoại lệ: dưới `--wow`, áp dụng dependency allowlist ở trên thay vì rule này
 - ❌ KHÔNG thêm màu brand mới — chỉ dùng token hiện có (ngoại lệ: `--wow` được phép thêm accent mới nếu vibe đã chốt yêu cầu)
 - ❌ KHÔNG dùng màu mặc định của component library (shadcn blue) nếu project đã có màu primary riêng
@@ -346,10 +352,11 @@ Vẫn bắt buộc kể cả khi `--wow`: accessibility (contrast, focus ring, �
 1. Nếu ban đầu có URL/localhost → chụp screenshot sau khi fix, so sánh before/after
 2. Nếu có ảnh input → verify code có khớp ý đồ của ảnh không
 3. Chạy `pnpm format` (nếu project có)
-4. Nếu bạn vừa edit trực tiếp một file ảnh dưới `public/` (ghi đè cùng path, tên không đổi) và user báo "không thấy thay đổi" → đừng vội sửa code/ảnh lần nữa; báo user hard-refresh hoặc xóa `.next/cache/images` + restart dev server trước — Next.js Image Optimizer cache theo URL+size, không theo nội dung file, nên fix nhiều khả năng đã đúng nhưng vẫn đang serve bản cache cũ
-5. **Adversarial Verify** (subagent — chỉ khi Fix thực sự đụng structural/JSX-level: swap component, đổi cấu trúc grid/layout, đổi hướng thị giác — HOẶC có dùng `--wow`): spawn 1 subagent mới hoàn toàn, đưa diff, checklist audit của Phase 2, và (nếu `--wow`) anti-slop gate. Subagent tự audit lại state cuối cùng một cách độc lập — không tiếp cận reasoning của lần chạy này — và báo PASS hoặc list vấn đề còn sót (audit item vẫn hỏng, fix vượt quá cái thực sự cần, vi phạm anti-slop). Có vấn đề → quay lại Phase 3 fix, chạy lại bước này 1 lần. Mirror theo đúng Phase 4 Adversarial Pass của `vreview` trong cùng bộ skill này.
-6. **Self-Check** (inline, mọi lần chạy, không cần subagent): trước khi viết báo cáo ngắn, xác nhận — (a) độ sâu fix tương xứng với cái Phase 2 thực sự tìm ra, không có rewrite ngoài yêu cầu; (b) mọi category Phase 2 áp dụng được đã xử lý hoặc đánh dấu rõ not-applicable; (c) nếu có `--wow`, anti-slop gate (kể cả illustration check) đã thực sự được kiểm tra, không chỉ ngầm hiểu.
-7. **Báo cáo ngắn gọn**: "Đã redesign [X]. Thay đổi chính: [liệt kê 3-5 bullet points]"
+4. **Verify accessibility**: nếu project đã có (hoặc user cho phép thêm) `@axe-core/playwright` hoặc `axe-core` thường, chạy một script ngắn nhắm vào route/component đang audit và in ra violations. Nếu không có sẵn, in ra lệnh manual-check tương đương để user tự chạy — review visual/manual thủ công không được là verification duy nhất cho accessibility.
+5. Nếu bạn vừa edit trực tiếp một file ảnh dưới `public/` (ghi đè cùng path, tên không đổi) và user báo "không thấy thay đổi" → đừng vội sửa code/ảnh lần nữa; báo user hard-refresh hoặc xóa `.next/cache/images` + restart dev server trước — Next.js Image Optimizer cache theo URL+size, không theo nội dung file, nên fix nhiều khả năng đã đúng nhưng vẫn đang serve bản cache cũ
+6. **Adversarial Verify** (subagent — chỉ khi Fix thực sự đụng structural/JSX-level: swap component, đổi cấu trúc grid/layout, đổi hướng thị giác — HOẶC có dùng `--wow`): spawn 1 subagent mới hoàn toàn, đưa diff, checklist audit của Phase 2, và (nếu `--wow`) anti-slop gate. Subagent tự audit lại state cuối cùng một cách độc lập — không tiếp cận reasoning của lần chạy này — và báo PASS hoặc list vấn đề còn sót (audit item vẫn hỏng, fix vượt quá cái thực sự cần, vi phạm anti-slop). Có vấn đề → quay lại Phase 3 fix, chạy lại bước này 1 lần. Mirror theo đúng Phase 4 Adversarial Pass của `vreview` trong cùng bộ skill này.
+7. **Self-Check** (inline, mọi lần chạy, không cần subagent): trước khi viết báo cáo ngắn, xác nhận — (a) độ sâu fix tương xứng với cái Phase 2 thực sự tìm ra, không có rewrite ngoài yêu cầu; (b) mọi category Phase 2 áp dụng được đã xử lý hoặc đánh dấu rõ not-applicable; (c) nếu có `--wow`, anti-slop gate (kể cả illustration check) đã thực sự được kiểm tra, không chỉ ngầm hiểu.
+8. **Báo cáo ngắn gọn**: "Đã redesign [X]. Thay đổi chính: [liệt kê 3-5 bullet points]"
    - Không summary dài
    - Chỉ nêu các thay đổi đáng kể
    - Nếu có chạy `--wow`: thêm 1 dòng trạng thái theo từng khía cạnh (đủ 8) của Phase 0 step 6, cộng kết quả PASS/có-vấn-đề của Adversarial Verify — VD "ui: fresh, ux: cached, animation: fallback (agent không khả dụng), layout: fresh, 3d: unavailable, text: cached, features: fresh, flow: unavailable; Adversarial Verify: PASS"
