@@ -464,6 +464,7 @@ CRITICAL ISSUES (fix trước khi merge)
      Fix:
        {code}
      Conflict check: {No conflict / Conflicts with Group B — xác nhận vấn đề này đúng vì...}
+     Status: PENDING
 
 ────────────────────────────────────────
 WARNING ISSUES (nên fix)
@@ -486,6 +487,7 @@ CROSS-GROUP ISSUES
     Related groups: Group A + Group B
     Issue: {mô tả vấn đề giữa 2 group}
     File: fileA.ts:10 ↔ fileB.ts:25
+    Status: PENDING
 
 ────────────────────────────────────────
 RULES COMPLIANCE SUMMARY (tổng hợp từ báo cáo FAIL của subagent — rule không được liệt kê = ALL PASS)

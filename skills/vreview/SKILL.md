@@ -464,6 +464,7 @@ CRITICAL ISSUES (fix before merge)
      Fix:
        {code}
      Conflict check: {No conflict / Conflicts with Group B — confirmed this issue is correct because...}
+     Status: PENDING
 
 ────────────────────────────────────────
 WARNING ISSUES (should fix)
@@ -486,6 +487,7 @@ CROSS-GROUP ISSUES
     Related groups: Group A + Group B
     Issue: {description of the issue between the 2 groups}
     File: fileA.ts:10 ↔ fileB.ts:25
+    Status: PENDING
 
 ────────────────────────────────────────
 RULES COMPLIANCE SUMMARY (aggregated from subagents' FAIL reports — a rule not listed = ALL PASS)

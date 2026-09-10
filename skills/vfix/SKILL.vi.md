@@ -53,11 +53,12 @@ BƯỚC 2 — Issue CRITICAL (REPORT.md)
 4. TRƯỚC khi fix, kiểm tra STOP-GATE (xem phần "DỪNG LẠI VÀ HỎI USER" bên dưới) cho từng issue trong batch.
 5. Sau khi xong một batch → verify (test/build liên quan) → commit 1 lần cho cả batch: `fix: {short batch description}` — KHÔNG commit từng issue riêng lẻ nếu chúng phụ thuộc lẫn nhau.
 6. Nếu batch thay đổi shared schema hoặc API route → chạy SDK/codegen (xem phần "SDK GENERATE").
+7. Khi quyết định outcome của từng item, ghi chú lại (fix / reject / defer) nhưng CHƯA ghi `Status:` vội. Ngay sau khi batch commit của bước này hoàn tất, đi một lượt qua từng item vừa xử lý và cập nhật dòng `Status:` của nó trong `.code-review/REPORT.md` thành `FIXED (commit <sha>)` (dùng sha commit thật của batch đó) / `REJECTED (<lý do ngắn gọn>)` / `DEFERRED (<lý do ngắn gọn>)`.
 
 ──────────────────────────────────────────────────────
 BƯỚC 3 — Issue WARNING (REPORT.md)
 ──────────────────────────────────────────────────────
-Lặp lại đúng quy trình của BƯỚC 2 (gom theo dependency → batch → stop-gate → fix → verify → commit → sdk generate nếu cần) nhưng áp dụng cho phần WARNING.
+Lặp lại đúng quy trình của BƯỚC 2 (gom theo dependency → batch → stop-gate → fix → verify → commit → sdk generate nếu cần → ghi `Status:` sau khi batch commit của bước này hoàn tất) nhưng áp dụng cho phần WARNING.
 
 ──────────────────────────────────────────────────────
 BƯỚC 4 — CROSS-GROUP ISSUES (REPORT.md)
@@ -67,6 +68,7 @@ BƯỚC 4 — CROSS-GROUP ISSUES (REPORT.md)
 2. Mỗi cross-group issue là một batch riêng (vì theo định nghĩa nó đã trải rộng nhiều file/group).
 3. Fix → verify TẤT CẢ file liên quan ở CẢ HAI phía → commit riêng: `fix: {cross-group issue description}`.
 4. Nếu một trong hai phía thay đổi shared schema hoặc API route → chạy SDK/codegen (xem phần "SDK GENERATE").
+5. Khi quyết định outcome của item, ghi chú lại nhưng CHƯA ghi `Status:` vội. Ngay sau khi commit của issue này hoàn tất, cập nhật dòng `Status:` của nó trong `.code-review/REPORT.md` thành `FIXED (commit <sha>)` / `REJECTED (<lý do ngắn gọn>)` / `DEFERRED (<lý do ngắn gọn>)`.
 
 ──────────────────────────────────────────────────────
 BƯỚC 5 — Issue SUGGESTION (REPORT.md)
@@ -75,9 +77,9 @@ KHÁC với 4 bước trên: KHÔNG tự ý apply.
 
 1. Đọc phần SUGGESTION.
 2. Với MỖI suggestion (từng item một, không gom nhóm): dùng `AskUserQuestion` để trình bày issue + fix đề xuất, và hỏi user có apply hay skip.
-3. User đồng ý → fix item đó ngay → verify → chuyển sang item tiếp theo.
-4. User từ chối → bỏ qua, ghi chú lại, chuyển sang item tiếp theo — KHÔNG hỏi lại.
-5. Sau khi đi hết các item SUGGESTION → nếu có ít nhất 1 item được apply → commit chung: `fix: apply {N} accepted suggestions`.
+3. User đồng ý → fix item đó ngay → verify → ghi `Status: FIXED (pending commit)` → chuyển sang item tiếp theo.
+4. User từ chối → ghi `Status: REJECTED (<lý do ngắn gọn>)` ngay (không phụ thuộc commit) → chuyển sang item tiếp theo — KHÔNG hỏi lại.
+5. Sau khi đi hết các item SUGGESTION → nếu có ít nhất 1 item được apply → commit chung: `fix: apply {N} accepted suggestions` → sau đó đi một lượt cuối qua từng item `FIXED (pending commit)` và thay bằng `FIXED (commit <sha>)` dùng sha commit thật.
 
 ═══════════════════════════════════════════════════════
 STOP-GATE — DỪNG LẠI VÀ HỎI USER (áp dụng cho bước 2-4, KHÔNG tự quyết định)
@@ -107,8 +109,9 @@ WRAP-UP — FORMAT + DỌN DẸP
 ═══════════════════════════════════════════════════════
 
 1. Sau khi tất cả các bước đã xong (kể cả các item SUGGESTION đã hỏi) → tự động phát hiện và chạy format command của project: tìm trong scripts của `package.json` theo thứ tự `format` → `format:fix` → `lint:fix`. Nếu không tìm thấy → bỏ qua.
-2. Trước khi xoá `.code-review/` (hoặc report path đã dùng): hỏi user xác nhận — luôn mặc định là user CHƯA CHẮC đã đọc xong report; luôn hỏi, không bao giờ tự cho là đã đọc xong.
-3. User xác nhận → xoá report directory. User muốn giữ lại → để nguyên, xong.
+2. Append mỗi item trong `.code-review/REPORT.md` thành 1 dòng vào `.code-review-history.jsonl` ở repo root (tạo file nếu chưa có) — mỗi dòng JSON: `{date, rule_or_source, file, status}`, đọc giá trị `Status:` cuối cùng của từng item. Làm bước này bất kể sau đó user xác nhận hay từ chối xoá — đây là bản ghi bền vững tồn tại độc lập với cả hai lựa chọn.
+3. Trước khi xoá `.code-review/` (hoặc report path đã dùng): hỏi user xác nhận — luôn mặc định là user CHƯA CHẮC đã đọc xong report; luôn hỏi, không bao giờ tự cho là đã đọc xong.
+4. User xác nhận → xoá report directory. User muốn giữ lại → để nguyên, xong.
 
 ═══════════════════════════════════════════════════════
 QUY TẮC CỨNG

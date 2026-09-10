@@ -53,11 +53,12 @@ STEP 2 — CRITICAL issues (REPORT.md)
 4. BEFORE fixing, check the STOP-GATE (see "STOP AND ASK THE USER" section below) for each issue in the batch.
 5. After finishing a batch → verify (relevant test/build) → commit once for the whole batch: `fix: {short batch description}` — do NOT commit issues individually if they depend on each other.
 6. If the batch changes a shared schema or API route → run SDK/codegen (see "SDK GENERATE" section).
+7. As you decide each item's outcome, note it (fix / reject / defer) but do not write `Status:` yet. Immediately after this step's batch commit completes, do one pass over every item just handled and update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` (using that batch's real commit sha) / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
 
 ──────────────────────────────────────────────────────
 STEP 3 — WARNING issues (REPORT.md)
 ──────────────────────────────────────────────────────
-Repeat the exact same process as STEP 2 (group by dependency → batch → stop-gate → fix → verify → commit → sdk generate if needed) but for the WARNING section.
+Repeat the exact same process as STEP 2 (group by dependency → batch → stop-gate → fix → verify → commit → sdk generate if needed → write `Status:` after that step's batch commit completes) but for the WARNING section.
 
 ──────────────────────────────────────────────────────
 STEP 4 — CROSS-GROUP ISSUES (REPORT.md)
@@ -67,6 +68,7 @@ STEP 4 — CROSS-GROUP ISSUES (REPORT.md)
 2. Each cross-group issue is its own batch (since by definition it already spans multiple files/groups).
 3. Fix → verify ALL files involved on BOTH sides → commit separately: `fix: {cross-group issue description}`.
 4. If either side touches a shared schema or API route → run SDK/codegen (see "SDK GENERATE" section).
+5. As you decide each item's outcome, note it but do not write `Status:` yet. Immediately after this issue's commit completes, update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
 
 ──────────────────────────────────────────────────────
 STEP 5 — SUGGESTION issues (REPORT.md)
@@ -75,9 +77,9 @@ DIFFERENT from the 4 steps above: do NOT apply arbitrarily.
 
 1. Read the SUGGESTION section.
 2. For EACH suggestion (one item at a time, no grouping): use `AskUserQuestion` to present the issue + proposed fix, and ask the user whether to apply it or skip it.
-3. User agrees → fix that item immediately → verify → move on to the next item.
-4. User declines → skip, note it, move to the next item — do NOT ask again.
-5. After going through all SUGGESTION items → if at least 1 item was applied → commit together: `fix: apply {N} accepted suggestions`.
+3. User agrees → fix that item immediately → verify → write `Status: FIXED (pending commit)` → move on to the next item.
+4. User declines → write `Status: REJECTED (<one-line reason>)` immediately (no commit dependency) → move to the next item — do NOT ask again.
+5. After going through all SUGGESTION items → if at least 1 item was applied → commit together: `fix: apply {N} accepted suggestions` → then do one final pass over every `FIXED (pending commit)` item and replace it with `FIXED (commit <sha>)` using the real commit sha.
 
 ═══════════════════════════════════════════════════════
 STOP-GATE — STOP AND ASK THE USER (applies to steps 2-4, do NOT decide on your own)
@@ -107,8 +109,9 @@ WRAP-UP — FORMAT + CLEANUP
 ═══════════════════════════════════════════════════════
 
 1. After all steps are done (including SUGGESTION items already asked about) → auto-detect and run the project's format command: look in `package.json` scripts in this order `format` → `format:fix` → `lint:fix`. If none found → skip.
-2. Before deleting `.code-review/` (or the report path used): ask the user for confirmation — always default to assuming the user has NOT necessarily finished reading the report; always ask, never assume.
-3. User confirms → delete the report directory. User wants to keep it → leave it as-is, done.
+2. Append one line per item in `.code-review/REPORT.md` to `.code-review-history.jsonl` at the repo root (create if absent) — JSON per line: `{date, rule_or_source, file, status}`, reading each item's final `Status:` value. Do this regardless of whether the user later confirms or declines deletion — it's the persistent record that survives either way.
+3. Before deleting `.code-review/` (or the report path used): ask the user for confirmation — always default to assuming the user has NOT necessarily finished reading the report; always ask, never assume.
+4. User confirms → delete the report directory. User wants to keep it → leave it as-is, done.
 
 ═══════════════════════════════════════════════════════
 HARD RULES
