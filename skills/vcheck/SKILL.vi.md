@@ -4,8 +4,6 @@ description: "Chạy typecheck + build + format (+ test tùy chọn) song song c
 argument-hint: "[package-names...] [--test]"
 user-invocable: true
 when_to_use: "Dùng khi cần typecheck/build (và test) nhanh cho toàn bộ repo hoặc một nhóm package trong monorepo JS/TS (hoặc single package) trước khi commit/PR."
-category: workflow
-keywords: [typecheck, build, tsc, pnpm, npm, yarn, bun, monorepo, ci]
 metadata:
   author: vyvu
   version: "1.1.0"

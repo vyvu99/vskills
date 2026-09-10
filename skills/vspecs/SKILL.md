@@ -3,18 +3,13 @@ name: vspecs
 description: "Create and update a specs file for a feature through an iterative loop: read the codebase → brainstorm edge cases → ask the user → update the file. Supports comparison with other products."
 user-invocable: true
 when_to_use: "Invoke when you want to create new specs or add to existing specs for a feature."
-category: docs
-keywords: [specs, feature, brainstorm, edge-cases, documentation]
 argument-hint: "Feature: [feature name]\nCompare: [product name] (optional)"
-extends: brainstorm
 metadata:
   author: vyvu
   version: "1.1.0"
 ---
 
 # Specs Loop
-
-> Extends the underlying `brainstorm` skill — inherits all its principles (YAGNI/KISS/DRY, brutal honesty, explore alternatives, challenge assumptions). The difference: the final output is a specs file, not a design doc.
 
 Read input from the user:
 

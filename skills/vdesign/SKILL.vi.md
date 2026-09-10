@@ -3,8 +3,6 @@ name: vdesign
 description: "Redesign UI/UX hiện có theo gu thẩm mỹ cá nhân: tinh tế, hài hòa, hiện đại, thanh lịch, nhất quán với hệ thống. Dùng khi nâng cấp UI của một trang/component/feature/PR đã có sẵn."
 user-invocable: true
 when_to_use: "Kích hoạt khi bạn muốn redesign hoặc nâng cấp UI/UX của một trang, component, feature, hoặc toàn bộ diff/PR hiện có."
-category: frontend
-keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
 argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--wow]"
 metadata:
   author: vyvu

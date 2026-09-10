@@ -5,9 +5,6 @@ argument-hint: "[path đến report dir, mặc định .code-review/]"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Gọi sau khi đã có report (từ vreview hoặc report tương đương) và cần fix theo đúng thứ tự ưu tiên, không tuỳ tiện apply suggestion."
-category: workflow
-keywords: [fix, bugfix, code-review, priority, sdk-generate, root-cause]
-extends: fix
 metadata:
   author: vyvu
   version: "1.1.0"

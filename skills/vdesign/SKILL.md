@@ -3,8 +3,6 @@ name: vdesign
 description: "Redesign existing UI/UX according to a personal aesthetic: refined, harmonious, modern, elegant, consistent with the system. Use when upgrading the UI of an existing page/component/feature/PR."
 user-invocable: true
 when_to_use: "Invoke when you want to redesign or upgrade the UI/UX of a page, component, feature, or an entire existing diff/PR."
-category: frontend
-keywords: [redesign, ui, ux, design, harmonious, refined, modern, elegant]
 argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--wow]"
 metadata:
   author: vyvu

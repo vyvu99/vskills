@@ -4,15 +4,12 @@ description: "Tạo implementation plan từ một file specs có sẵn: đọc 
 argument-hint: "[specs-file-path]"
 user-invocable: true
 when_to_use: "Dùng khi đã có sẵn file specs (được tạo bởi vspecs, dạng plans/specs/<feature-slug>.md) và muốn xây implementation plan từ đó."
-category: workflow
-keywords: [plan, specs, implementation, phases, migration, gap-analysis]
-extends: plan
 metadata:
   author: vyvu
   version: "1.0.0"
 ---
 
-> Kế thừa skill `plan` gốc — nhận toàn bộ base workflow (mode detection, cấu trúc plan.md + phase-XX-*.md, red-team, validate, task hydration, post-plan handoff). Điểm khác biệt: input bắt buộc phải là một file specs có sẵn, và trước khi sinh plan phải chạy bước so sánh (gap analysis) giữa specs và code hiện tại để biết chính xác cần thay đổi những gì.
+> Input bắt buộc phải là một file specs có sẵn, và trước khi sinh plan phải chạy bước so sánh (gap analysis) giữa specs và code hiện tại để biết chính xác cần thay đổi những gì.
 
 Đọc input từ user:
 

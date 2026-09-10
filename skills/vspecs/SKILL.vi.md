@@ -3,18 +3,13 @@ name: vspecs
 description: "Tạo và cập nhật file specs cho một feature qua vòng lặp lặp đi lặp lại: đọc codebase → brainstorm edge case → hỏi user → cập nhật file. Hỗ trợ so sánh với sản phẩm khác."
 user-invocable: true
 when_to_use: "Dùng khi muốn viết specs mới hoặc bổ sung specs hiện có cho một feature."
-category: docs
-keywords: [specs, feature, brainstorm, edge-cases, documentation]
 argument-hint: "Feature: [tên feature]\nCompare: [tên sản phẩm] (tuỳ chọn)"
-extends: brainstorm
 metadata:
   author: vyvu
   version: "1.1.0"
 ---
 
 # Specs Loop
-
-> Kế thừa skill `brainstorm` gốc — thừa hưởng toàn bộ nguyên tắc của nó (YAGNI/KISS/DRY, thẳng thắn không né tránh, khám phá phương án thay thế, thách thức các giả định). Điểm khác biệt: output cuối cùng là file specs, không phải design doc.
 
 Đọc input từ user:
 
