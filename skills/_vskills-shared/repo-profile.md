@@ -7,7 +7,11 @@ Detect each section once per run and reuse the result. If a signal is ambiguous,
 Detection order:
 1. `packageManager` field in root `package.json` (corepack format `"pnpm@9.1.0"`) → take the part before `@`.
 2. No such field → lockfile: `pnpm-lock.yaml`→pnpm, `yarn.lock`→yarn, `bun.lockb`→bun, `package-lock.json`→npm.
-3. Multiple lockfiles present → prefer the `packageManager` field; if that is also absent, ask the user (do not guess).
+3. Multiple lockfiles present → prefer the `packageManager` field; if that is also absent, use `AskUserQuestion` with this exact shape instead of improvising phrasing:
+   - `question`: "Multiple lockfiles found (<comma-separated list, e.g. pnpm-lock.yaml, package-lock.json>) — which package manager should I treat as authoritative?"
+   - `header`: "Package manager"
+   - `options`: one per lockfile found, `label` = the package manager name (pnpm/yarn/npm/bun), `description` = the lockfile it maps to
+   - `multiSelect`: false
 4. No JS lockfile and no `package.json` → not a JS/TS project: skip every step that runs a package-manager command and say so in one line.
 
 Workspace shape: `pnpm-workspace.yaml` exists, or root `package.json` has a `workspaces` field → **monorepo**; otherwise **single-package** (drop `--filter`/`-w` entirely, run at root).
@@ -28,6 +32,14 @@ Script resolution — prefer a declared `package.json` script before a raw binar
 - build: declared `build` script only — no raw fallback, nothing to build without one
 - format: `format` → `format:fix`
 - test: `test:run` → `test:ci` → `test`
+
+Test-runner watch-mode flags — when the resolved script falls through to the raw `test` script, check which runner it invokes and add the flag that forces a single run:
+
+| runner | flag needed to avoid watch mode |
+|--------|----------------------------------|
+| vitest | `--run` |
+| jest | `--ci` |
+| mocha | none — runs once by default |
 
 Worked example (regression anchor): pnpm + `pnpm-workspace.yaml` + no `typecheck` script → `pnpm --filter @app/api exec tsc --noEmit`.
 
@@ -56,7 +68,9 @@ Per-skill degraded messages:
 
 ## §3 — Primary language + framework
 
-Language: count file extensions across the reviewed diff (or the repo when there is no diff) — `.ts/.tsx`→TypeScript, `.js/.jsx`→JavaScript, `.py`→Python, `.go`→Go, `.rs`→Rust, etc. The winner is the primary language; keep the full tally — a mixed diff means language-specific rules apply per file, not per run.
+Language: count file extensions across the reviewed diff — `.ts/.tsx`→TypeScript, `.js/.jsx`→JavaScript, `.py`→Python, `.go`→Go, `.rs`→Rust, etc. The winner is the primary language; keep the full tally — a mixed diff means language-specific rules apply per file, not per run.
+
+No diff to count from (e.g. `--path` mode): don't count file extensions across the whole repo — a repo with mixed/legacy code mis-detects that way. Prefer reading root `package.json`'s `dependencies`/`devDependencies` instead (a `typescript` dep → TypeScript, otherwise JavaScript) and fall back to whole-repo extension counting only when there's no `package.json` to read.
 
 Framework signal, first match wins: `next` dependency or `next.config.*` → Next.js; `nuxt.config.*` → Nuxt; `astro.config.*` → Astro; `svelte.config.*` → SvelteKit; `vite.config.*` + a `react-router*` dep → Vite/React Router; `remix.config.*` → Remix. No match → **generic**.
 
