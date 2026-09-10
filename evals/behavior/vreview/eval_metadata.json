@@ -1,0 +1,23 @@
+{
+  "prompt": "Review the code under after/ in this directory for bugs. Focus on security and correctness.",
+  "ground_truth": [
+    {
+      "file": "after/src/orders-service.ts",
+      "line": 7,
+      "description": "SQL injection via string concatenation in searchOrders — orgId/keyword interpolated directly into the query template string instead of parameterized placeholders",
+      "keyword": "injection"
+    },
+    {
+      "file": "after/src/orders-service.ts",
+      "line": 14,
+      "description": "Missing org-scope filter in getOrderById — query drops org_id, allowing cross-org IDOR (any org can read any other org's order by guessing/enumerating orderId)",
+      "keyword": "org"
+    },
+    {
+      "file": "after/src/orders-service.ts",
+      "line": 23,
+      "description": "N+1 query in getOrderItemsForOrders — issues one order_items query per order inside the loop instead of a single batched query (e.g. WHERE order_id = ANY($1)) like before/src/orders-service.ts does",
+      "keyword": "N+1"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "vcheck-fixture-yarn",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "yarn@1.22.22",
+  "workspaces": ["packages/*"],
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

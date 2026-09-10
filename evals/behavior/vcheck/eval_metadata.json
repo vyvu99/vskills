@@ -1,0 +1,38 @@
+[
+  {
+    "package_manager": "pnpm",
+    "fixture": "pnpm",
+    "prompt": "run a typecheck across this project",
+    "assertions": {
+      "expected_error_in_output": true,
+      "error_signature": "TS2322"
+    }
+  },
+  {
+    "package_manager": "npm",
+    "fixture": "npm",
+    "prompt": "run a typecheck across this project",
+    "assertions": {
+      "expected_error_in_output": true,
+      "error_signature": "TS2322"
+    }
+  },
+  {
+    "package_manager": "yarn",
+    "fixture": "yarn",
+    "prompt": "run a typecheck across this project",
+    "assertions": {
+      "expected_error_in_output": true,
+      "error_signature": "TS2322"
+    }
+  },
+  {
+    "package_manager": "bun",
+    "fixture": "bun",
+    "prompt": "run a typecheck across this project",
+    "assertions": {
+      "expected_error_in_output": true,
+      "error_signature": "TS2322"
+    }
+  }
+]

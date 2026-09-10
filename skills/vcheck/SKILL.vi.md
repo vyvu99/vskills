@@ -39,32 +39,36 @@ $ARGUMENTS
 
 ## Bước 1 — Typecheck song song
 
+Sanitize tên package để dùng làm filesystem path trước: thay `/` và `@` bằng `_` (vd: `@app/api` → `_app_api`) — tên package có scope ghi thẳng vào `/tmp/tsc-<package>.log` sẽ lỗi (tạo ra subdirectory ngoài ý muốn, hoặc fail hẳn).
+
 Với MỖI package trong danh sách, spawn một background command:
 
 ```
-<pm workspace/root exec template từ Bước -1> <typecheck cmd> > /tmp/tsc-<package>.log 2>&1 &
+timeout 600s <pm workspace/root exec template từ Bước -1> <typecheck cmd> > /tmp/tsc-<sanitized-package>.log 2>&1 &
 ```
 
 `<typecheck cmd>` = script đã resolve ở Bước -1 (`typecheck` → `type-check` → `tsc --noEmit`). Ví dụ minh hoạ:
-- pnpm + workspace, không có script `typecheck` → `pnpm --filter <package> exec tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &` (mặc định hiện tại, y hệt)
-- npm + single-package → `npm exec -- tsc --noEmit > /tmp/tsc-<package>.log 2>&1 &`
+- pnpm + workspace, không có script `typecheck` → `timeout 600s pnpm --filter <package> exec tsc --noEmit > /tmp/tsc-<sanitized-package>.log 2>&1 &` (mặc định hiện tại, y hệt)
+- npm + single-package → `timeout 600s npm exec -- tsc --noEmit > /tmp/tsc-<sanitized-package>.log 2>&1 &`
 
 Spawn tất cả package trước, rồi mới `wait` — KHÔNG chạy tuần tự từng cái một.
 
-Sau `wait`, đọc từng `/tmp/tsc-<package>.log`:
+Sau `wait`, đọc từng `/tmp/tsc-<sanitized-package>.log`:
 - Không có lỗi → báo pass
 - Có lỗi → trích xuất file:line + message cụ thể, fix, rồi recheck **chỉ package vừa fix** (chạy lại đúng 1 lệnh tsc cho package đó, không chạy lại toàn bộ danh sách)
 - Nếu package không có `tsconfig.json`, coi lỗi đó là "không có config typecheck" chứ không phải lỗi type, và skip/báo cáo tương ứng thay vì coi đó là bug trong code
 
 ## Bước 2 — Build song song
 
+Sanitize tên package để dùng làm filesystem path trước: thay `/` và `@` bằng `_` (vd: `@app/api` → `_app_api`) — tên package có scope ghi thẳng vào `/tmp/build-<package>.log` sẽ lỗi (tạo ra subdirectory ngoài ý muốn, hoặc fail hẳn).
+
 Tương tự bước 1, spawn một background command cho mỗi package:
 
 ```
-<pm workspace/root exec template từ Bước -1> <build script> > /tmp/build-<package>.log 2>&1 &
+timeout 600s <pm workspace/root exec template từ Bước -1> <build script> > /tmp/build-<sanitized-package>.log 2>&1 &
 ```
 
-`<build script>` = script `build` khai báo của package đó (Bước -1 — không có fallback raw; package không có script `build` thì bị skip, không chạy bằng lệnh thay thế). Ví dụ minh hoạ: pnpm + workspace → `pnpm --filter <package> build > /tmp/build-<package>.log 2>&1 &` (mặc định hiện tại, y hệt).
+`<build script>` = script `build` khai báo của package đó (Bước -1 — không có fallback raw; package không có script `build` thì bị skip, không chạy bằng lệnh thay thế). Ví dụ minh hoạ: pnpm + workspace → `timeout 600s pnpm --filter <package> build > /tmp/build-<sanitized-package>.log 2>&1 &` (mặc định hiện tại, y hệt).
 
 Spawn tất cả → `wait` → parse log từng package (pass/fail). Package fail → fix, recheck chỉ package đó.
 
@@ -75,7 +79,7 @@ Spawn tất cả → `wait` → parse log từng package (pass/fail). Package fa
 ## Bước 4 — Test (chỉ khi user yêu cầu hoặc `$ARGUMENTS` chứa `--test`)
 
 - Xác định test script trong `package.json` của từng package cần test — ưu tiên non-watch mode (`test:run`, `test:ci`, `test -- --run`, ...) hơn plain `test` nếu nghi ngờ mặc định là watch mode
-- Chạy background + `wait`, giống bước 1-2
+- Chạy background + `wait`, giống bước 1-2 (thêm prefix `timeout 600s`)
 - Fail → fix, recheck chỉ package đó, lặp lại đến khi pass — **KHÔNG BAO GIỜ** bỏ qua test failure vì bất kỳ lý do gì
 
 ---
@@ -86,6 +90,7 @@ Spawn tất cả → `wait` → parse log từng package (pass/fail). Package fa
 - KHÔNG BAO GIỜ hardcode bất kỳ tên package cụ thể nào trong logic — mọi danh sách phải đến từ argument hoặc workspace auto-detect
 - Package fail → recheck chỉ package đó sau khi fix, không chạy lại toàn bộ danh sách
 - KHÔNG BAO GIỜ bỏ qua test failure để đi tiếp bước khác — PHẢI fix và recheck đến khi pass
+- Bọc mọi background command trong `timeout 600s` (hoặc `gtimeout` trên macOS) — package bị treo không được làm treo toàn bộ `wait`
 
 ## Bước tiếp theo
 
