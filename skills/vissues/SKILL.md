@@ -59,12 +59,18 @@ These commands assume full gh mode from Step 0; in degraded mode, follow the man
 
 ## Step 3 — Create/update sub-issues
 
-1. Group the plan's phases into sub-issues by area of work — **DO NOT** create one sub-issue per small phase; related phases (same layer, same feature slice) should be merged into a single sub-issue. Avoid creating too many issues. Derive each sub-issue's title **deterministically** from the phase numbers/area it covers (e.g. a fixed template such as `<Area name> (Phase N-M)`) — not free-form phrasing that can vary between runs, so the dedupe search in step 2 reliably matches the same title on a re-run.
-2. For EACH sub-issue you plan to create — search first to avoid duplicates when the skill is re-run (update mode):
+1. Group the plan's phases into sub-issues by area of work — **DO NOT** create one sub-issue per small phase; related phases (same layer, same feature slice) should be merged into a single sub-issue. Avoid creating too many issues. Derive each sub-issue's title **deterministically** from the phase numbers/area it covers (e.g. a fixed template such as `<Area name> (Phase N-M)`) — not free-form phrasing that can vary between runs, so the dedupe check in step 3 reliably matches the same title on a re-run.
+2. Before creating/updating or linking any sub-issue, fetch the epic's current sub-issues **once per skill invocation** (REST, `<owner>`/`<repo>` per §2) — cache this list (`id`, `number`, `title`) and reuse it for the creation dedup check in step 3, the already-linked check in step 5, AND the count check, don't re-fetch per sub-issue:
+   ```
+   gh api repos/<owner>/<repo>/issues/<epic_number>/sub_issues --paginate --jq '.[] | {id,number,title}'
+   ```
+   - If this call fails outright → do not assume the epic has 0 sub-issues. Warn the user explicitly that the current count/links couldn't be verified, and ask whether to proceed before linking anything.
+   - If it succeeds → count check: if the list already has 100 or more entries (GitHub's documented per-parent limit — reconfirm live if this skill is revisited later, don't trust a stale number), **STOP** and tell the user the epic is at GitHub's sub-issue limit; they must close/reorganize existing sub-issues before adding more. Do this once for the whole run, not per sub-issue.
+3. For EACH sub-issue you plan to create — dedupe against the cached list from step 2 first, by exact title match: a cached entry whose title matches the planned title means it already exists, reuse its `number`. Only when the epic has no matching sub-issue in that cached list, fall back to a repo-wide title search (title-based, can miss GitHub's title normalization or special characters):
    ```
    gh issue list --search "<planned title>" --state all --json number,title,url
    ```
-3. If it already exists → update its content according to the matching phase:
+4. If it already exists (from either lookup in step 3) → update its content according to the matching phase:
    ```
    gh issue edit <number> --body "<new content>"
    ```
@@ -72,18 +78,12 @@ These commands assume full gh mode from Step 0; in degraded mode, follow the man
    ```
    gh issue create --title "<title, in English>" --body "<content, see Step 4>"
    ```
-4. Before linking any sub-issue, fetch the epic's current sub-issues **once per skill invocation** (REST, `<owner>`/`<repo>` per §2) — cache this list and reuse it for every sub-issue's already-linked check below AND for the count check, don't re-fetch per sub-issue:
-   ```
-   gh api repos/<owner>/<repo>/issues/<epic_number>/sub_issues --paginate --jq '.[].id'
-   ```
-   - If this call fails outright → do not assume the epic has 0 sub-issues. Warn the user explicitly that the current count/links couldn't be verified, and ask whether to proceed before linking anything.
-   - If it succeeds → count check: if the list already has 100 or more entries (GitHub's documented per-parent limit — reconfirm live if this skill is revisited later, don't trust a stale number), **STOP** and tell the user the epic is at GitHub's sub-issue limit; they must close/reorganize existing sub-issues before adding more. Do this once for the whole run, not per sub-issue.
-5. For each sub-issue to link (found or newly created in step 3):
+5. For each sub-issue to link (found or newly created in step 4):
    a. Fetch its numeric `id` — **NOT** `number`, **NOT** node ID:
       ```
       gh api repos/<owner>/<repo>/issues/<sub_issue_number> --jq .id
       ```
-   b. If that numeric id is already in the cached list from step 4 → already linked to this epic from a previous run, **skip silently** — this is the expected, common outcome on every re-run, not an error.
+   b. If that numeric id is already in the cached list from step 2 → already linked to this epic from a previous run, **skip silently** — this is the expected, common outcome on every re-run, not an error.
    c. Otherwise, attempt REST linking (this also covers moving a sub-issue that currently belongs to a different parent, via `replace_parent`):
       ```
       gh api repos/<owner>/<repo>/issues/<epic_number>/sub_issues -F sub_issue_id=<numeric_id> -F replace_parent=true
@@ -97,6 +97,11 @@ These commands assume full gh mode from Step 0; in degraded mode, follow the man
         ```
         gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!,$replaceParent:Boolean){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId,replaceParent:$replaceParent}){issue{title}subIssue{title}}}' -f issueId=<epic_node_id> -f subIssueId=<sub_issue_node_id> -F replaceParent=true
         ```
+6. Optional — milestone/labels: ask the user once (via `AskUserQuestion`) whether to assign a milestone per phase and/or labels per area of work to the sub-issues touched this run. If yes:
+   ```
+   gh issue edit <number> --milestone "<milestone>" --add-label "<label>"
+   ```
+   If the user declines, skip silently — don't ask again per sub-issue.
 
 ## Step 4 — Issue content (both epic and sub-issues follow this format)
 
@@ -117,12 +122,24 @@ Plain, non-technical language — no file names, function names, DB table names,
 
 If the plan includes database changes → put ALL migration-related content into **the sub-issue containing phase 1's content** (not necessarily the first sub-issue created — Step 3.1 groups by area of work, not phase order). DO NOT scatter migration content across multiple sub-issues.
 
+## Step 6 — Final links table
+
+At the end of the run, print a table of every issue touched this run (epic + all sub-issues, whether created or updated):
+
+```
+| # | title | url | parent |
+|---|---|---|---|
+```
+
+Also save this same table to `<plan-path>/issues.md`, so a future re-run of this skill on the same plan can read it directly instead of re-searching GitHub.
+
 ---
 
 ## Hard rules
 
-- Always search before creating (`gh issue list --search`) — avoid duplicate epic/sub-issues when re-running the skill
+- Always check the epic's cached sub-issues list first for sub-issue creation dedup (step 3), falling back to `gh issue list --search` only when the epic has no matching title; for the epic itself, always search before creating — avoid duplicate epic/sub-issues when re-running the skill
 - REST `sub_issues` is the primary linking path; fetch the epic's sub-issues list once per run (cached) and skip linking a sub-issue whose numeric `id` is already in that list — this is the idempotent no-op, never a REST failure requiring fallback
+- GitHub's `sub_issues_summary`/`subIssuesSummary` field (shown as a progress badge on Project boards and issue lists) can go stale — this is a known GitHub bug, not a sign your linking failed; the issue's live `sub_issues` REST list (or GraphQL equivalent) is always the authoritative source, never the badge
 - Only fall back to the GraphQL `addSubIssue` mutation (with `replaceParent: true`) on a genuine non-permission REST failure; on a 401/403 from REST, stop and report it to the user directly — never silently fall back
 - Never link a sub-issue when the epic's cached sub-issue count is already ≥ 100 (GitHub's per-parent limit) — stop and tell the user to close/reorganize existing sub-issues first; if the count-fetch itself fails, warn the user and ask before proceeding, don't assume 0
 - Issue language must always be non-technical — no code jargon, no file/function/DB table names
