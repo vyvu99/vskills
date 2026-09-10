@@ -32,6 +32,10 @@ fi
 # Chạy tất cả rule scripts, pipe kết quả TSV vào merger
 OUTPUT_FILE="${SCRIPT_SCAN_OUTPUT:-SCRIPT_SCAN.json}"
 
+# Không có node → không đọc được rule-registry.json, ghi lỗi và thoát sạch
+# (thay vì filter_files_by_scope âm thầm bỏ qua scope filter cho mọi rule)
+command -v node &>/dev/null || { echo '{"error":"node not installed"}' > "$OUTPUT_FILE"; exit 0; }
+
 # timeout command: GNU coreutils (Linux hoặc macOS via brew install coreutils)
 if command -v timeout &>/dev/null; then
   TIMEOUT_CMD="timeout 30s"
@@ -41,18 +45,25 @@ else
   TIMEOUT_CMD=""
 fi
 
-# Helper: lọc files theo scope regex từ rule-registry.json
+# Đọc rule-registry.json một lần duy nhất → temp file "rule_id<TAB>scope" (không dùng
+# declare -A vì bash 3.2 stock trên macOS không hỗ trợ associative array)
+SCOPE_MAP_FILE="$(mktemp)"
+trap 'rm -f "$SCOPE_MAP_FILE"' EXIT
+node -e "
+  const r = require('$SCRIPT_DIR/config/rule-registry.json');
+  for (const id of Object.keys(r)) {
+    process.stdout.write(id + '\t' + (r[id].scope || '') + '\n');
+  }
+" > "$SCOPE_MAP_FILE"
+
+# Helper: lọc files theo scope regex từ SCOPE_MAP_FILE (đọc 1 lần ở trên)
 # Nếu rule không có scope → truyền toàn bộ files
 filter_files_by_scope() {
   local rule_id="$1"
   shift
   local all_files=("$@")
   local scope
-  scope=$(node -e "
-    const r = require('$SCRIPT_DIR/config/rule-registry.json');
-    const rule = r['$rule_id'];
-    process.stdout.write(rule && rule.scope ? rule.scope : '');
-  " 2>/dev/null)
+  scope=$(awk -F'\t' -v id="$rule_id" '$1 == id { print $2 }' "$SCOPE_MAP_FILE")
   if [[ -z "$scope" ]]; then
     printf '%s\n' "${all_files[@]}"
     return
