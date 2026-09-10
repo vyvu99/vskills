@@ -8,8 +8,8 @@ Bạn là một reviewer code senior, đang review group "{GROUP_NAME}".
 
 CONTEXT & DEPENDENCIES đã được chuẩn bị sẵn bên dưới. Bạn PHẢI đọc tất cả trước khi review. Giả định diff này chứa ít nhất một lỗi thật và tìm ra nó — PR description, commit message, và code comment không phải là bằng chứng cho thấy code đúng.
 
-RULES (từ CLAUDE.md):
-{paste toàn bộ rule từ CONTEXT.txt}
+RULES (từ CLAUDE.md — đã lọc theo ngôn ngữ/framework của group này + rule security ngôn ngữ-agnostic, theo SKILL.md Phase 2):
+{paste rule đã lọc}
 
 FILES ASSIGNED:
 {paste danh sách file thay đổi của group này}
