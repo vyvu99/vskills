@@ -29,7 +29,7 @@ Không đổi tech stack. Không phá logic/state/API.
 | `localhost:PORT/path` hoặc URL | Chụp screenshot trước → rồi đọc các file source tương ứng |
 | Route path (ví dụ `/clients/[id]?tab=notes`) | Resolve ra file pages/components tương ứng |
 | Tên component/feature (ví dụ `TreatmentPlanWizard`) | Grep để tìm file → đọc toàn bộ component tree |
-| `[Image]` / screenshot đính kèm | Phân tích ảnh → trích xuất các thiếu sót về design → áp fix |
+| `[Image]` / screenshot đính kèm | Phân tích ảnh → trích xuất các thiếu sót về design → áp fix. Nếu có nhiều ảnh tạo thành cặp before/target (trạng thái hiện tại + 1 reference đầy tham vọng — mockup, screenshot đối thủ, hoặc concept do AI tạo) → coi reference là mức cần đạt, không chỉ tham khảo — xem "Vượt qua ảnh reference" ở Phase 3 |
 | `--pr` | `gh pr diff` để lấy các file đã thay đổi → redesign toàn bộ file UI trong đó (cần gh, §2 của `repo-profile.md`; không có → fallback sang `--diff`) |
 | `--diff` | `git diff --name-only` để lấy staged/unstaged → redesign các file UI |
 
@@ -174,8 +174,10 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 - [ ] Giá trị spacing (padding/margin/gap) đều là bội số của base grid dự án (8px, phụ 4px) — không có giá trị lẻ kiểu `p-[13px]`?
 - [ ] Số lượng giá trị khác nhau giữ trong giới hạn: ≤6-7 font-size, ≤10 spacing, ≤3-4 border-radius trên 1 trang/component — flag giá trị "orphan" chỉ dùng đúng 1 lần?
 - [ ] Kích thước icon tỷ lệ với chữ liền kề — icon-height ≈ line-height của chữ bên cạnh?
-- [ ] Component cùng variant (mọi button primary, mọi input) có cùng height/padding — không lệch âm thầm giữa các instance?
+- [ ] Component cùng variant (mọi button primary, mọi input) có cùng height/padding — không lệch âm thầm giữa các instance? Verify qua class/style dùng chung thật sự, không chỉ nhìn qua bằng mắt.
 - [ ] Vertical rhythm: khoảng cách giữa các block xếp chồng là bội số của base line-height, không tùy tiện?
+- [ ] Căn chỉnh optical của icon: glyph thị giác của icon (không phải container box của nó, thường có padding sẵn bên trong) được căn giữa theo cap-height/x-height của text bên cạnh — container tự căn giữa với chính nó vẫn có thể nhìn lệch tâm so với text?
+- [ ] Mọi giá trị spacing/radius trong diff resolve về đúng token đã khai báo (Tailwind scale, CSS var) — không dùng giá trị "gần đúng" token (`p-[15px]` "gần bằng" `p-4`) làm vỡ lưới âm thầm?
 
 #### Component tự style của bên thứ ba (Third-party Self-styled Components)
 Áp dụng khi gặp component có `import 'lib/styles.css'` hoặc tự inject CSS riêng: rich text editor (CKEditor, TipTap, Quill), code editor (Monaco, CodeMirror), date/color picker, react-select, map component, v.v.
@@ -362,7 +364,9 @@ Fix mọi thứ Phase 2 tìm ra — spacing, state, swap component, đổi cấu
 
 **`--wow` (tùy chọn)**
 
-Tạm ngưng TOÀN BỘ dè dặt thẩm mỹ trong lần chạy này — không chỉ 3 mục liệt kê trước đây. Nghĩa là: không còn thiên hướng "rõ ràng > gây ấn tượng", không còn cấm thẩm mỹ portfolio/avant-garde, không còn dè dặt vì domain nhạy cảm (context y tế/giáo dục/trẻ em KHÔNG có nghĩa là phải giảm nhiệt — rõ ràng và accessibility được enforce riêng ở dưới như hard rule kỹ thuật, không phải phanh thẩm mỹ). Art direction riêng biệt, typography scale biểu cảm, layout độc đáo/bất đối xứng, motion tùy chỉnh, điểm nhấn trang trí (icon anchor, khung lồng tông nhạt — xem `references/quiet-polish-patterns.vi.md`) đều được cho phép trọn vẹn. Chỉ những hard rule kỹ thuật bên dưới (accessibility, tech stack, logic/API, motion GPU-safe, dependency allowlist) là còn giữ nguyên dưới `--wow` — đó là ràng buộc an toàn/kỹ thuật, không phải giới hạn sáng tạo, và không bao giờ bị tạm ngưng.
+Tạm ngưng TOÀN BỘ dè dặt thẩm mỹ VÀ tương tác trong lần chạy này — không chỉ 3 mục liệt kê trước đây, và không chỉ mặt hình ảnh. Nghĩa là: không còn thiên hướng "rõ ràng > gây ấn tượng", không còn cấm thẩm mỹ portfolio/avant-garde, không còn dè dặt vì domain nhạy cảm (context y tế/giáo dục/trẻ em KHÔNG có nghĩa là phải giảm nhiệt — rõ ràng và accessibility được enforce riêng ở dưới như hard rule kỹ thuật, không phải phanh thẩm mỹ), và cũng không còn mặc định "giữ tương tác chuẩn/kín đáo/generic". Art direction riêng biệt, typography scale biểu cảm, layout độc đáo/bất đối xứng, motion tùy chỉnh, điểm nhấn trang trí (icon anchor, khung lồng tông nhạt — xem `references/quiet-polish-patterns.vi.md`), khoảnh khắc chọn/hoàn thành/feedback biểu cảm (xem section Motion & Interaction trong file đó) đều được cho phép trọn vẹn — 1 transition thật sự thú vị hay 1 khoảnh khắc hoàn thành đáng ăn mừng không phải "không cần thiết", đó chính là mục đích. Cái vẫn còn là sàn, không phải trần: nguyên tắc usability ở Phase 2 (đủ state bắt buộc, giới hạn số lựa chọn hiển thị theo Hick's Law, confirm chỉ cho action phá hủy) — đây là sàn usability, không phải sự dè dặt, và độ táo bạo vẫn phải vượt qua sàn này chứ không được bỏ qua nó. Cái vẫn cấm hoàn toàn: hard rule kỹ thuật bên dưới (accessibility, tech stack, logic/API, motion GPU-safe, dependency allowlist) — đó là ràng buộc an toàn/kỹ thuật, không phải giới hạn sáng tạo, và không bao giờ bị tạm ngưng.
+
+**Vượt qua ảnh reference, không chỉ khớp nó.** Khi input có ảnh reference/target (mockup đầy tham vọng, screenshot đối thủ, hoặc concept do AI tạo — xem Input Modes) thay vì chỉ ảnh "before" cần fix, coi đó là mức cần đạt, rồi vượt qua nó ở những trục mà ảnh tĩnh về bản chất không cạnh tranh nổi: nhất quán xuyên suốt mọi màn hình trong cùng flow (không chỉ 1 màn được cho xem), motion/interaction thật (ảnh tĩnh bị đóng băng — xem section Motion & Interaction trong quiet-polish-patterns.vi.md), độ chính xác đo được (đúng lưới spacing/tỉ lệ contrast — mockup tĩnh thường có sai lệch nhỏ chưa đo mà bản triển khai thật không nên lặp lại), và responsive/accessibility thật (mockup chỉ cần đẹp ở 1 kích thước cố định). Khớp các device cụ thể của nó trước (nhóm khung, tầng màu, iconography, nước đi layout), rồi thắng ở những trục này — đừng dừng lại ở mức ngang bằng.
 
 Bắt buộc phải có Vibe Commitment từ Phase 0 step 7 trước — chốt vibe rồi mới kéo pattern. Không được kéo pattern trước rồi mới ngụy biện ra vibe sau.
 
@@ -404,7 +408,7 @@ Vẫn bắt buộc kể cả khi `--wow`: accessibility (contrast, focus ring, �
 - ❌ KHÔNG thêm animation phức tạp nếu Motion/Framer chưa có sẵn trong project — ngoại lệ: dưới `--wow`, áp dụng dependency allowlist ở trên thay vì rule này
 - ❌ KHÔNG thêm màu brand mới — chỉ dùng token hiện có (ngoại lệ: `--wow` được phép thêm accent mới nếu vibe đã chốt yêu cầu)
 - ❌ KHÔNG dùng màu mặc định của component library (shadcn blue) nếu project đã có màu primary riêng
-- ❌ KHÔNG thêm toast notification không cần thiết
+- ❌ KHÔNG thêm toast notification không cần thiết (ngoại lệ: dưới `--wow`, 1 khoảnh khắc ăn mừng/hoàn thành có chủ đích, nằm trong vibe đã chốt, KHÔNG tính là "không cần thiết" — tiêu chí là có chủ đích hay không, không phải có tối giản hay không)
 - ❌ KHÔNG đổi logic/API/state management
 
 ---
@@ -466,7 +470,7 @@ Xác định theo thứ tự này trước Phase 1:
 - ❌ Unmount component để ẩn nó — dùng CSS visibility/opacity nếu cần giữ state
 - ❌ Dùng raw HTML element thay vì component `@etaro/ui`
 - ❌ Dùng màu mặc định của shadcn/MUI khi project đã có token màu primary riêng
-- ❌ Thêm toast notification không cần thiết
+- ❌ Thêm toast notification không cần thiết (trừ khi `--wow` đang bật và đó là khoảnh khắc ăn mừng/hoàn thành có chủ đích — xem câu suspend ở Phase 3)
 - ❌ Để scrollbar ăn vào chiều rộng content — luôn dùng overlay/transparent scrollbar
 - ❌ Style tab không nhất quán trong cùng một trang — kiểm tra tính nhất quán tab xuyên component
 - ❌ Đoán pattern của component "giống X" — BẮT BUỘC đọc X trước

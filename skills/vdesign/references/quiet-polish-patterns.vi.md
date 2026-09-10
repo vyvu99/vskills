@@ -26,6 +26,18 @@ Khoảng trống mà file này vá: catalog ồn ào giả định "ấn tượn
 - **Radio-Card** — thay toggle/pill-button dạng segmented bằng card cho mỗi option (full-width hoặc nửa width): viền bo góc, padding rộng rãi, chỉ báo dạng dot đặc (hoặc checkmark) bên trái — dot fill đặc + viền đổi màu accent khi được chọn. Đọc ra chủ động và thân thiện với thao tác chạm hơn cặp toggle viền trơn.
 - **Selected-State Warmth** — card của option được chọn có nền tint mềm (không chỉ đổi màu viền) để trạng thái chọn rõ ngay từ cái nhìn đầu, không cần nhìn kỹ mới thấy.
 
+## Motion & Interaction
+
+1 ảnh reference tĩnh (mockup, screenshot đối thủ, concept AI) bị đóng băng — không thể hiện được transition. Code thật thì có thể, và đây là 1 trong những cách rõ nhất để vượt qua 1 ảnh reference tĩnh, không chỉ khớp mặt nhìn. Giữ mọi chuyển động GPU-safe (chỉ `transform`/`opacity`, không bao giờ `width`/`height`/`top`/`left`) và trong khoảng 150-350ms — quiet polish là để cảm nhận, không phải để trình diễn.
+
+- **Selection Transition** — dot-fill và màu viền của Radio-Card animate vào (150-250ms ease-out) khi được chọn, thay vì snap ngay lập tức. Bản thân fill có thể scale từ 0 lên full thay vì chỉ xuất hiện.
+- **Progress Fill Animation** — fill của progress bar animate mượt tới giá trị mới khi tiến bước (250-350ms ease-out), không bao giờ jump-cut. Implementation GPU-safe: track width cố định, phần tử fill bên trong animate bằng `transform: scaleX(progress)` (`transform-origin: left`), không animate trực tiếp `width`.
+- **Selected-Card Settle** — card của option vừa được chọn có 1 scale pulse rất nhẹ (vd `scale(1.02)` → `scale(1)`, ~150ms) khi chọn, củng cố Selected-State Warmth bằng motion, không chỉ bằng màu.
+- **Icon Chip Entrance** — chip của Icon Anchor fade/scale vào sau khi container mount xong (stagger ngắn, delay ~80-120ms), thay vì xuất hiện đồng thời với mọi thứ khác — sequencing nhỏ đọc ra như được cân nhắc kỹ.
+- **Tactile Press Feedback** — mọi bề mặt có thể chạm (radio-card, button, chip) có `scale(0.98)` khi `:active` — xác nhận thao tác chạm đã ghi nhận trước khi kết quả async về.
+- **Completion Moment** — khi thực sự hoàn thành 1 flow (không phải mọi action nhỏ), 1 tín hiệu ăn mừng ngắn gọn, tiết chế (check-mark vẽ vào mềm mại, scale/fade nhẹ trên icon hoàn thành) là hợp lý — đây là lựa chọn vibe có chủ đích, không phải "không cần thiết", nhưng chỉ 1 khoảnh khắc/flow, không rải rác.
+- **Reduced-motion guard** — mọi pattern ở đây vẫn cần fallback `prefers-reduced-motion` (đổi state ngay lập tức, không animation) theo category audit Animation & Motion gốc — quiet polish không bao giờ bỏ qua điều này.
+
 ## Khi nào dùng tier này thay vì catalog ồn ào
 
 - Vibe là Soft Neumorphic / Organic Asymmetric / Maximal Minimal / Authentic Humanist / Flow-First System → kéo chủ yếu từ đây.

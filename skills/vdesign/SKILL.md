@@ -29,7 +29,7 @@ Do not change the tech stack. Do not break logic/state/API.
 | `localhost:PORT/path` or URL | Take a screenshot first → then read the corresponding source files |
 | Route path (e.g. `/clients/[id]?tab=notes`) | Resolve to the corresponding pages/components files |
 | Component/feature name (e.g. `TreatmentPlanWizard`) | Grep to find the file → read the entire component tree |
-| `[Image]` / attached screenshot | Analyze the image → extract design gaps → apply fixes |
+| `[Image]` / attached screenshot | Analyze the image → extract design gaps → apply fixes. If multiple images form a before/target pair (current state + an aspirational reference — a mockup, competitor screenshot, or AI-generated concept) → treat the reference as the bar to reach, not just inspiration; see "Beating a reference image" in Phase 3 |
 | `--pr` | `gh pr diff` to get changed files → redesign all UI files in it (requires gh, §2 of `repo-profile.md`; unavailable → falls back to `--diff`) |
 | `--diff` | `git diff --name-only` to get staged/unstaged → redesign UI files |
 
@@ -174,8 +174,10 @@ Go through each category — only flag issues that **actually affect visual/UX q
 - [ ] Spacing values (padding/margin/gap) are all multiples of the project's base grid (8px, secondary 4px) — no odd values like `p-[13px]`?
 - [ ] Distinct value count stays bounded: ≤6-7 font-size, ≤10 spacing, ≤3-4 border-radius values per page/component — flag "orphan" values used only once?
 - [ ] Icon size proportional to adjacent text — icon height ≈ line-height of the text beside it?
-- [ ] Same-variant components (all primary buttons, all inputs) share identical height/padding — no silent drift between instances?
+- [ ] Same-variant components (all primary buttons, all inputs) share identical height/padding — no silent drift between instances? Verify via the actual shared class/style, not a per-instance visual pass.
 - [ ] Vertical rhythm: gaps between stacked elements are multiples of the base line-height, not arbitrary?
+- [ ] Icon optical alignment: an icon's visual glyph (not its container box, which often has built-in padding) is centered against the cap-height/x-height of the text beside it — a container centered on itself can still look visually off-center next to text?
+- [ ] Every spacing/radius value in the diff resolves to an actual declared token (Tailwind scale, CSS var) — no near-token approximation (`p-[15px]` "close enough" to `p-4`) that silently breaks the grid?
 
 #### Third-party Self-styled Components
 Applies when encountering a component with `import 'lib/styles.css'` or that injects its own CSS: rich text editor (CKEditor, TipTap, Quill), code editor (Monaco, CodeMirror), date/color picker, react-select, map component, etc.
@@ -362,7 +364,9 @@ Fix everything Phase 2 found — spacing, states, component swaps, grid/layout r
 
 **`--wow` (optional)**
 
-Suspends ALL aesthetic caution for this run — not just the 3 items previously listed. This means: no "clarity > impressiveness" bias, no portfolio/avant-garde prohibition, no domain-sensitivity restraint (a healthcare/education/children's-product context does NOT mean tone it down — clarity and accessibility are enforced separately as hard technical rules below, not as an aesthetic brake). Bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion, decorative accents (icon anchors, tinted sub-cards — see `references/quiet-polish-patterns.md`) are all fully permitted. The only things that stay off-limits under `--wow` are the hard technical rules below (accessibility, tech stack, logic/API, GPU-safe motion, dependency allowlist) — those are safety/engineering constraints, not restraint on creativity, and are never suspended.
+Suspends ALL aesthetic AND interaction caution for this run — not just the 3 items previously listed, and not just visuals. This means: no "clarity > impressiveness" bias, no portfolio/avant-garde prohibition, no domain-sensitivity restraint (a healthcare/education/children's-product context does NOT mean tone it down — clarity and accessibility are enforced separately as hard technical rules below, not as an aesthetic brake), and no "keep interactions standard/low-key/generic" default either. Bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion, decorative accents (icon anchors, tinted sub-cards — see `references/quiet-polish-patterns.md`), expressive selection/completion/feedback moments (see that file's Motion & Interaction section) are all fully permitted — a genuinely delightful transition or a celebratory completion moment is not "unnecessary," it's the point. What stays as a floor, not a cap: Phase 2's usability principles (all required states present, Hick's Law visible-choice limits, confirm-only-destructive-actions) — these are usability floors, not timidity, and boldness must still clear them, not bypass them. What stays off-limits entirely: the hard technical rules below (accessibility, tech stack, logic/API, GPU-safe motion, dependency allowlist) — those are safety/engineering constraints, not restraint on creativity, and are never suspended.
+
+**Beating a reference image, not just matching it.** When the input includes a reference/target image (an aspirational mockup, competitor screenshot, or AI-generated concept — see Input Modes) rather than only a "before" screenshot to fix, treat it as the bar to clear, then exceed it on the axes a static image structurally cannot compete on: consistency across every screen in the same flow (not just the one shown), real motion/interaction (a static image is frozen — see quiet-polish-patterns.md's Motion & Interaction section), measurable precision (exact spacing-grid/contrast-ratio conformance — a static mockup often has small unmeasured misalignments a real implementation shouldn't repeat), and real responsiveness/accessibility (the mockup only had to look good at one fixed size). Match its specific devices first (grouping, color tiers, iconography, layout moves), then win on these axes — don't stop at parity.
 
 Requires the Vibe Commitment from Phase 0 step 7 first — pick the vibe, then pull patterns. Never pull patterns first and rationalize a vibe after the fact.
 
@@ -404,7 +408,7 @@ Still mandatory even under `--wow`: accessibility (contrast, focus rings, all re
 - ❌ DO NOT add complex animation if Motion/Framer isn't already in the project — exception: under `--wow`, the dependency allowlist above applies instead
 - ❌ DO NOT add new brand colors — only use existing tokens (exception: `--wow` may introduce a new accent if the committed vibe requires it)
 - ❌ DO NOT use the component library's default color (shadcn blue) if the project has its own primary color
-- ❌ DO NOT add unnecessary toast notifications
+- ❌ DO NOT add unnecessary toast notifications (exception: under `--wow`, an intentional celebratory/completion moment that's part of the committed vibe is not "unnecessary" — the bar is whether it's deliberate, not whether it's minimal)
 - ❌ DO NOT change logic/API/state management
 
 ---
@@ -466,7 +470,7 @@ Resolve in this order before Phase 1:
 - ❌ Unmount a component to hide it — use CSS visibility/opacity if state needs to be preserved
 - ❌ Use raw HTML elements instead of `@etaro/ui` components
 - ❌ Use shadcn/MUI default colors when the project has its own primary color token
-- ❌ Add unnecessary toast notifications
+- ❌ Add unnecessary toast notifications (unless `--wow` is active and it's a deliberate celebratory/completion moment — see Phase 3 suspend clause)
 - ❌ Let the scrollbar eat into the content area's width — always use an overlay/transparent scrollbar
 - ❌ Inconsistent tab style within the same page — check cross-component tab consistency
 - ❌ Guess a component's pattern "like X" — MUST read X first

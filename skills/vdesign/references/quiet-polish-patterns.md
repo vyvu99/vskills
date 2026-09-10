@@ -26,6 +26,18 @@ The gap this closes: the loud catalog assumes "more impressive = bigger effect" 
 - **Radio-Card** — replace a segmented toggle/pill-button choice with a full-width or half-width card per option: rounded border, generous padding, and a filled-dot (or checkmark) indicator on the left that fills solid + border recolors to the accent when selected. Reads as more deliberate and touch-friendly than a bare outlined toggle pair.
 - **Selected-State Warmth** — the selected option's card gets a soft tinted fill (not just a border color change) so selection is legible at a glance, not only on close inspection.
 
+## Motion & Interaction
+
+A static reference image (mockup, competitor screenshot, AI-generated concept) is frozen — it cannot show a transition. Real code can, and this is one of the clearest ways it should exceed a static reference, not just match its look. Keep every move GPU-safe (`transform`/`opacity` only, never `width`/`height`/`top`/`left`) and in the 150-350ms range — quiet polish is felt, not performed.
+
+- **Selection Transition** — a Radio-Card's dot-fill and border-color animate in (150-250ms ease-out) when selected, instead of snapping instantly. The fill itself can scale from 0 to full rather than just appearing.
+- **Progress Fill Animation** — a progress bar's fill animates smoothly to its new value on advance (250-350ms ease-out), never jump-cuts. GPU-safe implementation: a fixed-width track with an inner fill element animated via `transform: scaleX(progress)` (`transform-origin: left`), not by animating `width` directly.
+- **Selected-Card Settle** — the newly-selected option's card does a very subtle scale pulse (e.g. `scale(1.02)` → `scale(1)`, ~150ms) on selection, reinforcing the Selected-State Warmth tint with motion, not just color.
+- **Icon Chip Entrance** — an Icon Anchor's chip fades/scales in slightly after its container mounts (short stagger, ~80-120ms delay), rather than appearing simultaneously with everything else — small sequencing reads as considered.
+- **Tactile Press Feedback** — any tappable surface (radio-card, button, chip) gets `scale(0.98)` on `:active` — confirms the tap registered before the async result does.
+- **Completion Moment** — on genuinely completing a flow (not every minor action), a brief, restrained celebratory cue (a soft check-mark draw-in, a gentle scale/fade on a completion icon) is warranted — this is a deliberate vibe choice, not "unnecessary," but keep it to one moment per flow, not scattered.
+- **Reduced-motion guard** — every pattern here still needs a `prefers-reduced-motion` fallback (instant state change, no animation) per the base Animation & Motion audit category — quiet polish never skips this.
+
 ## When to reach for this tier vs. the loud catalog
 
 - Vibe is Soft Neumorphic / Organic Asymmetric / Maximal Minimal / Authentic Humanist / Flow-First System → pull primarily from here.
