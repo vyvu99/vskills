@@ -6,7 +6,7 @@ when_to_use: "Kích hoạt khi bạn muốn redesign hoặc nâng cấp UI/UX c�
 argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--wow]"
 metadata:
   author: vyvu
-  version: "6.0.0"
+  version: "7.0.0"
 ---
 
 # vdesign — Skill Redesign UI/UX Cá Nhân
@@ -29,7 +29,7 @@ Không đổi tech stack. Không phá logic/state/API.
 | `localhost:PORT/path` hoặc URL | Chụp screenshot trước → rồi đọc các file source tương ứng |
 | Route path (ví dụ `/clients/[id]?tab=notes`) | Resolve ra file pages/components tương ứng |
 | Tên component/feature (ví dụ `TreatmentPlanWizard`) | Grep để tìm file → đọc toàn bộ component tree |
-| `[Image]` / screenshot đính kèm | Phân tích ảnh → trích xuất các thiếu sót về design → áp fix |
+| `[Image]` / screenshot đính kèm | Phân tích ảnh → trích xuất các thiếu sót về design → áp fix. Nếu có nhiều ảnh tạo thành cặp before/target (trạng thái hiện tại + 1 reference đầy tham vọng — mockup, screenshot đối thủ, hoặc concept do AI tạo) → coi reference là mức cần đạt, không chỉ tham khảo — xem "Vượt qua ảnh reference" ở Phase 3 |
 | `--pr` | `gh pr diff` để lấy các file đã thay đổi → redesign toàn bộ file UI trong đó (cần gh, §2 của `repo-profile.md`; không có → fallback sang `--diff`) |
 | `--diff` | `git diff --name-only` để lấy staged/unstaged → redesign các file UI |
 
@@ -42,11 +42,13 @@ Không đổi tech stack. Không phá logic/state/API.
 | Từ khóa | Ý nghĩa thực tế trong code |
 |---------|--------------------------|
 | **Tinh tế (Refined)** | Chi tiết nhỏ đúng chỗ: border-radius nhất quán, icon size đều nhau, text-overflow được xử lý, không có giá trị spacing scale lẻ |
-| **Hài hòa (Harmonious)** | Màu, font, spacing khớp với phần còn lại của project; không phải "ốc đảo cô lập" tự mang style riêng |
+| **Hài hòa (Harmonious)** | Màu, font, spacing khớp với phần còn lại của project; không phải "ốc đảo cô lập" tự mang style riêng; font-size/spacing/component-size theo modular scale/tỷ lệ nhất quán, không dùng giá trị tùy tiện |
 | **Hiện đại (Modern)** | Không dùng pattern lỗi thời (table viền kiểu cũ, form label kiểu cũ, button phẳng không có state); tận dụng tốt whitespace |
 | **Thanh lịch (Elegant)** | Hierarchy rõ ràng, ít nhiễu thị giác, không trang trí thừa, phân cấp button rõ ràng (primary/ghost/link) |
+| **Chiều sâu (Deep)** | Elevation tier rõ ràng, shadow/border/light-source nhất quán — không bao giờ phẳng lì vô hồn, không bao giờ skeuomorphic |
 | **Nhất quán với hệ thống** | Khớp với design tokens, component pattern, và ngôn ngữ thị giác của project — **đây là yêu cầu quan trọng nhất** |
 | **Accessible** | Thông tin không bị ẩn; label rõ ràng; icon quan trọng có tooltip; đầy đủ state empty/loading/error |
+| **Tiện dụng (Efficient)** | Tối thiểu thao tác/click: bulk action, inline-edit, smart default khi an toàn |
 | **Sáng tạo khi được phép** | Được phép tạo hình ảnh khác biệt khi user yêu cầu "làm gì đó khác cho đa dạng" — nhưng vẫn phải nhất quán về spacing/màu |
 
 **KHÔNG** áp dụng thẩm mỹ portfolio/avant-garde. Kể cả redesign toàn bộ vẫn phải phục vụ bối cảnh sản phẩm B2B: **rõ ràng > gây ấn tượng**.
@@ -141,6 +143,15 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 - [ ] State active/selected/highlighted có màu phân biệt rõ chưa?
 - [ ] **KHÔNG dùng màu mặc định của component** (ví dụ màu xanh mặc định của shadcn) — phải dùng màu primary của hệ thống (`primary`, `accent` tokens)?
 
+#### Chiều sâu & Elevation (Depth & Elevation)
+- [ ] Elevation tier được định nghĩa rõ (3-5 level có tên: base/card/elevated-card/overlay) và gán nhất quán — mỗi loại surface luôn dùng đúng 1 tier?
+- [ ] Shadow lấy từ token scale cố định (sm/md/lg/xl) — không có giá trị box-shadow tùy tiện?
+- [ ] Light source nhất quán trên mọi shadow (cùng hướng/tỷ lệ offset)?
+- [ ] Z-index theo scale định nghĩa sẵn (dropdown < sticky < modal < toast) — không có `z-[9999]` tùy tiện; modal/toast render qua portal để tránh stacking-context trap?
+- [ ] Card/panel dùng border + shadow nhẹ; shadow nặng chỉ dành cho phần tử nổi (modal, popover, FAB)?
+- [ ] Blur/glass effect (nếu có) chỉ dùng cho overlay, không dùng cho surface nội dung chính?
+- [ ] Không có stacking trap ngoài ý muốn: sticky/opacity/transform ở cha vô tình cắt dropdown/popover con?
+
 #### Layout & Spacing
 - [ ] Padding/gap dùng spacing scale nhất quán (không có giá trị lẻ kiểu `p-[13px]`)?
 - [ ] Responsive chắc chắn: mobile-first, không bị scroll ngang?
@@ -155,6 +166,18 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 - [ ] Icon nhất quán (cùng library, cùng size)?
 - [ ] Card: tránh `border + shadow + white bg` chung chung nếu density cao — dùng spacing/divider thay thế?
 - [ ] Form field dùng wrapper `Form*` từ UI library (`FormTextField`, `FormSelectField`, v.v.)?
+- [ ] Icon dùng theo mapping ngữ nghĩa nhất quán — cùng 1 icon luôn mang đúng 1 ý nghĩa/action xuyên suốt app, không đổi tùy tiện?
+- [ ] Button/control chỉ dùng icon (icon-only) có accessible label (`aria-label` hoặc tương đương) — không chỉ dựa vào bản thân icon?
+
+#### Hài hòa Tỷ lệ (Proportion & Scale Harmony)
+- [ ] Font-size toàn trang/component bám theo 1 modular scale duy nhất (base × ratio^n: Perfect Fourth 1.333 / Major Third 1.25 / Golden Ratio 1.618) — không có size chen giữa tùy tiện?
+- [ ] Giá trị spacing (padding/margin/gap) đều là bội số của base grid dự án (8px, phụ 4px) — không có giá trị lẻ kiểu `p-[13px]`?
+- [ ] Số lượng giá trị khác nhau giữ trong giới hạn: ≤6-7 font-size, ≤10 spacing, ≤3-4 border-radius trên 1 trang/component — flag giá trị "orphan" chỉ dùng đúng 1 lần?
+- [ ] Kích thước icon tỷ lệ với chữ liền kề — icon-height ≈ line-height của chữ bên cạnh?
+- [ ] Component cùng variant (mọi button primary, mọi input) có cùng height/padding — không lệch âm thầm giữa các instance? Verify qua class/style dùng chung thật sự, không chỉ nhìn qua bằng mắt.
+- [ ] Vertical rhythm: khoảng cách giữa các block xếp chồng là bội số của base line-height, không tùy tiện?
+- [ ] Căn chỉnh optical của icon: glyph thị giác của icon (không phải container box của nó, thường có padding sẵn bên trong) được căn giữa theo cap-height/x-height của text bên cạnh — container tự căn giữa với chính nó vẫn có thể nhìn lệch tâm so với text?
+- [ ] Mọi giá trị spacing/radius trong diff resolve về đúng token đã khai báo (Tailwind scale, CSS var) — không dùng giá trị "gần đúng" token (`p-[15px]` "gần bằng" `p-4`) làm vỡ lưới âm thầm?
 
 #### Component tự style của bên thứ ba (Third-party Self-styled Components)
 Áp dụng khi gặp component có `import 'lib/styles.css'` hoặc tự inject CSS riêng: rich text editor (CKEditor, TipTap, Quill), code editor (Monaco, CodeMirror), date/color picker, react-select, map component, v.v.
@@ -170,7 +193,7 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 3. Wrapper quản lý focus state qua React `useState` + `onFocus`/`onBlur`, không dùng CSS `:has(.ck-focused)`
 
 #### States (Phải có đủ)
-- [ ] **Loading**: skeleton hoặc spinner trong component, không được để trắng
+- [ ] **Loading**: skeleton hoặc spinner trong component, không được để trắng — hình dạng skeleton phải phản ánh đúng layout content thật (skeleton của card phải giống card, không phải khối xám chung chung); với content nhiều phần, reveal dần theo tiến trình (outline → text → ảnh) thay vì reveal 1 lần
 - [ ] **Empty**: empty state có message rõ ràng + CTA nếu cần
 - [ ] **Error**: error message dễ đọc, không lộ stack trace
 - [ ] **Hover**: các item có action (button, row) có hover state
@@ -178,10 +201,32 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 - [ ] **Active/Selected**: item được chọn có chỉ báo thị giác
 - [ ] **Disabled**: button disabled có look phân biệt rõ + cursor-not-allowed
 
+#### UX Efficiency & Giảm Thao Tác (UX Efficiency & Reduced Interaction)
+- [ ] Số lựa chọn hiển thị cùng lúc ≤5-7 (Hick's Law) — nhiều hơn thì group lại hoặc progressive disclosure?
+- [ ] Form hiển thị cùng lúc >7 field → chia step hoặc collapsible section?
+- [ ] List/table có action lặp lại theo hàng → hỗ trợ multi-select + bulk action, không chỉ từng-cái-một?
+- [ ] Sửa 1 field đơn giản (status, tên) không bắt buộc điều hướng sang trang/modal riêng nếu inline-edit khả thi?
+- [ ] Action rủi ro thấp, reversible (toggle, archive) → làm luôn + undo, không cần confirm dialog; chỉ action phá hủy/không hoàn tác mới cần bước confirm?
+- [ ] Giá trị hay dùng lại (filter cuối, lựa chọn cuối) được nhớ ở client-side (localStorage/session) thay vì reset mỗi lần?
+- [ ] Feedback cho mọi action xuất hiện trong vòng 400ms (Doherty Threshold) — optimistic update hoặc loading indicator, không bao giờ chờ im lặng?
+- [ ] Dropdown/select có >10 option thì có ô search/filter, không phải cuộn tay?
+
+**Scope carve-out (chỉ áp dụng cho category UX Efficiency + Content Design & Error Prevention):** fix trong 2 category này (multi-select/bulk action, inline-edit, nhớ state client-side, optimistic UI, đổi validation-timing, input masking) được phép chạm **frontend interaction state** (React state/hooks, localStorage) — vẫn KHÔNG được gọi backend endpoint mới, đổi data model, hay sửa server logic. Nếu fix thực sự cần API mới (vd: bulk-delete endpoint thật) → ghi vào báo cáo cuối là "backend dependency", không tự chế workaround client-side giả lập.
+
+#### Kiến Trúc Thông Tin & Khả Năng Quét (Information Architecture & Scannability)
+- [ ] Content above-the-fold trên trang/dashboard dày đặc ưu tiên thông tin giá trị cao nhất ở top-left (F-pattern) — KPI/action quan trọng không bị chôn dưới fold?
+- [ ] Chiều cao row của bảng dữ liệu dày đặc khớp với đối tượng dùng thật: mặc định comfortable (~48-52px, ít row/viewport hơn) cho user hỗn hợp/thỉnh thoảng dùng, option compact (~28-32px) cho power-user/analyst — không chọn tùy tiện?
+- [ ] List/table nhiều item có cách quét thông tin chính mà không cần mở từng row (chọn cột, badge tóm tắt) — không ép phải drill-down từng row để so sánh cơ bản?
+- [ ] Dashboard dày đặc dùng progressive disclosure: overview trước, drill-down chi tiết sau, không render hết mọi thứ cùng lúc?
+
 #### Accessibility (WCAG 2.2)
 - [ ] **2.4.11 Focus Not Obscured**: element đang focus có bao giờ bị che khuất hoàn toàn sau sticky header/cookie banner/overlay khác không?
 - [ ] **2.5.7 Dragging Movements**: mọi tương tác drag-and-drop có phương án thay thế bằng click/tap không (không chỉ drag)?
 - [ ] **3.3.8 Accessible Authentication**: flow đăng nhập có tránh chặn paste password, và tránh yêu cầu giải câu đố nhận thức mà không có phương án thay thế không?
+- [ ] Tab order khớp thứ tự đọc thị giác/logic, không phải thứ tự DOM-insertion tình cờ?
+- [ ] Có skip-to-content link là element focusable đầu tiên trên trang có navigation/header lặp lại?
+- [ ] Composite widget (tabs, menu, combobox) hỗ trợ điều hướng arrow-key trong nội bộ widget (roving tabindex) theo WAI-ARIA APG, không chỉ Tab đơn thuần?
+- [ ] Escape đóng modal/popover đang ở trên cùng, đúng convention chuẩn?
 
 #### Animation & Motion
 - [ ] Animation chỉ dùng khi có **ý nghĩa**: hover reveal, chuyển state, vào trang
@@ -209,6 +254,17 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 - [ ] Validation error: hiện ngay dưới field, không chỉ ở trên đầu
 - [ ] Wizard nhiều bước: chỉ báo tiến trình rõ ràng
 - [ ] Tham chiếu: booking form (create-booking) là **chuẩn vàng** trong hệ thống
+
+#### Content Design & Phòng Ngừa Lỗi (Content Design & Error Prevention)
+- [ ] Label button nêu rõ outcome cụ thể (verb + object, vd "Tạo báo cáo") — không dùng label chung chung ("Submit", "OK") khi có thể cụ thể hơn?
+- [ ] Error message nêu rõ cái gì sai VÀ bước tiếp theo cần làm — không chỉ nói "Dữ liệu không hợp lệ"?
+- [ ] Validation timing: không validate mỗi lần gõ phím — validate khi blur trước, sau đó (nếu lỗi) mới re-validate liên tục theo change cho tới khi hết lỗi?
+- [ ] Với field cần đúng format (phone, date, currency), format kỳ vọng hiển thị TRƯỚC khi user gõ (placeholder/hint), không chỉ lộ ra sau khi báo lỗi?
+- [ ] Input masking/constraint ngăn nhập sai ngay từ đầu khi khả thi (vd: date picker chặn ngày không hợp lệ) thay vì chỉ dựa vào validate sau khi đã nhập?
+- [ ] Copy của empty-state và success-message có context + hành động tiếp theo rõ ràng, không chỉ nêu trạng thái?
+- [ ] Label của action phá hủy/rủi ro cao nêu rõ hậu quả cụ thể (vd "Xóa 12 bản ghi" thay vì chỉ "Xóa")?
+
+**Scope:** các item về validation-timing và input-masking dùng chung scope carve-out frontend-only với UX Efficiency ở trên.
 
 #### Riêng cho Table/List
 - [ ] Table header: typography phân biệt rõ với data row
@@ -268,6 +324,13 @@ Duyệt qua từng nhóm — chỉ flag các vấn đề **thực sự ảnh hư
 - [ ] Padding card: `p-4 sm:p-5 lg:p-6` — không cố định padding lớn cho mọi viewport
 - [ ] Grid gap: `gap-3 sm:gap-4 lg:gap-6`
 
+#### Theming & Dark Mode
+Chỉ áp dụng nếu project có dark mode / theme toggle. Bỏ qua hẳn category này nếu project chỉ có light-mode.
+- [ ] Contrast ratio được re-verify riêng cho dark mode — cặp màu pass ở light mode KHÔNG được mặc định coi là pass ở dark?
+- [ ] Background dark mode tránh dùng `#000000` thuần — dùng tông tối mềm (vd khoảng `#121212`-`#1E1E1E`) để tránh hiện tượng halation?
+- [ ] Shadow ở dark mode dùng opacity cao hơn (~40-70%) hoặc elevation-tint (màu surface sáng hơn theo tier) thay vì tái dùng giá trị shadow của light mode?
+- [ ] Ảnh/icon/illustration có thích ứng dark mode (không có viền trắng quanh PNG trong suốt, không có icon tối-trên-tối khó đọc)?
+
 #### Scrollbar
 - [ ] Scrollbar không ăn vào chiều rộng content → dùng overlay scrollbar (plugin Tailwind `scrollbar-thin` hoặc CSS `scrollbar-width: thin; scrollbar-color: transparent transparent` kèm hiện ra khi `:hover`)
 - [ ] Background scrollbar: transparent
@@ -301,7 +364,9 @@ Fix mọi thứ Phase 2 tìm ra — spacing, state, swap component, đổi cấu
 
 **`--wow` (tùy chọn)**
 
-Tạm ngưng chỉ trong lần chạy này: "KHÔNG áp dụng thẩm mỹ portfolio/avant-garde", thiên hướng mặc định "rõ ràng > gây ấn tượng", và anti-pattern "Copy design sáng tạo từ landing page/portfolio vào product UI" — cho phép art direction riêng biệt, typography scale biểu cảm hơn, layout độc đáo/bất đối xứng, motion tùy chỉnh.
+Tạm ngưng TOÀN BỘ dè dặt thẩm mỹ VÀ tương tác trong lần chạy này — không chỉ 3 mục liệt kê trước đây, và không chỉ mặt hình ảnh. Nghĩa là: không còn thiên hướng "rõ ràng > gây ấn tượng", không còn cấm thẩm mỹ portfolio/avant-garde, không còn dè dặt vì domain nhạy cảm (context y tế/giáo dục/trẻ em KHÔNG có nghĩa là phải giảm nhiệt — rõ ràng và accessibility được enforce riêng ở dưới như hard rule kỹ thuật, không phải phanh thẩm mỹ), và cũng không còn mặc định "giữ tương tác chuẩn/kín đáo/generic". Art direction riêng biệt, typography scale biểu cảm, layout độc đáo/bất đối xứng, motion tùy chỉnh, điểm nhấn trang trí (icon anchor, khung lồng tông nhạt — xem `references/quiet-polish-patterns.vi.md`), khoảnh khắc chọn/hoàn thành/feedback biểu cảm (xem section Motion & Interaction trong file đó) đều được cho phép trọn vẹn — 1 transition thật sự thú vị hay 1 khoảnh khắc hoàn thành đáng ăn mừng không phải "không cần thiết", đó chính là mục đích. Cái vẫn còn là sàn, không phải trần: nguyên tắc usability ở Phase 2 (đủ state bắt buộc, giới hạn số lựa chọn hiển thị theo Hick's Law, confirm chỉ cho action phá hủy) — đây là sàn usability, không phải sự dè dặt, và độ táo bạo vẫn phải vượt qua sàn này chứ không được bỏ qua nó. Cái vẫn cấm hoàn toàn: hard rule kỹ thuật bên dưới (accessibility, tech stack, logic/API, motion GPU-safe, dependency allowlist) — đó là ràng buộc an toàn/kỹ thuật, không phải giới hạn sáng tạo, và không bao giờ bị tạm ngưng.
+
+**Vượt qua ảnh reference, không chỉ khớp nó.** Khi input có ảnh reference/target (mockup đầy tham vọng, screenshot đối thủ, hoặc concept do AI tạo — xem Input Modes) thay vì chỉ ảnh "before" cần fix, coi đó là mức cần đạt, rồi vượt qua nó ở những trục mà ảnh tĩnh về bản chất không cạnh tranh nổi: nhất quán xuyên suốt mọi màn hình trong cùng flow (không chỉ 1 màn được cho xem), motion/interaction thật (ảnh tĩnh bị đóng băng — xem section Motion & Interaction trong quiet-polish-patterns.vi.md), độ chính xác đo được (đúng lưới spacing/tỉ lệ contrast — mockup tĩnh thường có sai lệch nhỏ chưa đo mà bản triển khai thật không nên lặp lại), và responsive/accessibility thật (mockup chỉ cần đẹp ở 1 kích thước cố định). Khớp các device cụ thể của nó trước (nhóm khung, tầng màu, iconography, nước đi layout), rồi thắng ở những trục này — đừng dừng lại ở mức ngang bằng.
 
 Bắt buộc phải có Vibe Commitment từ Phase 0 step 7 trước — chốt vibe rồi mới kéo pattern. Không được kéo pattern trước rồi mới ngụy biện ra vibe sau.
 
@@ -320,18 +385,19 @@ Kéo pattern từ 6 pattern có tên sau (award-winning B2B, không phải portf
 
 CSS/SVG grain-texture overlay (opacity <10%, `<feTurbulence>` hoặc CSS `filter`) cũng là một kỹ thuật `--wow` khả dụng — không cần dependency mới.
 
-**Kéo pattern, không chỉ audit-fix.** Sau khi chốt vibe, kéo từ 6 pattern trên cộng arsenal của vibe đó — nếu `~/.claude/skills/frontend-design/references/premium-design-patterns.md` tồn tại, đọc file đó để có catalog đầy đủ (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction); nếu không có, dùng archetype pattern trong `references/anti-slop-minimum.vi.md` thay thế — cộng thêm pattern/insight domain-specific từ các report domain research nhóm design-pattern ở Phase 0 step 6 hiện có cho lần chạy này (`ui`/`ux`/`animation`/`layout`/`3d`/`text`, tối đa 6 — report `features`/`flow` không nằm trong nhóm này, chúng chỉ để tham khảo cho Vibe Commitment, không phải nguyên liệu kéo pattern). Merge tất cả với catalog tĩnh, không thay thế. Audit ở Phase 2 vẫn chạy (bắt state hỏng/a11y/responsive) nhưng dưới `--wow` nó là sàn, không phải trần — output được đánh giá bằng độ đặc trưng của điểm nhấn DUY NHẤT đã chốt, không chỉ bằng việc không còn lỗi.
+**Kéo pattern, không chỉ audit-fix.** Sau khi chốt vibe, kéo từ 6 pattern trên cộng arsenal của vibe đó — nếu `~/.claude/skills/frontend-design/references/premium-design-patterns.md` tồn tại, đọc file đó để có catalog đầy đủ (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction); nếu không có, dùng archetype pattern trong `references/anti-slop-minimum.vi.md` thay thế. **Luôn đọc thêm `references/quiet-polish-patterns.vi.md`** — 1 tier tiết chế (khung lồng tông nhạt, icon anchor, eyebrow tag, radio-card) cho khi vibe cần sự ấm áp/tinh tế hơn là táo bạo; đây là bổ sung thường trực merge thêm vào catalog trên, không phải fallback khi catalog thiếu — cộng thêm pattern/insight domain-specific từ các report domain research nhóm design-pattern ở Phase 0 step 6 hiện có cho lần chạy này (`ui`/`ux`/`animation`/`layout`/`3d`/`text`, tối đa 6 — report `features`/`flow` không nằm trong nhóm này, chúng chỉ để tham khảo cho Vibe Commitment, không phải nguyên liệu kéo pattern). Merge tất cả với catalog tĩnh, không thay thế. Audit ở Phase 2 vẫn chạy (bắt state hỏng/a11y/responsive) nhưng dưới `--wow` nó là sàn, không phải trần — output được đánh giá bằng độ đặc trưng của điểm nhấn DUY NHẤT đã chốt, không chỉ bằng việc không còn lỗi.
 
 **Dependency allowlist — thêm thẳng, không cần hỏi:** GSAP (+ ScrollTrigger), Motion (Framer Motion), Lenis (smooth scroll), CSS scroll-driven animation gốc / View Transitions API, Rive, Lottie — bộ công cụ chuẩn de-facto của site đoạt giải 2025-2026.
 **Vẫn phải dừng lại hỏi:** React Three Fiber/Three.js (650KB+ — chỉ khi 3D thực sự là cốt lõi của concept), Barba.js, bất kỳ tool trả phí/SaaS nào ngoài Rive, custom WebGL/GLSL shader.
 
-**Anti-slop gate trước khi báo done** — nếu `~/.claude/skills/frontend-design/references/anti-slop-rules.md` tồn tại, đọc file đó để có checklist đầy đủ; nếu không có, dùng điều kiện fail trong `references/anti-slop-minimum.vi.md` thay thế. Tối thiểu fail run nếu có: Inter/Roboto là font duy nhất, gradient tím-xanh là thẩm mỹ chủ đạo, 3+ card giống hệt nhau trong một hàng, tên/số placeholder ("John Doe", số tròn 50%/$100), copy sáo rỗng kiểu startup ("Elevate", "Seamless", "Next-Gen"), background `#000000` thuần, thiếu hover/focus state, **illustration flat stock chưa customize** (unDraw/Storyset/DrawKit/Blush/Icons8-Ouch/ManyPixels/Open-Peeps không đổi palette/pose — ngang tier với gradient tím; fix theo tier: hand-drawn custom > line-art/sketch > isometric 3D > flat đã customize kỹ > geometric/abstract > bỏ illustration).
+**Anti-slop gate trước khi báo done** — nếu `~/.claude/skills/frontend-design/references/anti-slop-rules.md` tồn tại, đọc file đó để có checklist đầy đủ; nếu không có, dùng điều kiện fail trong `references/anti-slop-minimum.vi.md` thay thế. Tối thiểu fail run nếu có: Inter/Roboto là font duy nhất, gradient tím-xanh là thẩm mỹ chủ đạo, 3+ card giống hệt nhau trong một hàng, tên/số placeholder ("John Doe", số tròn 50%/$100), copy sáo rỗng kiểu startup ("Elevate", "Seamless", "Next-Gen"), background `#000000` thuần, thiếu hover/focus state, **illustration flat stock chưa customize** (unDraw/Storyset/DrawKit/Blush/Icons8-Ouch/ManyPixels/Open-Peeps không đổi palette/pose — ngang tier với gradient tím; fix theo tier: hand-drawn custom > line-art/sketch > isometric 3D > flat đã customize kỹ > geometric/abstract > bỏ illustration). **Ngoại lệ — không tính slop**: 1 icon nhỏ (≤32px) dạng line/duotone custom, đặt có chủ đích làm điểm neo trang trí (ví dụ cạnh tiêu đề), KHÔNG phải illustration stock scene — được khuyến khích, không bị flag — xem pattern Icon Anchor trong `references/quiet-polish-patterns.vi.md`.
 
 Vẫn bắt buộc kể cả khi `--wow`: accessibility (contrast, focus ring, đầy đủ state), không migrate tech stack, không đổi logic/state/API, chỉ dùng motion GPU-safe (`transform`/`opacity` — không animate `width`/`height`/`top`/`left`; LCP mobile của B2B vốn đã sát ngưỡng, bold không được phá budget đó).
 
 **Quy tắc cứng (áp dụng cho mọi lần chạy, kể cả `--wow`):**
 - ✅ Làm việc trong tech stack hiện có — KHÔNG migrate framework
 - ✅ KHÔNG phá logic/state/API — chỉ đổi presentation layer
+- ✅ Ngoại lệ: fix thuộc category UX Efficiency và Content Design & Error Prevention (Phase 2) được phép chạm frontend interaction state/hooks/localStorage — xem scope carve-out dưới mục UX Efficiency. Vẫn không được đụng backend/API/data-model.
 - ✅ Kiểm tra `package.json` trước khi thêm dependency — trừ dependency allowlist của `--wow` ở trên, được thêm thẳng
 - ✅ Khi ẩn (không xóa) → dùng opacity/visibility, không unmount
 - ✅ Dùng Tailwind tokens — không hardcode hex
@@ -342,7 +408,7 @@ Vẫn bắt buộc kể cả khi `--wow`: accessibility (contrast, focus ring, �
 - ❌ KHÔNG thêm animation phức tạp nếu Motion/Framer chưa có sẵn trong project — ngoại lệ: dưới `--wow`, áp dụng dependency allowlist ở trên thay vì rule này
 - ❌ KHÔNG thêm màu brand mới — chỉ dùng token hiện có (ngoại lệ: `--wow` được phép thêm accent mới nếu vibe đã chốt yêu cầu)
 - ❌ KHÔNG dùng màu mặc định của component library (shadcn blue) nếu project đã có màu primary riêng
-- ❌ KHÔNG thêm toast notification không cần thiết
+- ❌ KHÔNG thêm toast notification không cần thiết (ngoại lệ: dưới `--wow`, 1 khoảnh khắc ăn mừng/hoàn thành có chủ đích, nằm trong vibe đã chốt, KHÔNG tính là "không cần thiết" — tiêu chí là có chủ đích hay không, không phải có tối giản hay không)
 - ❌ KHÔNG đổi logic/API/state management
 
 ---
@@ -354,7 +420,7 @@ Vẫn bắt buộc kể cả khi `--wow`: accessibility (contrast, focus ring, �
 3. Chạy `pnpm format` (nếu project có)
 4. **Verify accessibility**: nếu project đã có (hoặc user cho phép thêm) `@axe-core/playwright` hoặc `axe-core` thường, chạy một script ngắn nhắm vào route/component đang audit và in ra violations. Nếu không có sẵn, in ra lệnh manual-check tương đương để user tự chạy — review visual/manual thủ công không được là verification duy nhất cho accessibility.
 5. Nếu bạn vừa edit trực tiếp một file ảnh dưới `public/` (ghi đè cùng path, tên không đổi) và user báo "không thấy thay đổi" → đừng vội sửa code/ảnh lần nữa; báo user hard-refresh hoặc xóa `.next/cache/images` + restart dev server trước — Next.js Image Optimizer cache theo URL+size, không theo nội dung file, nên fix nhiều khả năng đã đúng nhưng vẫn đang serve bản cache cũ
-6. **Adversarial Verify** (subagent — chỉ khi Fix thực sự đụng structural/JSX-level: swap component, đổi cấu trúc grid/layout, đổi hướng thị giác — HOẶC có dùng `--wow`): spawn 1 subagent mới hoàn toàn, đưa diff, checklist audit của Phase 2, và (nếu `--wow`) anti-slop gate. Subagent tự audit lại state cuối cùng một cách độc lập — không tiếp cận reasoning của lần chạy này — và báo PASS hoặc list vấn đề còn sót (audit item vẫn hỏng, fix vượt quá cái thực sự cần, vi phạm anti-slop). Có vấn đề → quay lại Phase 3 fix, chạy lại bước này 1 lần. Mirror theo đúng Phase 4 Adversarial Pass của `vreview` trong cùng bộ skill này.
+6. **Adversarial Verify** (subagent — chỉ khi Fix thực sự đụng structural/JSX-level: swap component, đổi cấu trúc grid/layout, đổi hướng thị giác — HOẶC có dùng `--wow` — HOẶC fix thuộc category UX Efficiency / Content Design & Error Prevention có chạm frontend state/interaction logic): spawn 1 subagent mới hoàn toàn, đưa diff, checklist audit của Phase 2, và (nếu `--wow`) anti-slop gate. Subagent tự audit lại state cuối cùng một cách độc lập — không tiếp cận reasoning của lần chạy này — và báo PASS hoặc list vấn đề còn sót (audit item vẫn hỏng, fix vượt quá cái thực sự cần, vi phạm anti-slop). Có vấn đề → quay lại Phase 3 fix, chạy lại bước này 1 lần. Mirror theo đúng Phase 4 Adversarial Pass của `vreview` trong cùng bộ skill này.
 7. **Self-Check** (inline, mọi lần chạy, không cần subagent): trước khi viết báo cáo ngắn, xác nhận — (a) độ sâu fix tương xứng với cái Phase 2 thực sự tìm ra, không có rewrite ngoài yêu cầu; (b) mọi category Phase 2 áp dụng được đã xử lý hoặc đánh dấu rõ not-applicable; (c) nếu có `--wow`, anti-slop gate (kể cả illustration check) đã thực sự được kiểm tra, không chỉ ngầm hiểu.
 8. **Báo cáo ngắn gọn**: "Đã redesign [X]. Thay đổi chính: [liệt kê 3-5 bullet points]"
    - Không summary dài
@@ -387,8 +453,8 @@ Xác định theo thứ tự này trước Phase 1:
 ## Anti-Patterns (KHÔNG được làm)
 
 - ❌ Viết lại toàn bộ layout khi chỉ cần "chỉnh" một phần
-- ❌ Thêm animation lòe loẹt cho app healthcare
-- ❌ Copy design sáng tạo từ landing page/portfolio vào product UI
+- ❌ Thêm animation lòe loẹt cho app healthcare (trừ khi `--wow` đang bật — xem câu suspend ở Phase 3; rule motion GPU-safe vẫn áp dụng)
+- ❌ Copy design sáng tạo từ landing page/portfolio vào product UI (trừ khi `--wow` đang bật — xem câu suspend ở Phase 3)
 - ❌ Đổi màu brand chỉ vì "đẹp hơn" — chỉ dùng token
 - ❌ Hỏi user trước khi đọc code — scout trước, chỉ hỏi khi thực sự cần
 - ❌ Fix padding nhưng làm hỏng responsiveness
@@ -404,7 +470,7 @@ Xác định theo thứ tự này trước Phase 1:
 - ❌ Unmount component để ẩn nó — dùng CSS visibility/opacity nếu cần giữ state
 - ❌ Dùng raw HTML element thay vì component `@etaro/ui`
 - ❌ Dùng màu mặc định của shadcn/MUI khi project đã có token màu primary riêng
-- ❌ Thêm toast notification không cần thiết
+- ❌ Thêm toast notification không cần thiết (trừ khi `--wow` đang bật và đó là khoảnh khắc ăn mừng/hoàn thành có chủ đích — xem câu suspend ở Phase 3)
 - ❌ Để scrollbar ăn vào chiều rộng content — luôn dùng overlay/transparent scrollbar
 - ❌ Style tab không nhất quán trong cùng một trang — kiểm tra tính nhất quán tab xuyên component
 - ❌ Đoán pattern của component "giống X" — BẮT BUỘC đọc X trước
@@ -415,6 +481,16 @@ Xác định theo thứ tự này trước Phase 1:
 - ❌ Ép `line-clamp`/height cố định lên copy có độ dài khác nhau giữa các card song song thay vì cân bằng lại độ dài text — line-clamp chỉ là band-aid, cân bằng lại copy mới là fix gốc thực sự cho "sự hài hòa"
 - ❌ Chạy `--wow` mà không chốt vibe trước (Phase 0 step 7) — bold không có điểm neo vẫn đọc ra là generic/an toàn; chọn pattern trước khi chọn hướng chỉ tạo ra một mớ hổ lốn, không phải một thiết kế mạch lạc
 - ❌ Research lại một khía cạnh đã có cache trong session/ngày cho cùng domain-slug (Phase 0 step 6) — kiểm tra `plans/reports/` theo từng khía cạnh trước, chỉ khía cạnh chưa có cache mới spawn agent mới
+- ❌ Trộn nhiều giá trị font-size/spacing/border-radius hơn mức cho phép mà không bám theo scale nào — giá trị lẻ tùy tiện phá vỡ sự hài hòa tỷ lệ
+- ❌ Surface phẳng lì 1 tier duy nhất khắp trang, không có phân biệt elevation — mọi thứ đọc ra cùng 1 độ sâu thị giác
+- ❌ Shadow quá tay/skeuomorphic trong bối cảnh B2B — sửa quá đà từ phẳng sang rối mắt
+- ❌ List/table chỉ có action từng-cái-một, không có bulk/multi-select khi action đó đáng lẽ batch được
+- ❌ Confirm dialog cho action reversible, rủi ro thấp — nên dùng undo thay vì confirm
+- ❌ Label button chung chung ("Submit", "OK") khi có thể dùng label cụ thể theo outcome
+- ❌ Validate 1 field mỗi lần gõ phím thay vì khi blur — gây nhấp nháy error message lúc đang gõ
+- ❌ Tái dùng giá trị shadow/contrast của light mode cho dark mode mà không re-verify
+- ❌ Chôn thông tin/action ưu tiên cao nhất dưới fold trên dashboard dày đặc
+- ❌ Chọn density row của table tùy tiện thay vì khớp với đối tượng user thật (casual vs power-user)
 
 ## Bước tiếp theo
 

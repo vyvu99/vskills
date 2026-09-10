@@ -6,7 +6,7 @@ when_to_use: "Invoke when you want to redesign or upgrade the UI/UX of a page, c
 argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]] [--wow]"
 metadata:
   author: vyvu
-  version: "6.0.0"
+  version: "7.0.0"
 ---
 
 # vdesign — Personal UI/UX Redesign Skill
@@ -29,7 +29,7 @@ Do not change the tech stack. Do not break logic/state/API.
 | `localhost:PORT/path` or URL | Take a screenshot first → then read the corresponding source files |
 | Route path (e.g. `/clients/[id]?tab=notes`) | Resolve to the corresponding pages/components files |
 | Component/feature name (e.g. `TreatmentPlanWizard`) | Grep to find the file → read the entire component tree |
-| `[Image]` / attached screenshot | Analyze the image → extract design gaps → apply fixes |
+| `[Image]` / attached screenshot | Analyze the image → extract design gaps → apply fixes. If multiple images form a before/target pair (current state + an aspirational reference — a mockup, competitor screenshot, or AI-generated concept) → treat the reference as the bar to reach, not just inspiration; see "Beating a reference image" in Phase 3 |
 | `--pr` | `gh pr diff` to get changed files → redesign all UI files in it (requires gh, §2 of `repo-profile.md`; unavailable → falls back to `--diff`) |
 | `--diff` | `git diff --name-only` to get staged/unstaged → redesign UI files |
 
@@ -42,11 +42,13 @@ This is the user's vocabulary — **ALL** must be met by default, not just a few
 | Keyword | Practical meaning in code |
 |---------|--------------------------|
 | **Refined** | Micro-details in the right place: consistent border-radius, even icon sizes, text-overflow handled, no odd spacing scale values |
-| **Harmonious** | Color, font, spacing match the rest of the project; no "isolated island" of its own style |
+| **Harmonious** | Color, font, spacing match the rest of the project; no "isolated island" of its own style; font-size/spacing/component-size follow a consistent modular scale/ratio, not arbitrary values |
 | **Modern** | No outdated patterns (old-style bordered tables, old-style form labels, flat buttons with no state); makes good use of whitespace |
 | **Elegant** | Clear hierarchy, low visual noise, no unnecessary decoration, clearly distinguished button hierarchy (primary/ghost/link) |
+| **Deep** | Clear elevation tiers, consistent shadow/border/light-source — never flat-and-lifeless, never skeuomorphic |
 | **Consistent with the system** | Matches design tokens, component patterns, and the project's visual language — **this is the most important requirement** |
 | **Accessible** | Information isn't hidden; labels are clear; important icons have tooltips; empty/loading/error states are all present |
+| **Efficient** | Minimizes clicks/steps: bulk actions, inline-edit, smart defaults where safe |
 | **Creative when permitted** | Distinct visuals are allowed when the user asks for "something different to add variety" — but must still stay consistent on spacing/color |
 
 **DO NOT** apply portfolio/avant-garde aesthetics. Even a full redesign must still serve the B2B product context: **clarity > impressiveness**.
@@ -141,6 +143,15 @@ Go through each category — only flag issues that **actually affect visual/UX q
 - [ ] Do active/selected/highlighted states have a distinguishing color?
 - [ ] **NOT using the component's default color** (e.g. shadcn's default blue) — must use the system's primary color (`primary`, `accent` tokens)?
 
+#### Depth & Elevation
+- [ ] Elevation tiers defined (3-5 named levels: base/card/elevated-card/overlay) and consistently assigned — each surface type always uses the same tier?
+- [ ] Shadows come from a fixed token scale (sm/md/lg/xl) — no ad-hoc box-shadow values?
+- [ ] Light source consistent across all shadows (same offset direction/ratio)?
+- [ ] Z-index from a defined scale (dropdown < sticky < modal < toast) — no arbitrary `z-[9999]`; modals/toasts render via portal to avoid stacking-context traps?
+- [ ] Cards/panels use border + minimal shadow; heavier shadow reserved for floating elements (modal, popover, FAB) only?
+- [ ] Blur/glass effects (if used) only on overlays, not on primary content surfaces?
+- [ ] No unintended stacking traps: sticky/opacity/transform parents don't accidentally clip child dropdowns/popovers?
+
 #### Layout & Spacing
 - [ ] Padding/gap use a consistent spacing scale (no odd `p-[13px]` values)?
 - [ ] Responsive is solid: mobile-first, no horizontal scroll?
@@ -155,6 +166,18 @@ Go through each category — only flag issues that **actually affect visual/UX q
 - [ ] Consistent icons (same library, same size)?
 - [ ] Card: avoid a generic `border + shadow + white bg` if density is high — use spacing/divider instead?
 - [ ] Form fields use `Form*` wrappers from the UI library (`FormTextField`, `FormSelectField`, etc.)?
+- [ ] Icon usage follows a consistent semantic mapping — the same icon always means the same action/concept across the app, not swapped arbitrarily?
+- [ ] Icon-only buttons/controls have an accessible label (`aria-label` or equivalent) — not relying on the icon alone?
+
+#### Proportion & Scale Harmony
+- [ ] Font sizes across the page/component derive from a single modular scale (base × ratio^n: Perfect Fourth 1.333 / Major Third 1.25 / Golden Ratio 1.618) — no arbitrary in-between sizes?
+- [ ] Spacing values (padding/margin/gap) are all multiples of the project's base grid (8px, secondary 4px) — no odd values like `p-[13px]`?
+- [ ] Distinct value count stays bounded: ≤6-7 font-size, ≤10 spacing, ≤3-4 border-radius values per page/component — flag "orphan" values used only once?
+- [ ] Icon size proportional to adjacent text — icon height ≈ line-height of the text beside it?
+- [ ] Same-variant components (all primary buttons, all inputs) share identical height/padding — no silent drift between instances? Verify via the actual shared class/style, not a per-instance visual pass.
+- [ ] Vertical rhythm: gaps between stacked elements are multiples of the base line-height, not arbitrary?
+- [ ] Icon optical alignment: an icon's visual glyph (not its container box, which often has built-in padding) is centered against the cap-height/x-height of the text beside it — a container centered on itself can still look visually off-center next to text?
+- [ ] Every spacing/radius value in the diff resolves to an actual declared token (Tailwind scale, CSS var) — no near-token approximation (`p-[15px]` "close enough" to `p-4`) that silently breaks the grid?
 
 #### Third-party Self-styled Components
 Applies when encountering a component with `import 'lib/styles.css'` or that injects its own CSS: rich text editor (CKEditor, TipTap, Quill), code editor (Monaco, CodeMirror), date/color picker, react-select, map component, etc.
@@ -170,7 +193,7 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 3. Wrapper manages focus state via React `useState` + `onFocus`/`onBlur`, not CSS `:has(.ck-focused)`
 
 #### States (Must all be present)
-- [ ] **Loading**: skeleton or spinner within the component, not blank
+- [ ] **Loading**: skeleton or spinner within the component, not blank — skeleton shape mirrors the actual content layout (a card skeleton looks like a card, not a generic gray block); for multi-part content, reveal progressively (outline → text → images) rather than a single flat reveal
 - [ ] **Empty**: empty state has a clear message + CTA if needed
 - [ ] **Error**: readable error message, no exposed stack trace
 - [ ] **Hover**: action items (button, row) have a hover state
@@ -178,10 +201,32 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] **Active/Selected**: selected item has a visual indicator
 - [ ] **Disabled**: disabled button has a visually distinct look + cursor-not-allowed
 
+#### UX Efficiency & Reduced Interaction
+- [ ] Visible choice count in one view ≤5-7 (Hick's Law) — more than that → group or progressively disclose?
+- [ ] Form with >7 visible fields → split into steps or collapsible sections?
+- [ ] List/table with repeatable row actions → supports multi-select + bulk action, not only one-at-a-time?
+- [ ] Editing a single simple field (status, name) doesn't force navigation to a new page/full modal when inline-edit is viable?
+- [ ] Low-risk, reversible actions (toggle, archive) proceed directly with undo, not a confirmation dialog; only destructive/irreversible actions get a confirm step?
+- [ ] Frequently-reused values (last filter, last selection) are remembered client-side (localStorage/session) instead of resetting every time?
+- [ ] Feedback for any action appears within 400ms (Doherty Threshold) — optimistic UI update or a loading indicator, never a silent wait?
+- [ ] Dropdown/select with >10 options has a search/filter input, not a bare scroll list?
+
+**Scope carve-out (UX Efficiency + Content Design & Error Prevention categories only):** fixes in these two categories (multi-select/bulk action, inline-edit, remembered client-side state, optimistic UI, validation-timing changes, input masking) may touch **frontend interaction state only** (React state/hooks, localStorage) — still DO NOT call new backend endpoints, change data models, or modify server logic. If a fix genuinely requires a new API (e.g. a true bulk-delete endpoint), flag it in the final report as a backend dependency instead of implementing a client-side workaround that fakes it.
+
+#### Information Architecture & Scannability
+- [ ] Above-the-fold content on a dense page/dashboard prioritizes the highest-value info top-left (F-pattern) — critical KPI/action isn't buried below the fold?
+- [ ] Dense data table row height matches the actual user: comfortable default (~48-52px, fewer rows/viewport) for mixed/occasional users, compact option (~28-32px) for power-user/analyst contexts — not picked arbitrarily?
+- [ ] A list/table with many items provides a way to scan key info without opening each row individually (column choice, summary badges) — not forcing per-row drill-down for basic comparison?
+- [ ] Progressive disclosure used for dense dashboards: overview first, drill-down for detail, not everything rendered at once?
+
 #### Accessibility (WCAG 2.2)
 - [ ] **2.4.11 Focus Not Obscured**: is a focused element ever fully hidden behind a sticky header/cookie banner/other overlay?
 - [ ] **2.5.7 Dragging Movements**: does every drag-and-drop interaction have a click/tap alternative (not drag-only)?
 - [ ] **3.3.8 Accessible Authentication**: does the login flow avoid blocking password paste, and avoid requiring a cognitive puzzle with no alternative?
+- [ ] Tab order follows the visual/logical reading order, not accidental DOM-insertion order?
+- [ ] A skip-to-content link is the first focusable element on pages with repeated navigation/headers?
+- [ ] Composite widgets (tabs, menus, comboboxes) support arrow-key navigation within the widget (roving tabindex) per WAI-ARIA APG, not just Tab-only navigation?
+- [ ] Escape key closes the topmost modal/popover as a standard convention?
 
 #### Animation & Motion
 - [ ] Animation only where it has **meaning**: hover reveal, state transition, page enter
@@ -209,6 +254,17 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Validation error: shown right below the field, not only at the top
 - [ ] Multi-step wizard: clear progress indicator
 - [ ] Reference: the booking form (create-booking) is the **gold standard** in the system
+
+#### Content Design & Error Prevention
+- [ ] Button labels are outcome-specific (verb + object, e.g. "Create report") — not generic ("Submit", "OK") when a more specific label is available?
+- [ ] Error messages state what's wrong AND what to do next — not just "Invalid input"?
+- [ ] Validation timing: don't validate on every keystroke — validate on blur first, then (if failed) re-validate on change until fixed?
+- [ ] Where format matters (phone, date, currency), the expected format is visible before the user types (placeholder/hint), not only revealed after an error?
+- [ ] Input masking/constraints prevent invalid entry where feasible (e.g. date picker blocks invalid dates) rather than relying solely on after-the-fact validation?
+- [ ] Empty-state and success-message copy gives context + a clear next action, not just a status statement?
+- [ ] Destructive/high-stakes action labels are specific about consequence (e.g. "Delete 12 records" not just "Delete")?
+
+**Scope:** validation-timing and input-masking items follow the same frontend-only scope carve-out as UX Efficiency above.
 
 #### Table/List Specific
 - [ ] Table header: typography clearly distinguished from data rows
@@ -268,6 +324,13 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Card padding: `p-4 sm:p-5 lg:p-6` — don't fix large padding for every viewport
 - [ ] Grid gap: `gap-3 sm:gap-4 lg:gap-6`
 
+#### Theming & Dark Mode
+Applies only if the project has dark mode / a theme toggle. Skip this category entirely if the project is light-mode-only.
+- [ ] Contrast ratios are re-verified separately in dark mode — a pair passing in light mode is NOT assumed to pass in dark?
+- [ ] Dark mode background avoids pure `#000000` — uses a soft dark tone (e.g. `#121212`-`#1E1E1E` range) to avoid halation?
+- [ ] Shadows in dark mode use higher opacity (~40-70%) or an elevation-tint (lighter surface color per tier) instead of reusing light-mode shadow values?
+- [ ] Images/icons/illustrations adapt to dark mode (no white-box artifacts around transparent PNGs, no illegible dark-on-dark icons)?
+
 #### Scrollbar
 - [ ] Scrollbar doesn't eat into content width → use an overlay scrollbar (`scrollbar-thin` Tailwind plugin or CSS `scrollbar-width: thin; scrollbar-color: transparent transparent` with `:hover` reveal)
 - [ ] Scrollbar background: transparent
@@ -301,7 +364,9 @@ Fix everything Phase 2 found — spacing, states, component swaps, grid/layout r
 
 **`--wow` (optional)**
 
-Suspends for this run only: "DO NOT apply portfolio/avant-garde aesthetics", the "clarity > impressiveness" default bias, and the anti-pattern "Copy creative design from a landing page/portfolio into product UI" — allows bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion.
+Suspends ALL aesthetic AND interaction caution for this run — not just the 3 items previously listed, and not just visuals. This means: no "clarity > impressiveness" bias, no portfolio/avant-garde prohibition, no domain-sensitivity restraint (a healthcare/education/children's-product context does NOT mean tone it down — clarity and accessibility are enforced separately as hard technical rules below, not as an aesthetic brake), and no "keep interactions standard/low-key/generic" default either. Bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion, decorative accents (icon anchors, tinted sub-cards — see `references/quiet-polish-patterns.md`), expressive selection/completion/feedback moments (see that file's Motion & Interaction section) are all fully permitted — a genuinely delightful transition or a celebratory completion moment is not "unnecessary," it's the point. What stays as a floor, not a cap: Phase 2's usability principles (all required states present, Hick's Law visible-choice limits, confirm-only-destructive-actions) — these are usability floors, not timidity, and boldness must still clear them, not bypass them. What stays off-limits entirely: the hard technical rules below (accessibility, tech stack, logic/API, GPU-safe motion, dependency allowlist) — those are safety/engineering constraints, not restraint on creativity, and are never suspended.
+
+**Beating a reference image, not just matching it.** When the input includes a reference/target image (an aspirational mockup, competitor screenshot, or AI-generated concept — see Input Modes) rather than only a "before" screenshot to fix, treat it as the bar to clear, then exceed it on the axes a static image structurally cannot compete on: consistency across every screen in the same flow (not just the one shown), real motion/interaction (a static image is frozen — see quiet-polish-patterns.md's Motion & Interaction section), measurable precision (exact spacing-grid/contrast-ratio conformance — a static mockup often has small unmeasured misalignments a real implementation shouldn't repeat), and real responsiveness/accessibility (the mockup only had to look good at one fixed size). Match its specific devices first (grouping, color tiers, iconography, layout moves), then win on these axes — don't stop at parity.
 
 Requires the Vibe Commitment from Phase 0 step 7 first — pick the vibe, then pull patterns. Never pull patterns first and rationalize a vibe after the fact.
 
@@ -320,18 +385,19 @@ Pull from these 6 named patterns (award-winning B2B, not portfolio/consumer):
 
 CSS/SVG grain-texture overlay (opacity <10%, `<feTurbulence>` or CSS `filter`) is also available as a `--wow` texture technique — no dependency needed.
 
-**Pattern-pull, not audit-fix.** Once the vibe is committed, pull from the 6 patterns above plus that vibe's arsenal — if `~/.claude/skills/frontend-design/references/premium-design-patterns.md` exists, read it for the full catalog (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction patterns); if absent, use `references/anti-slop-minimum.md`'s archetype patterns instead — plus any domain-specific patterns/insights from whichever of Phase 0 step 6's design-pattern aspect reports exist for this run (`ui`/`ux`/`animation`/`layout`/`3d`/`text`, up to 6 — `features`/`flow` reports are excluded here, they're informational-only for Vibe Commitment, not pattern-pull material). Merge all of them, don't replace the catalog. Phase 2's audit still runs (it catches broken states/a11y/responsive) but under `--wow` it's a floor, not a ceiling — output is judged by how distinctive the ONE committed signature element is, not just absence of defects.
+**Pattern-pull, not audit-fix.** Once the vibe is committed, pull from the 6 patterns above plus that vibe's arsenal — if `~/.claude/skills/frontend-design/references/premium-design-patterns.md` exists, read it for the full catalog (navigation, layout, card, scroll-driven animation, kinetic typography, micro-interaction patterns); if absent, use `references/anti-slop-minimum.md`'s archetype patterns instead. **Always also read `references/quiet-polish-patterns.md`** — a restrained tier (tinted sub-cards, icon anchors, eyebrow tags, radio-cards) for when the committed vibe calls for warmth/refinement rather than boldness; this is a permanent supplement merged in addition to the catalog above, not a fallback for when it's missing — plus any domain-specific patterns/insights from whichever of Phase 0 step 6's design-pattern aspect reports exist for this run (`ui`/`ux`/`animation`/`layout`/`3d`/`text`, up to 6 — `features`/`flow` reports are excluded here, they're informational-only for Vibe Commitment, not pattern-pull material). Merge all of them, don't replace the catalog. Phase 2's audit still runs (it catches broken states/a11y/responsive) but under `--wow` it's a floor, not a ceiling — output is judged by how distinctive the ONE committed signature element is, not just absence of defects.
 
 **Dependency allowlist — add directly, no need to ask:** GSAP (+ ScrollTrigger), Motion (Framer Motion), Lenis (smooth scroll), native CSS scroll-driven animations / View Transitions API, Rive, Lottie — the de-facto standard toolkit on 2025-2026 award-winning sites.
 **Still stop-and-ask:** React Three Fiber/Three.js (650KB+ — only if 3D is genuinely core to the concept), Barba.js, any paid/SaaS tool beyond Rive, custom WebGL/GLSL shaders.
 
-**Anti-slop gate before reporting done** — if `~/.claude/skills/frontend-design/references/anti-slop-rules.md` exists, read it for the full checklist; if absent, use `references/anti-slop-minimum.md`'s fail conditions instead. At minimum fail the run on: Inter/Roboto as the only typeface, purple-to-blue gradient as the dominant aesthetic, 3+ visually-identical cards in a row, placeholder names/numbers ("John Doe", round 50%/$100), generic startup copy ("Elevate", "Seamless", "Next-Gen"), pure `#000000` background, missing hover/focus states, **unmodified stock flat illustration** (unDraw/Storyset/DrawKit/Blush/Icons8-Ouch/ManyPixels/Open-Peeps without custom palette/poses — same tier as purple-gradient; fix by tier: custom hand-drawn > line-art/sketch > isometric 3D > heavily-customized flat > geometric/abstract > skip illustration).
+**Anti-slop gate before reporting done** — if `~/.claude/skills/frontend-design/references/anti-slop-rules.md` exists, read it for the full checklist; if absent, use `references/anti-slop-minimum.md`'s fail conditions instead. At minimum fail the run on: Inter/Roboto as the only typeface, purple-to-blue gradient as the dominant aesthetic, 3+ visually-identical cards in a row, placeholder names/numbers ("John Doe", round 50%/$100), generic startup copy ("Elevate", "Seamless", "Next-Gen"), pure `#000000` background, missing hover/focus states, **unmodified stock flat illustration** (unDraw/Storyset/DrawKit/Blush/Icons8-Ouch/ManyPixels/Open-Peeps without custom palette/poses — same tier as purple-gradient; fix by tier: custom hand-drawn > line-art/sketch > isometric 3D > heavily-customized flat > geometric/abstract > skip illustration). **Exception — not slop**: a single small (≤32px) custom line/duotone icon placed with clear intent as a decorative anchor (e.g. beside a title) is NOT a stock illustration scene and is encouraged, not flagged — see the Icon Anchor pattern in `references/quiet-polish-patterns.md`.
 
 Still mandatory even under `--wow`: accessibility (contrast, focus rings, all required states), no tech-stack migration, no logic/state/API changes, GPU-safe motion only (`transform`/`opacity` — never animate `width`/`height`/`top`/`left`; B2B mobile LCP is already tight, bold must not blow the budget).
 
 **Hard rules (apply to every run, including `--wow`):**
 - ✅ Work with the existing tech stack — DO NOT migrate framework
 - ✅ DO NOT break logic/state/API — only change the presentation layer
+- ✅ Exception: UX Efficiency and Content Design & Error Prevention category fixes (Phase 2) may touch frontend interaction state/hooks/localStorage — see the scope carve-out under UX Efficiency. Still no backend/API/data-model changes.
 - ✅ Check `package.json` before adding a dependency — except the `--wow` allowlist above, which may be added directly
 - ✅ When hiding (not deleting) → use opacity/visibility, don't unmount
 - ✅ Use Tailwind tokens — no hardcoded hex
@@ -342,7 +408,7 @@ Still mandatory even under `--wow`: accessibility (contrast, focus rings, all re
 - ❌ DO NOT add complex animation if Motion/Framer isn't already in the project — exception: under `--wow`, the dependency allowlist above applies instead
 - ❌ DO NOT add new brand colors — only use existing tokens (exception: `--wow` may introduce a new accent if the committed vibe requires it)
 - ❌ DO NOT use the component library's default color (shadcn blue) if the project has its own primary color
-- ❌ DO NOT add unnecessary toast notifications
+- ❌ DO NOT add unnecessary toast notifications (exception: under `--wow`, an intentional celebratory/completion moment that's part of the committed vibe is not "unnecessary" — the bar is whether it's deliberate, not whether it's minimal)
 - ❌ DO NOT change logic/API/state management
 
 ---
@@ -354,7 +420,7 @@ Still mandatory even under `--wow`: accessibility (contrast, focus rings, all re
 3. Run `pnpm format` (if the project has it)
 4. **Accessibility verify**: if the project has (or the user allows adding) `@axe-core/playwright` or plain `axe-core`, run a short script against the audited route/component and print violations. If unavailable, print the equivalent manual-check command for the user to run themselves — visual/manual review should not be the only verification for accessibility.
 5. If you just edited an image file directly under `public/` (overwritten at the same path, name unchanged) and the user reports "not seeing the change" → don't rush to edit the code/image again; tell the user to hard-refresh or clear `.next/cache/images` + restart the dev server first — Next.js Image Optimizer caches by URL+size, not by file content, so the fix is likely already correct but an old cached version is still being served
-6. **Adversarial Verify** (subagent — only when Fix actually touched structural/JSX-level code: component swap, grid/layout restructure, visual-direction change — OR `--wow` was used): spawn 1 fresh subagent with the diff, Phase 2's audit checklist, and (if `--wow`) the anti-slop gate. It re-audits the final state independently — no access to this run's reasoning — and reports PASS or a list of remaining issues (audit items still broken, fixes that overstepped what was actually needed, anti-slop violations). Issues found → return to Phase 3, fix, re-run this step once. Mirrors `vreview`'s Phase 4 Adversarial Pass in this same skill pack.
+6. **Adversarial Verify** (subagent — only when Fix actually touched structural/JSX-level code: component swap, grid/layout restructure, visual-direction change — OR `--wow` was used — OR UX Efficiency / Content Design & Error Prevention category fixes touched frontend state/interaction logic): spawn 1 fresh subagent with the diff, Phase 2's audit checklist, and (if `--wow`) the anti-slop gate. It re-audits the final state independently — no access to this run's reasoning — and reports PASS or a list of remaining issues (audit items still broken, fixes that overstepped what was actually needed, anti-slop violations). Issues found → return to Phase 3, fix, re-run this step once. Mirrors `vreview`'s Phase 4 Adversarial Pass in this same skill pack.
 7. **Self-Check** (inline, every run, no subagent): before writing the short report, confirm — (a) fix depth was proportional to what Phase 2 actually found, no unrequested rewrites beyond that; (b) every applicable Phase 2 category was addressed or explicitly marked not-applicable; (c) if `--wow` ran, the anti-slop gate (including the illustration check) was actually checked off, not just implied.
 8. **Short report**: "Redesigned [X]. Main changes: [list 3-5 bullet points]"
    - No long summary
@@ -387,8 +453,8 @@ Resolve in this order before Phase 1:
 ## Anti-Patterns (DO NOT do)
 
 - ❌ Rewrite the entire layout when only a "tweak" of one part was needed
-- ❌ Add flashy animation to a healthcare app
-- ❌ Copy creative design from a landing page/portfolio into product UI
+- ❌ Add flashy animation to a healthcare app (unless `--wow` is active — see Phase 3 suspend clause; GPU-safe motion rules still apply)
+- ❌ Copy creative design from a landing page/portfolio into product UI (unless `--wow` is active — see Phase 3 suspend clause)
 - ❌ Change the brand color because it's "nicer" — only use tokens
 - ❌ Ask the user before reading the code — scout first, ask only when actually needed
 - ❌ Fix padding but break responsiveness
@@ -404,7 +470,7 @@ Resolve in this order before Phase 1:
 - ❌ Unmount a component to hide it — use CSS visibility/opacity if state needs to be preserved
 - ❌ Use raw HTML elements instead of `@etaro/ui` components
 - ❌ Use shadcn/MUI default colors when the project has its own primary color token
-- ❌ Add unnecessary toast notifications
+- ❌ Add unnecessary toast notifications (unless `--wow` is active and it's a deliberate celebratory/completion moment — see Phase 3 suspend clause)
 - ❌ Let the scrollbar eat into the content area's width — always use an overlay/transparent scrollbar
 - ❌ Inconsistent tab style within the same page — check cross-component tab consistency
 - ❌ Guess a component's pattern "like X" — MUST read X first
@@ -415,6 +481,16 @@ Resolve in this order before Phase 1:
 - ❌ Forcing `line-clamp`/fixed height onto copy of varying length across parallel cards instead of rebalancing the text length — line-clamp is a band-aid, rebalancing the copy is the actual root fix for "harmoniousness"
 - ❌ Run `--wow` without committing to a vibe first (Phase 0 step 7) — un-anchored boldness still reads as generic/safe; picking patterns before picking a direction produces a grab-bag, not a coherent design
 - ❌ Re-run domain research for an aspect already cached this session/day for the same domain-slug (Phase 0 step 6) — check `plans/reports/` per-aspect first, reuse instead of re-researching; only cache-missed aspects get a fresh agent
+- ❌ Mix more than the allowed count of font-size/spacing/border-radius values without a derivable scale — arbitrary one-off values break proportion harmony
+- ❌ Flat, single-tier surfaces everywhere with no elevation distinction — everything reads at the same visual depth
+- ❌ Heavy shadow/skeuomorphic depth in a B2B context — over-correcting flatness into clutter
+- ❌ List/table with only one-at-a-time actions and no bulk/multi-select when the action is naturally batchable
+- ❌ Confirmation dialog for a reversible, low-risk action — use undo instead
+- ❌ Generic button labels ("Submit", "OK") when a specific outcome-based label is available
+- ❌ Validating a field on every keystroke instead of on blur — creates error-message flicker while typing
+- ❌ Reusing the same dark-mode shadow/contrast values from light mode without re-verification
+- ❌ Burying the highest-priority info/action below the fold on a dense dashboard
+- ❌ Picking table row density arbitrarily instead of matching the actual user type (casual vs power-user)
 
 ## Next steps
 
