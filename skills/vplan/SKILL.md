@@ -59,9 +59,78 @@ Using edge-case thinking similar to vspecs (empty/null input, concurrency, permi
 
 ## Step 4 — Generate the plan
 
-Follow the exact structure of the overview `plan.md` + detailed `phase-XX-*.md` per the canonical template of the underlying `plan` skill (frontmatter phase/title/status/priority/effort/dependencies; sections Overview/Requirements/Architecture/Related Code Files/Implementation Steps/Success Criteria/Risk Assessment).
+Generate the overview `plan.md` + one detailed `phase-XX-*.md` per phase, using the literal skeletons below.
 
-**Differences from the default `plan`:**
+**`plan.md` skeleton:**
+
+```markdown
+# <Feature Name> — Implementation Plan
+
+**Generated against commit:** <short-sha>  <!-- from `git rev-parse --short HEAD` at generation time -->
+
+## Case Summary
+
+| Case ID | Status | Handling Phase | Effort |
+|---|---|---|---|
+| <id> | PASS / FAIL / MISSING | phase-N or "—" | S/M/L or "—" |
+
+## Phases
+
+| Phase | Title | Status | Dependencies |
+|---|---|---|---|
+| Phase 1 | <title> | pending | — |
+| Phase 2 | <title> | pending | Phase 1 |
+
+## Key Dependencies
+
+- <cross-phase or external dependency>
+
+## Risks / Rollback
+
+### Phase 1
+- **If it fails partway:** <state left behind — code/DB>
+- **Rollback:** <how to undo>
+```
+
+**`phase-XX-*.md` skeleton:**
+
+```markdown
+---
+phase: 1
+title: "<phase title>"
+status: pending
+priority: high | medium | low
+effort: S | M | L
+dependencies: []
+---
+
+## Overview
+<1-2 sentences: what this phase does and why>
+
+## Requirements
+- <functional/non-functional requirement>
+
+## Architecture
+<component interactions, data flow relevant to this phase>
+
+## Related Code Files
+- <file to modify/create/delete>
+
+## Implementation Steps
+1. **File:** <path>
+   **Logic:** <exact condition/branch/field changed>
+   **Validate:** <specific test name (red→green), or manual verify command + expected result>
+
+## Success Criteria
+- <definition of done>
+
+## Risk Assessment
+- <potential issue + mitigation>
+```
+
+The `**Generated against commit:**` stamp exists so a reader (or `vcook` running the plan later) can tell how stale the plan's file:line references might be. `vcook` should treat a mismatch between this stamp and current HEAD as a signal to re-verify PASS cases before trusting them, not assume they still hold.
+
+**Rules beyond the skeleton:**
 
 1. **Phases are split by RELATED CASE GROUPS** (not by file/layer). Example: "Phase 2: Validate cart item quantity" groups every case related to quantity limits, even if those cases touch different routes + services + UI.
 2. Each entry in a phase's Implementation Steps MUST spell out 3 parts, no vagueness allowed:
@@ -69,8 +138,8 @@ Follow the exact structure of the overview `plan.md` + detailed `phase-XX-*.md` 
    - **Logic:** exactly what changes (don't write generic "update logic" — must state the exact condition/branch/field being changed)
    - **Validate:** if a test framework exists in the repo — name the specific test (existing or new) and state that it must fail before the change (red) and pass after the change (green); if no test framework exists — a specific manual verify command/step with the expected observation stated explicitly (not "check the UI" — the exact result that confirms success)
 3. **Migration grouping:** migrations go into a single **first Phase** by default. A migration may be split into its own case's phase only when it is genuinely independent (no shared table/key) from Phase 1's other migrations — state that independence explicitly when splitting. If a later phase needs an additional schema change discovered while writing the plan and it isn't independent → go back and update Phase 1, don't split off a new migration phase.
-4. At the top of `plan.md`, add a **"Case Summary"** section — a table summarizing every case from Step 2 + Step 3, each row: Case ID | Status (PASS/FAIL/MISSING) | Handling Phase (phase number, or "—" if PASS and nothing needs to change) | Effort (the handling phase's `effort` frontmatter value, e.g. "2h"; "—" for PASS rows).
-5. `plan.md`'s template must include a **`## Risks / Rollback`** section: for each phase, state what state (code/DB) is left behind if that phase fails partway through, and how to roll it back.
+4. At the top of `plan.md`, the **"Case Summary"** table summarizes every case from Step 2 + Step 3: Case ID | Status (PASS/FAIL/MISSING) | Handling Phase (phase number, or "—" if PASS and nothing needs to change) | Effort (the handling phase's `effort` frontmatter value; "—" for PASS rows). Effort is a rough relative-sizing estimate, not a committed/calibrated estimate — read it as a coarse bucket (S/M/L), never as a false-precision hour count or a promised timeline.
+5. Fill in `## Risks / Rollback` for every phase, not just Phase 1 — state what state (code/DB) is left behind if that phase fails partway through, and how to roll it back.
 
 ---
 
@@ -84,11 +153,11 @@ After generating plan.md + phase files, before handoff, verify:
 
 Fix plan.md/phase files for any check that fails before proceeding.
 
-Then continue with the exact Post-Plan Handoff of the underlying `plan` skill — use `AskUserQuestion` to offer running the validate/red-team gate of `plan`, implementing right away with `vcook <plan-path>`, or ending the session.
+Then hand off — use `AskUserQuestion` to offer: (a) implement now via `vcook <plan-path>`, (b) create GitHub tracking issues first via `vtickets <plan-dir>`, or (c) end the session.
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
 
 ---
 
