@@ -62,8 +62,8 @@ Degraded-mode contract:
 
 Per-skill degraded messages:
 - **vcook** (PR creation): `⚠️ gh unavailable / non-GitHub remote — commits are pushed, open the PR manually on your host. Suggested title: <title>. Body below.` then print the body.
-- **vissues** (sub-issue linking): `⚠️ Sub-issue linking uses GitHub's addSubIssue GraphQL mutation, which has no equivalent on other hosts — create the epic + sub-issues manually and link them by hand.` then print the ready-to-paste issue bodies.
-- **vrules** (PR-comment fetch): `⚠️ Can't fetch review comments without gh — paste the bot's review comments and I'll continue from Step 3.`
+- **vtickets** (sub-issue linking): `⚠️ Sub-issue linking uses GitHub's addSubIssue GraphQL mutation, which has no equivalent on other hosts — create the epic + sub-issues manually and link them by hand.` then print the ready-to-paste issue bodies.
+- **vlearn** (PR-comment fetch): `⚠️ Can't fetch review comments without gh — paste the bot's review comments and I'll continue from Step 3.`
 - **vdesign / vreview** (PR diff / PR-ref resolution): `⚠️ Can't resolve PR refs without gh — pass a branch name instead; branch/diff modes work without gh.`
 
 ## §3 — Primary language + framework

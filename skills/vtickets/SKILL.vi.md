@@ -1,5 +1,5 @@
 ---
-name: vissues
+name: vtickets
 description: "Tạo/đồng bộ 1 GitHub epic issue + sub-issues từ 1 plan directory, dùng gh CLI + REST sub_issues API (GraphQL addSubIssue làm fallback). Nội dung issue phi kỹ thuật, migration được gộp vào sub-issue chứa nội dung phase 1. Idempotent — chạy lại không tạo trùng."
 argument-hint: "<plan-path>"
 user-invocable: true
@@ -7,10 +7,10 @@ disable-model-invocation: true
 when_to_use: "Dùng khi cần tạo hoặc đồng bộ GitHub epic + sub-issues từ 1 plan có sẵn (plan.md + phase-XX-*.md)."
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
-# vissues
+# vtickets
 
 Tạo hoặc đồng bộ 1 GitHub epic issue + sub-issues từ 1 plan directory, dùng `gh` CLI. Idempotent — chạy lần thứ hai sẽ update thay vì tạo trùng.
 
@@ -26,7 +26,7 @@ Nếu `$ARGUMENTS` rỗng — hỏi user đường dẫn đến plan directory (
 
 ## Bước 0 — Xác định VCS profile
 
-Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (nếu có; nếu không có, giả định GitHub + gh — mặc định hiện tại). Full gh mode → tiếp tục như bình thường bên dưới. Degraded/local-only → in thông báo §2 dành cho vissues (link sub-issue — cả REST `sub_issues` lẫn GraphQL `addSubIssue` fallback — đều là API riêng của GitHub, không có tương đương ở host khác), rồi vẫn làm Bước 1 (đọc plan) và Bước 4 (soạn nội dung issue), in ra nội dung epic + sub-issue sẵn sàng để paste — đánh dấu sub-issue nào chứa migration theo Bước 5. KHÔNG BAO GIỜ abort chỉ vì thiếu `gh`.
+Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (nếu có; nếu không có, giả định GitHub + gh — mặc định hiện tại). Full gh mode → tiếp tục như bình thường bên dưới. Degraded/local-only → in thông báo §2 dành cho vtickets (link sub-issue — cả REST `sub_issues` lẫn GraphQL `addSubIssue` fallback — đều là API riêng của GitHub, không có tương đương ở host khác), rồi vẫn làm Bước 1 (đọc plan) và Bước 4 (soạn nội dung issue), in ra nội dung epic + sub-issue sẵn sàng để paste — đánh dấu sub-issue nào chứa migration theo Bước 5. KHÔNG BAO GIỜ abort chỉ vì thiếu `gh`.
 
 ## Bước 1 — Đọc plan
 
@@ -37,22 +37,32 @@ Nếu `$ARGUMENTS` rỗng — hỏi user đường dẫn đến plan directory (
 
 Các lệnh này giả định đang ở full gh mode từ Bước 0; ở chế độ degraded, làm theo hướng dẫn thủ công ở Bước 0 thay thế.
 
-1. Search issue hiện có khớp với plan này:
+Tìm epic theo chuỗi fallback sau, check nào rẻ nhất và đáng tin nhất trước — dừng ngay khi tìm thấy:
+
+1. **Local cache** (nhanh nhất, nhưng chỉ dùng được trên cùng máy) — nếu `<plan-path>/issues.md` tồn tại, đọc dòng epic từ đó và dùng thẳng số issue này.
+2. **Marker search** (sống sót qua clone mới trên máy khác) — mọi epic do skill này tạo đều embed 1 marker ẩn `<!-- vplan: <plan-slug> -->` trong body (xem bước 5 bên dưới), với `<plan-slug>` là basename của plan directory, kebab-case (theo đúng convention slug đã dùng ở nơi khác trong bộ này, ví dụ `[feature-slug]` ở vspecs/vplan). Search marker này, rồi xác nhận khớp chính xác — search của GitHub là fuzzy/tokenized nên chỉ coi kết quả là ứng viên, chưa phải bằng chứng:
+   ```
+   gh issue list --search "\"vplan: <plan-slug>\" in:body" --state all --json number,title,url,body
+   ```
+   Grep `body` của từng ứng viên để tìm đúng chuỗi `<!-- vplan: <plan-slug> -->` trước khi tin đó là epic.
+3. **Title search** (phương án cuối cùng — dành cho epic tạo trước khi có marker, hoặc body bị sửa mất marker):
    ```
    gh issue list --search "<keyword from plan name>" --state all --json number,title,url,labels
    ```
-2. Nếu tìm thấy issue title tương đồng cao → dùng nó làm epic, **KHÔNG tạo mới**
-3. Nếu không tìm thấy → kiểm tra xem label `epic` đã tồn tại trong repo chưa:
+   Nếu tìm thấy issue title tương đồng cao → dùng nó làm epic, **KHÔNG tạo mới**.
+4. Nếu cả 3 cách trên đều không tìm thấy → kiểm tra xem label `epic` đã tồn tại trong repo chưa:
    ```
    gh label list
    ```
    - Label `epic` đã tồn tại → tạo issue với `--label epic`
    - Chưa tồn tại → **STOP, hỏi user** có muốn tạo label mới không (không bao giờ tự tạo label mà không xác nhận)
-4. Tạo epic mới:
+5. Tạo epic mới — embed marker làm dòng đầu tiên của body, trước nội dung Bước 4:
    ```
-   gh issue create --title "<feature name, in English>" --body "<epic description, see Step 4>" --label epic
+   gh issue create --title "<feature name, in English>" --body "<!-- vplan: <plan-slug> -->
+
+   <epic description, see Step 4>" --label epic
    ```
-5. Lấy node ID của epic — chỉ cần cho GraphQL fallback ở Bước 3, không cần cho REST path (`<owner>`/`<repo>` xác định theo §2):
+6. Lấy node ID của epic — chỉ cần cho GraphQL fallback ở Bước 3, không cần cho REST path (`<owner>`/`<repo>` xác định theo §2):
    ```
    gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id}}}' -f owner=<owner> -f repo=<repo> -F number=<epic_number>
    ```
@@ -118,6 +128,8 @@ Ngôn ngữ đơn giản, phi kỹ thuật — không tên file, không tên hà
 <brief — what's in, what's out>
 ```
 
+(Body của epic có thêm marker ẩn `<!-- vplan: <plan-slug> -->` từ Bước 2.5 ở đầu — body của sub-issue không có marker này.)
+
 ## Bước 5 — Ràng buộc về migration
 
 Nếu plan có thay đổi database → đưa TOÀN BỘ nội dung liên quan đến migration vào **sub-issue chứa nội dung phase 1** (không nhất thiết là sub-issue tạo đầu tiên — Bước 3.1 gom nhóm theo mảng công việc, không theo thứ tự phase). KHÔNG rải nội dung migration ra nhiều sub-issue.
@@ -137,9 +149,10 @@ Cuối lần chạy, in ra 1 bảng liệt kê mọi issue đã đụng tới tr
 
 ## Hard rules
 
-- Luôn check danh sách sub-issues cache của epic trước để dedupe khi tạo sub-issue (bước 3), chỉ fallback sang `gh issue list --search` khi epic không có title nào khớp; riêng epic thì luôn search trước khi tạo — tránh trùng epic/sub-issue khi chạy lại skill
+- Luôn check danh sách sub-issues cache của epic trước để dedupe khi tạo sub-issue (bước 3), chỉ fallback sang `gh issue list --search` khi epic không có title nào khớp; riêng epic thì luôn chạy đủ chuỗi discovery trước khi tạo — cache `issues.md` → marker search `<!-- vplan: <plan-slug> -->` → title search — để tránh trùng epic/sub-issue khi chạy lại skill (kể cả từ 1 clone mới trên máy khác)
 - REST `sub_issues` là path link chính; fetch danh sách sub-issues của epic một lần cho mỗi lần chạy (cache lại) và bỏ qua việc link nếu `id` dạng số của sub-issue đã có trong danh sách đó — đây là no-op idempotent, không bao giờ coi là lỗi REST cần fallback
 - Field `sub_issues_summary`/`subIssuesSummary` của GitHub (hiển thị dạng badge tiến độ trên Project board và issue list) có thể bị stale — đây là bug đã biết của GitHub, không phải dấu hiệu link bị lỗi; danh sách `sub_issues` live (REST hoặc GraphQL tương đương) của issue đó luôn là nguồn authoritative, không bao giờ là cái badge
+- Status pin (tính đến 2026-09-11): REST API `sub_issues` và GraphQL mutation `addSubIssue` của GitHub đã xác nhận generally available (GA), không còn beta/preview — GA được công bố ngày 2025-03-17. Đây là snapshot tại 1 thời điểm, không đảm bảo cho các lần chạy sau; vẫn xác minh lại live (theo ghi chú ở bước 3.2 về giới hạn 100 item) nếu skill này được sửa lại sau này và có dấu hiệu bất thường
 - Chỉ fallback sang GraphQL `addSubIssue` mutation (với `replaceParent: true`) khi REST fail thật sự và KHÔNG phải lỗi permission; khi REST trả 401/403, STOP và báo lỗi trực tiếp cho user — không bao giờ âm thầm fallback
 - Không bao giờ link sub-issue khi số lượng sub-issue cache của epic đã ≥ 100 (giới hạn per-parent của GitHub) — STOP và báo user đóng/tái tổ chức sub-issue hiện có trước; nếu bản thân việc fetch số lượng fail, cảnh báo user và hỏi trước khi tiếp tục, không giả định là 0
 - Ngôn ngữ issue luôn phải phi kỹ thuật — không thuật ngữ code, không tên file/hàm/table DB
@@ -150,4 +163,4 @@ Cuối lần chạy, in ra 1 bảng liệt kê mọi issue đã đụng tới tr
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

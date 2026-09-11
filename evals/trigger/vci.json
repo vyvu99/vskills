@@ -4,7 +4,7 @@
   { "query": "run tsc and build on all packages", "should_trigger": true },
   { "query": "typecheck the api and web packages", "should_trigger": true },
   { "query": "make sure everything still builds after this refactor", "should_trigger": true },
-  { "query": "run vcheck", "should_trigger": true },
+  { "query": "run vci", "should_trigger": true },
   { "query": "run typecheck, build, and tests on the whole monorepo", "should_trigger": true },
   { "query": "does this package still typecheck?", "should_trigger": true },
   { "query": "build and format the project before I open a PR", "should_trigger": true },

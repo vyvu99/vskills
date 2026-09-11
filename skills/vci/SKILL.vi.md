@@ -1,5 +1,5 @@
 ---
-name: vcheck
+name: vci
 description: "Chạy typecheck + build + format (+ test tùy chọn) song song cho toàn bộ hoặc một phần package trong repo JS/TS (monorepo hoặc single package). Tự động phát hiện package trong workspace và package manager, không hardcode tên package."
 argument-hint: "[package-names...] [--test] [--changed]"
 user-invocable: true
@@ -10,7 +10,7 @@ metadata:
   version: "1.2.0"
 ---
 
-# vcheck
+# vci
 
 Chạy typecheck + build (+ test tùy chọn) song song cho các package trong repo JS/TS (monorepo hoặc single package), dùng background command + `wait`. Generic — không hardcode tên package hay package manager.
 
@@ -24,7 +24,7 @@ $ARGUMENTS
 
 ## Bước -1 — Xác định repo profile
 
-Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (nếu có) để xác định package manager (`pm`), workspace shape, và tên script typecheck/build/format. Nếu file không tồn tại, giả định pnpm + workspace (`pnpm --filter <pkg> exec …`) — mặc định hiện tại. Nếu §1 báo "not a JS/TS project", dừng ở đây và nói rõ — vcheck không có gì để làm trong repo không phải JS/TS.
+Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (nếu có) để xác định package manager (`pm`), workspace shape, và tên script typecheck/build/format. Nếu file không tồn tại, giả định pnpm + workspace (`pnpm --filter <pkg> exec …`) — mặc định hiện tại. Nếu §1 báo "not a JS/TS project", dừng ở đây và nói rõ — vci không có gì để làm trong repo không phải JS/TS.
 
 Nếu có `turbo.json` hoặc `nx.json` ở gốc repo, ưu tiên dùng orchestrator cho Bước 1-2: `turbo run typecheck build` (hoặc `nx run-many --target=typecheck,build`) có sẵn cache hit và topological ordering. Ghi nhận đây là đường ưu tiên khi phát hiện; nếu không có thì fallback về cách spawn thủ công từng package bên dưới — chỉ bổ sung, không thay thế hành vi hiện tại.
 
@@ -116,4 +116,4 @@ Thử lần lượt, dừng ở lựa chọn đầu tiên áp dụng được:
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

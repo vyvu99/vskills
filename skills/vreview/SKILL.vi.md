@@ -389,7 +389,7 @@ FILES NOT REVIEWED
 MIGRATIONS — không semantic-review
 ────────────────────────────────────────
   {danh sách từ MIGRATIONS SKIPPED của CONTEXT.txt, hoặc "none"}
-  Khuyến nghị check thủ công rủi ro schema/data-loss (xem vmigrate-rollback).
+  Khuyến nghị check thủ công rủi ro schema/data-loss (xem vrollback).
 
 ────────────────────────────────────────
 CONFIDENCE NOTES
@@ -481,4 +481,4 @@ QUY TẮC CHUNG
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

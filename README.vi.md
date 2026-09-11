@@ -13,11 +13,11 @@ Bộ skill Claude Code cá nhân — checklist theo phong cách riêng, đặt l
 | `vcook` | Implement theo checklist 9 bước: branch, test-first, SDK client, review, PR | Đã có plan (hoặc mô tả nhanh), cần code |
 | `vreview` | Code review 4-phase (+ pre-scan/lint-harvest tùy chọn) bằng subagent song song + adversarial pass | Cần review 1 branch/PR |
 | `vfix` | Fix issue từ report của `vreview` theo thứ tự ưu tiên cố định | Có report review cần fix |
-| `vcheck` | Typecheck + build song song cho JS/TS workspace (mọi package manager) | Check nhanh trước khi commit |
-| `vissues` | Tạo/update GitHub epic + sub-issues từ 1 plan | Cần track plan trên GitHub |
+| `vci` | Typecheck + build song song cho JS/TS workspace (mọi package manager) | Check nhanh trước khi commit |
+| `vtickets` | Tạo/update GitHub epic + sub-issues từ 1 plan | Cần track plan trên GitHub |
 | `vdesign` | Redesign UI/UX theo thẩm mỹ cá nhân (audit-driven, không còn flag mức độ; `--wow` cho mức táo bạo tầm Awwwards) | Cần nâng cấp UI 1 page/component |
-| `vrules` | Rút pattern từ PR review của bot → đề xuất rule mới cho CLAUDE.md | Bot vừa review xong 1 PR |
-| `vmigrate-rollback` | Rollback 1 migration trên DB local + xoá tracking record | Cần undo 1 migration ở local |
+| `vlearn` | Rút pattern từ PR review của bot → đề xuất rule mới cho CLAUDE.md | Bot vừa review xong 1 PR |
+| `vrollback` | Rollback 1 migration trên DB local + xoá tracking record | Cần undo 1 migration ở local |
 
 Chi tiết đầy đủ nằm trong từng `skills/<name>/SKILL.vi.md`.
 
@@ -32,13 +32,13 @@ flowchart LR
     review --> fix["/vfix"]
     fix --> ship(["ship"])
 
-    plan -. track trên GitHub .-> issues["/vissues"]
-    cook -. trước khi mở PR .-> check["/vcheck"]
+    plan -. track trên GitHub .-> issues["/vtickets"]
+    cook -. trước khi mở PR .-> check["/vci"]
     cook -. UI work .-> design["/vdesign"]
-    review -. sau khi bot review .-> rules["/vrules"]
+    review -. sau khi bot review .-> rules["/vlearn"]
 ```
 
-`/vmigrate-rollback` chạy độc lập, dùng bất cứ khi nào cần undo migration ở local — không nằm trong pipeline này.
+`/vrollback` chạy độc lập, dùng bất cứ khi nào cần undo migration ở local — không nằm trong pipeline này.
 
 ## Use cases
 
@@ -68,19 +68,19 @@ flowchart LR
 
 **Trước khi mở PR, đảm bảo cả monorepo còn build:**
 ```bash
-/vcheck
+/vci
 ```
 → typecheck + build song song mọi package trong workspace (background commands), tự fix nếu fail.
 
 **Track 1 plan lớn cho PM/non-tech xem tiến độ trên GitHub:**
 ```bash
-/vissues plans/dat-lich-tai-kham
+/vtickets plans/dat-lich-tai-kham
 ```
 → tạo epic issue + sub-issue theo nhóm phase, ngôn ngữ không thuật ngữ kỹ thuật, idempotent (chạy lại không tạo trùng).
 
 **Lỡ chạy nhầm migration ở local:**
 ```bash
-/vmigrate-rollback 0007_add_appointment_status
+/vrollback 0007_add_appointment_status
 ```
 → auto-detect ORM/DB/container, rollback + xoá tracking record — chỉ chạy trên DB local, luôn hỏi xác nhận trước.
 
@@ -98,7 +98,7 @@ cd vskills
 
 Skill được symlink chứ không copy — sửa `SKILL.md`/`SKILL.vi.md` trong `~/.claude/skills/` hay trong repo này đều là cùng 1 file. `scripts/lint-rules/` mặc định KHÔNG cài: đó là rule harvest từ `vreview` trên project riêng của tác giả, chưa chắc hợp với project của bạn. Mỗi skill đều có bản dịch tiếng Việt (`SKILL.vi.md` nằm cạnh `SKILL.md`) — chọn ngôn ngữ 1 lần lúc cài bằng `--lang`, không thể bật cả 2 cùng lúc.
 
-`vreview`, `vcook`, `vrules` đọc/ghi thẳng vào `~/.claude/CLAUDE.md` — nếu bạn chưa có file này, `--with-claude-md` sẽ copy 1 bản khởi đầu tổng quát (`claude-md/CLAUDE.md`) vào đúng chỗ. Copy chứ không symlink, vì bạn sẽ tuỳ chỉnh nó ngay sau khi cài; nếu `~/.claude/CLAUDE.md` đã tồn tại, install.sh sẽ cảnh báo và không đụng vào nó.
+`vreview`, `vcook`, `vlearn` đọc/ghi thẳng vào `~/.claude/CLAUDE.md` — nếu bạn chưa có file này, `--with-claude-md` sẽ copy 1 bản khởi đầu tổng quát (`claude-md/CLAUDE.md`) vào đúng chỗ. Copy chứ không symlink, vì bạn sẽ tuỳ chỉnh nó ngay sau khi cài; nếu `~/.claude/CLAUDE.md` đã tồn tại, install.sh sẽ cảnh báo và không đụng vào nó.
 
 ## Cách dùng
 
@@ -125,19 +125,19 @@ Tôi có 1 việc cần code
 │  └─ /vfix
 │
 ├─ "Cần typecheck + build trước khi commit"
-│  └─ /vcheck
+│  └─ /vci
 │
 ├─ "Cần tạo/đồng bộ GitHub issues từ 1 plan"
-│  └─ /vissues
+│  └─ /vtickets
 │
 ├─ "Cần redesign UI/UX"
 │  └─ /vdesign
 │
 ├─ "Bot vừa review xong 1 PR, muốn rút rule mới"
-│  └─ /vrules
+│  └─ /vlearn
 │
 └─ "Cần rollback 1 migration ở local"
-   └─ /vmigrate-rollback
+   └─ /vrollback
 ```
 
 ---

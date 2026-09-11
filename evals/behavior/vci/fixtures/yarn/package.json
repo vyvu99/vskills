@@ -1,5 +1,5 @@
 {
-  "name": "vcheck-fixture-yarn",
+  "name": "vci-fixture-yarn",
   "version": "1.0.0",
   "private": true,
   "packageManager": "yarn@1.22.22",

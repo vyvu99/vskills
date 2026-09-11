@@ -1,5 +1,5 @@
 ---
-name: vmigrate-rollback
+name: vrollback
 description: "Rollback một migration cụ thể trên database LOCAL và xóa tracking record của nó, như thể migration đó chưa từng chạy. Tự động detect framework (Drizzle/Prisma/Knex/TypeORM/raw SQL) + DB (Postgres/MySQL/SQLite) + Docker container. Generic cho mọi project JS/TS (Drizzle/Prisma/Knex/TypeORM/raw SQL)."
 argument-hint: "<migration-name-or-version>"
 user-invocable: true
@@ -10,7 +10,7 @@ metadata:
   version: "1.1.0"
 ---
 
-# vmigrate-rollback
+# vrollback
 
 Rollback một migration trên local DB, xóa tracking record của nó, như thể migration đó chưa từng chạy. Generic cho mọi framework/DB — tự động detect.
 
@@ -89,4 +89,4 @@ Sau khi xóa tracking row, hỏi user có muốn xóa luôn file migration trên
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

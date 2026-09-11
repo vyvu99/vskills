@@ -1,5 +1,5 @@
 ---
-name: vcheck
+name: vci
 description: "Run typecheck + build + format (+ optional test) in parallel for all or part of the packages in a JS/TS repo (monorepo or single package). Auto-detects workspace packages and package manager, no hardcoded package names."
 argument-hint: "[package-names...] [--test] [--changed]"
 user-invocable: true
@@ -10,7 +10,7 @@ metadata:
   version: "1.2.0"
 ---
 
-# vcheck
+# vci
 
 Runs typecheck + build (+ optional test) in parallel for packages in a JS/TS repo (monorepo or single package), using background commands + `wait`. Generic — no hardcoded package names or package manager.
 
@@ -24,7 +24,7 @@ $ARGUMENTS
 
 ## Step -1 — Resolve the repo profile
 
-Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (if present) to resolve the package manager (`pm`), workspace shape, and the typecheck/build/format script names. If the file is absent, assume pnpm + workspace (`pnpm --filter <pkg> exec …`) — today's default. If §1 reports "not a JS/TS project", stop here and say so — vcheck has nothing to do in a non-JS/TS repo.
+Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (if present) to resolve the package manager (`pm`), workspace shape, and the typecheck/build/format script names. If the file is absent, assume pnpm + workspace (`pnpm --filter <pkg> exec …`) — today's default. If §1 reports "not a JS/TS project", stop here and say so — vci has nothing to do in a non-JS/TS repo.
 
 If `turbo.json` or `nx.json` exists at the repo root, prefer the orchestrator for Steps 1-2: `turbo run typecheck build` (or `nx run-many --target=typecheck,build`) gets cache hits and topological ordering for free. Note this as the preferred path when detected; fall back to the manual per-package spawn below otherwise — additive, not a replacement of the existing behavior.
 
@@ -116,4 +116,4 @@ Try, in order, stopping at the first one that applies:
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.

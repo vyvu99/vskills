@@ -1,5 +1,5 @@
 ---
-name: vrules
+name: vlearn
 description: "Phân tích comment review của Claude bot trên một PR hoặc N PR merge gần nhất, đối chiếu với rule hiện có trong ~/.claude/CLAUDE.md, và đề xuất rule mới để lấp khoảng trống — giúp CLAUDE.md tự cải thiện dựa trên pattern review thực tế."
 argument-hint: "<số-PR> | --last <N>"
 user-invocable: true
@@ -10,9 +10,11 @@ metadata:
   version: "1.1.0"
 ---
 
-# vrules
+# vlearn
 
 Chắt lọc rule mới cho `~/.claude/CLAUDE.md` từ pattern lặp lại trong comment review của Claude bot — một vòng lặp tự cải thiện cho file rule global. Mặc định: một PR; `--last <N>` chạy cross-PR.
+
+**Điều kiện tiên quyết:** skill này yêu cầu bot review (ví dụ Claude Code review bot hoặc tương đương) đã comment sẵn trên (các) PR mục tiêu — nếu chưa có hoạt động bot review nào thì không có comment để cluster thành pattern.
 
 Đọc input từ user:
 
@@ -45,9 +47,13 @@ gh pr list --state merged --limit <N> --json number
 ```
 Chạy 3 lệnh trên cho từng PR trả về, gộp toàn bộ comment lại trước khi vào Bước 3.
 
-Không phải GitHub hoặc thiếu `gh` → in thông báo §2 dành cho vrules (`⚠️ không lấy được comment review vì thiếu gh — paste nội dung vào, tôi sẽ tiếp tục từ Bước 3`) rồi tiếp tục Bước 3 với comment user paste vào.
+Không phải GitHub hoặc thiếu `gh` → in thông báo §2 dành cho vlearn (`⚠️ không lấy được comment review vì thiếu gh — paste nội dung vào, tôi sẽ tiếp tục từ Bước 3`) rồi tiếp tục Bước 3 với comment user paste vào.
 
-Lọc theo author là bot review tự động (thường có hậu tố `[bot]` hoặc tên app tuỳ chỉnh). Không chắc tên account bot → hỏi user, KHÔNG đoán.
+Lọc theo author là bot review tự động (thường có hậu tố `[bot]` hoặc tên app tuỳ chỉnh). Không chắc tên account bot → thử auto-detect trước, trước khi hỏi:
+```bash
+gh api repos/<owner>/<repo>/collaborators --jq '.[] | select(.type == "Bot" or (.login | endswith("[bot]"))) | .login'
+```
+Tìm được đúng 1 candidate → confirm nhanh với user ("phát hiện `<login>` là review bot — dùng account này?"). Nhiều candidate hoặc không tìm được → fallback về hỏi user account nào, KHÔNG đoán.
 
 ## Bước 3 — Cluster pattern
 
@@ -81,7 +87,13 @@ Patch theo đúng rule Document Updates đã định nghĩa sẵn trong chính C
 
 Đối chiếu danh sách rule ở Bước 1 với `scripts/lint-rules/violation-history.jsonl` (các entry `rule`/`count` tổng hợp) và báo cáo cũ của `vreview`. Một rule có 0 hit ở cả hai nguồn qua đủ lịch sử là ứng viên để gắn cờ siết chặt hoặc xoá — KHÔNG tự xoá — vì mỗi rule trong CLAUDE.md là một chi phí context phải trả mỗi session.
 
-Trình bày rule bị gắn cờ dưới dạng danh sách ngắn (nội dung rule + "0 hit trong violation-history.jsonl, 0 lần được cite trong report") và để user quyết định.
+Đừng dừng lại ở 0 hit: đọc cả field `count` trên những rule đã có entry. Một rule có count thấp hoặc giảm dần so với thời gian nó đã nằm trong CLAUDE.md (ví dụ chỉ vài hit tổng cộng, hoặc hit tập trung ở entry cũ, không có entry gần đây) là ứng viên phụ, độ tin cậy thấp hơn — rule này từng có ý nghĩa nhưng giờ hiếm khi kích hoạt. Trình bày tách riêng khỏi danh sách 0-hit, vì "chưa từng kích hoạt lần nào" là tín hiệu mạnh, còn "hiếm khi kích hoạt / từng kích hoạt nhiều hơn" là tín hiệu yếu hơn — user cần phân biệt được hai loại này.
+
+Trình bày rule bị gắn cờ dưới dạng hai danh sách ngắn:
+- **0 hit** — nội dung rule + "0 hit trong violation-history.jsonl, 0 lần được cite trong report"
+- **Hit thấp/giảm dần** (phụ, độ tin cậy thấp hơn) — nội dung rule + count + ghi chú xu hướng (ví dụ "3 hit tổng cộng, không có hit nào trong N entry gần nhất")
+
+Để user quyết định trên cả hai danh sách — đây vẫn KHÔNG phải tự xoá.
 
 ---
 
@@ -99,4 +111,4 @@ Trình bày rule bị gắn cờ dưới dạng danh sách ngắn (nội dung ru
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

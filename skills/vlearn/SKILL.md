@@ -1,5 +1,5 @@
 ---
-name: vrules
+name: vlearn
 description: "Analyze Claude bot's review comments on a PR or the last N merged PRs, cross-check them against existing rules in ~/.claude/CLAUDE.md, and propose new rules to fill the gaps — helping CLAUDE.md self-improve based on real review patterns."
 argument-hint: "<PR-number> | --last <N>"
 user-invocable: true
@@ -10,9 +10,11 @@ metadata:
   version: "1.1.0"
 ---
 
-# vrules
+# vlearn
 
 Distill new rules for `~/.claude/CLAUDE.md` from recurring patterns in Claude bot's review comments — a self-improvement loop for the global rule file. Default: one PR; `--last <N>` runs cross-PR.
+
+**Precondition:** this skill requires that a bot review (e.g. a Claude Code review bot or equivalent) has already commented on the target PR(s) — without prior bot review activity there are no comments to cluster into patterns.
 
 Read input from the user:
 
@@ -45,9 +47,13 @@ gh pr list --state merged --limit <N> --json number
 ```
 Run the three commands above for each returned PR number, pool all comments together before Step 3.
 
-Not GitHub or no `gh` → print the §2 vrules message (`⚠️ can't fetch review comments without gh — paste them and I'll continue from Step 3`) and continue from Step 3 with user-pasted comments.
+Not GitHub or no `gh` → print the §2 vlearn message (`⚠️ can't fetch review comments without gh — paste them and I'll continue from Step 3`) and continue from Step 3 with user-pasted comments.
 
-Filter by author being the automated review bot (usually suffixed `[bot]` or a custom app name). Unsure of the exact bot account → ask the user, don't guess.
+Filter by author being the automated review bot (usually suffixed `[bot]` or a custom app name). Unsure of the exact bot account → try auto-detection first, before asking:
+```bash
+gh api repos/<owner>/<repo>/collaborators --jq '.[] | select(.type == "Bot" or (.login | endswith("[bot]"))) | .login'
+```
+Exactly one candidate → quick confirm with the user ("detected `<login>` as the review bot — use this?"). Multiple candidates or none found → fall back to asking the user which account to filter by, don't guess.
 
 ## Step 3 — Cluster patterns
 
@@ -81,7 +87,13 @@ Patch following the Document Updates rule already in CLAUDE.md itself:
 
 Cross-reference the Step 1 rule list against `scripts/lint-rules/violation-history.jsonl` (aggregated `rule`/`count` entries) and `vreview`'s past reports. A rule with zero hits in either source across enough history is a candidate to flag for tightening or removal — not auto-remove — since every rule in CLAUDE.md is a context cost paid every session.
 
-Present flagged rules as a short list (rule text + "0 hits in violation-history.jsonl, 0 review-report citations") and let the user decide.
+Don't stop at zero-hit: also read the `count` field on rules that do have entries. A rule whose count is low or declining relative to how long it's been in CLAUDE.md (e.g. a handful of hits total, or hits clustered in older entries with none recent) is a weaker, secondary candidate — it once mattered but rarely fires now. Present these separately from the zero-hit list, since "never fired once" is a strong signal and "fires rarely / used to fire more" is a weaker one — the user should be able to tell them apart.
+
+Present flagged rules as two short lists:
+- **Zero hits** — rule text + "0 hits in violation-history.jsonl, 0 review-report citations"
+- **Low/declining hits** (secondary, lower-confidence) — rule text + count + trend note (e.g. "3 hits total, none in the last N entries")
+
+Let the user decide on both lists — this is still not auto-remove.
 
 ---
 
@@ -99,4 +111,4 @@ Present flagged rules as a short list (rule text + "0 hits in violation-history.
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.

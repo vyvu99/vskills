@@ -1,5 +1,5 @@
 ---
-name: vmigrate-rollback
+name: vrollback
 description: "Roll back one specific migration on the LOCAL database and delete its tracking record, as if the migration had never run. Auto-detects framework (Drizzle/Prisma/Knex/TypeORM/raw SQL) + DB (Postgres/MySQL/SQLite) + Docker container. Generic across any JS/TS project (Drizzle/Prisma/Knex/TypeORM/raw SQL)."
 argument-hint: "<migration-name-or-version>"
 user-invocable: true
@@ -10,7 +10,7 @@ metadata:
   version: "1.1.0"
 ---
 
-# vmigrate-rollback
+# vrollback
 
 Roll back one migration on the local DB, delete its tracking record, as if the migration had never run. Generic across any framework/DB — auto-detected.
 
@@ -89,4 +89,4 @@ After deleting the tracking row, ask the user whether to also delete the migrati
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.

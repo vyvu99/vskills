@@ -1,5 +1,5 @@
 {
-  "name": "vcheck-fixture-bun",
+  "name": "vci-fixture-bun",
   "version": "1.0.0",
   "private": true,
   "packageManager": "bun@1.1.34",

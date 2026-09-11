@@ -1,5 +1,5 @@
 ---
-name: vissues
+name: vtickets
 description: "Create/update a GitHub epic issue + sub-issues from 1 plan directory, using gh CLI + REST sub_issues API (GraphQL addSubIssue as fallback). Issue content is non-technical, migrations are consolidated into the sub-issue containing phase 1's content. Idempotent — re-running does not create duplicates."
 argument-hint: "<plan-path>"
 user-invocable: true
@@ -7,10 +7,10 @@ disable-model-invocation: true
 when_to_use: "Invoke when you need to create or sync a GitHub epic + sub-issues from an existing plan (plan.md + phase-XX-*.md)."
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
-# vissues
+# vtickets
 
 Create or sync a GitHub epic issue + sub-issues from a plan directory, using the `gh` CLI. Idempotent — running it a second time updates instead of creating duplicates.
 
@@ -26,7 +26,7 @@ If `$ARGUMENTS` is empty — ask the user for the path to the plan directory (e.
 
 ## Step 0 — Resolve the VCS profile
 
-Read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (if present; if absent, assume GitHub + gh — today's default). Full gh mode → continue as written below. Degraded/local-only → print the §2 vissues message (sub-issue linking — REST `sub_issues` and its GraphQL `addSubIssue` fallback alike — is GitHub's own API, no equivalent elsewhere), then still do Step 1 (read the plan) and Step 4 (compose issue content), and print the epic + sub-issue bodies ready to paste — marking which sub-issue holds the migrations per Step 5. Never abort the run because `gh` is unavailable.
+Read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (if present; if absent, assume GitHub + gh — today's default). Full gh mode → continue as written below. Degraded/local-only → print the §2 vtickets message (sub-issue linking — REST `sub_issues` and its GraphQL `addSubIssue` fallback alike — is GitHub's own API, no equivalent elsewhere), then still do Step 1 (read the plan) and Step 4 (compose issue content), and print the epic + sub-issue bodies ready to paste — marking which sub-issue holds the migrations per Step 5. Never abort the run because `gh` is unavailable.
 
 ## Step 1 — Read the plan
 
@@ -37,22 +37,32 @@ Read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (if present; if abse
 
 These commands assume full gh mode from Step 0; in degraded mode, follow the manual path from Step 0 instead.
 
-1. Search for an existing issue matching this plan:
+Discover the epic through this fallback chain, cheapest and most reliable check first — stop at the first hit:
+
+1. **Local cache** (fastest, but same-machine only) — if `<plan-path>/issues.md` exists, read the epic row from it and use that issue number directly.
+2. **Marker search** (survives a fresh clone on a different machine) — every epic this skill creates embeds a hidden marker `<!-- vplan: <plan-slug> -->` in its body (see step 5 below), where `<plan-slug>` is the plan directory's basename in kebab-case (same slug convention used elsewhere in this pack, e.g. `[feature-slug]` in vspecs/vplan). Search for it, then confirm an exact match — GitHub's search is fuzzy/tokenized, so treat a hit as a candidate only, not proof:
+   ```
+   gh issue list --search "\"vplan: <plan-slug>\" in:body" --state all --json number,title,url,body
+   ```
+   Grep each candidate's `body` for the exact string `<!-- vplan: <plan-slug> -->` before trusting it as the epic.
+3. **Title search** (last resort — covers epics created before the marker existed, or a body that was edited and lost it):
    ```
    gh issue list --search "<keyword from plan name>" --state all --json number,title,url,labels
    ```
-2. If a highly similar issue title is found → use it as the epic, **DO NOT create a new one**
-3. If not found → check whether the `epic` label already exists in the repo:
+   If a highly similar issue title is found → use it as the epic, **DO NOT create a new one**.
+4. If none of the above found anything → check whether the `epic` label already exists in the repo:
    ```
    gh label list
    ```
    - Label `epic` exists → create the issue with `--label epic`
    - Doesn't exist → **STOP, ask the user** whether to create the new label (never create a label without confirmation)
-4. Create the new epic:
+5. Create the new epic — embed the marker as the first line of the body, above the Step 4 content:
    ```
-   gh issue create --title "<feature name, in English>" --body "<epic description, see Step 4>" --label epic
+   gh issue create --title "<feature name, in English>" --body "<!-- vplan: <plan-slug> -->
+
+   <epic description, see Step 4>" --label epic
    ```
-5. Get the epic's node ID — only needed for the GraphQL fallback in Step 3, not for the REST path (`<owner>`/`<repo>` resolved per §2):
+6. Get the epic's node ID — only needed for the GraphQL fallback in Step 3, not for the REST path (`<owner>`/`<repo>` resolved per §2):
    ```
    gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id}}}' -f owner=<owner> -f repo=<repo> -F number=<epic_number>
    ```
@@ -118,6 +128,8 @@ Plain, non-technical language — no file names, function names, DB table names,
 <brief — what's in, what's out>
 ```
 
+(The epic's body additionally starts with the hidden `<!-- vplan: <plan-slug> -->` marker from Step 2.5 — sub-issue bodies don't carry it.)
+
 ## Step 5 — Migration constraint
 
 If the plan includes database changes → put ALL migration-related content into **the sub-issue containing phase 1's content** (not necessarily the first sub-issue created — Step 3.1 groups by area of work, not phase order). DO NOT scatter migration content across multiple sub-issues.
@@ -137,9 +149,10 @@ Also save this same table to `<plan-path>/issues.md`, so a future re-run of this
 
 ## Hard rules
 
-- Always check the epic's cached sub-issues list first for sub-issue creation dedup (step 3), falling back to `gh issue list --search` only when the epic has no matching title; for the epic itself, always search before creating — avoid duplicate epic/sub-issues when re-running the skill
+- Always check the epic's cached sub-issues list first for sub-issue creation dedup (step 3), falling back to `gh issue list --search` only when the epic has no matching title; for the epic itself, always run the full discovery chain first — `issues.md` cache → hidden `<!-- vplan: <plan-slug> -->` marker search → title search — before creating, to avoid duplicate epic/sub-issues when re-running the skill (including from a fresh clone on another machine)
 - REST `sub_issues` is the primary linking path; fetch the epic's sub-issues list once per run (cached) and skip linking a sub-issue whose numeric `id` is already in that list — this is the idempotent no-op, never a REST failure requiring fallback
 - GitHub's `sub_issues_summary`/`subIssuesSummary` field (shown as a progress badge on Project boards and issue lists) can go stale — this is a known GitHub bug, not a sign your linking failed; the issue's live `sub_issues` REST list (or GraphQL equivalent) is always the authoritative source, never the badge
+- Status pin (as of 2026-09-11): GitHub's `sub_issues` REST API and the `addSubIssue` GraphQL mutation are confirmed generally available (GA), not beta/preview — GA was announced 2025-03-17. This is a point-in-time snapshot, not a guarantee for future runs; reconfirm live (per the note in step 3.2 on the 100-item limit) if this skill is revisited later and something looks off
 - Only fall back to the GraphQL `addSubIssue` mutation (with `replaceParent: true`) on a genuine non-permission REST failure; on a 401/403 from REST, stop and report it to the user directly — never silently fall back
 - Never link a sub-issue when the epic's cached sub-issue count is already ≥ 100 (GitHub's per-parent limit) — stop and tell the user to close/reorganize existing sub-issues first; if the count-fetch itself fails, warn the user and ask before proceeding, don't assume 0
 - Issue language must always be non-technical — no code jargon, no file/function/DB table names
@@ -150,4 +163,4 @@ Also save this same table to `<plan-path>/issues.md`, so a future re-run of this
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.

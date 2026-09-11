@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/run-evals.sh -- trigger + behavior evals for the vcheck / vreview skills.
+# scripts/run-evals.sh -- trigger + behavior evals for the vci / vreview skills.
 # Usage: bash scripts/run-evals.sh
 #
 # ISOLATION POSTURE (soft containment, NOT a sandbox -- see
@@ -11,7 +11,7 @@
 #   an interactive prompt. `--add-dir` is ADDITIVE, not confining -- it does
 #   NOT hard-sandbox the session to $tmp (confirmed empirically; `--restricted`
 #   is the only flag that hard-confines, and it strips Bash + refuses
-#   bypassPermissions, both of which vcheck needs). This is acceptable ONLY
+#   bypassPermissions, both of which vci needs). This is acceptable ONLY
 #   because every prompt this script runs is one of the small, fixed,
 #   hand-authored strings in evals/**/*.json -- never external/untrusted
 #   input. Do not extend this runner to run arbitrary/externally-sourced
@@ -29,7 +29,7 @@
 # hypothetical): with cwd=$tmp + --add-dir "$tmp" + bypassPermissions, a
 # handful of trigger-eval prompts run in an EMPTY temp dir caused the
 # subprocess to read/edit real tracked files in THIS repo
-# (skills/vfix/SKILL.md, skills/vreview/SKILL.md, skills/vcheck/SKILL.vi.md,
+# (skills/vfix/SKILL.md, skills/vreview/SKILL.md, skills/vci/SKILL.vi.md,
 # etc.) via absolute paths, and to create new files under scripts/. This is
 # exactly the "--add-dir does not hard-confine" risk the plan's Risk
 # Assessment named -- it was not hypothetical, it happened. `--strict-mcp-config`
@@ -158,8 +158,8 @@ run_trigger_evals() {
   done
 }
 
-run_vcheck_behavior() {
-  local meta="$EVALS_DIR/behavior/vcheck/eval_metadata.json"
+run_vci_behavior() {
+  local meta="$EVALS_DIR/behavior/vci/eval_metadata.json"
   local total; total=$(jq 'length' "$meta")
   local i=0
   while [ "$i" -lt "$total" ]; do
@@ -168,7 +168,7 @@ run_vcheck_behavior() {
     prompt=$(jq -r ".[$i].prompt" "$meta")
     sig=$(jq -r ".[$i].assertions.error_signature" "$meta")
     tmp=$(mktemp -d)
-    cp -r "$EVALS_DIR/behavior/vcheck/fixtures/$pm/." "$tmp/"
+    cp -r "$EVALS_DIR/behavior/vci/fixtures/$pm/." "$tmp/"
 
     install_log="$tmp/install.log"
     case "$pm" in
@@ -179,18 +179,18 @@ run_vcheck_behavior() {
     esac
     if [ $? -ne 0 ]; then
       FAIL=$((FAIL + 1))
-      RESULTS+=("vcheck|behavior|$pm|FAIL|install step failed, see $install_log")
-      echo "[FAIL] behavior/vcheck: $pm (install step failed, see $install_log)"
+      RESULTS+=("vci|behavior|$pm|FAIL|install step failed, see $install_log")
+      echo "[FAIL] behavior/vci: $pm (install step failed, see $install_log)"
       rm -rf "$tmp"
       i=$((i + 1))
       continue
     fi
 
-    guarded_run_claude "$tmp" "$prompt" "behavior/vcheck: $pm"
+    guarded_run_claude "$tmp" "$prompt" "behavior/vci: $pm"
     if [ "$BREACH" -eq 1 ]; then
       FAIL=$((FAIL + 1))
-      RESULTS+=("vcheck|behavior|$pm|FAIL|CONTAINMENT BREACH -- reverted, see stderr above")
-      echo "[FAIL] behavior/vcheck: $pm -- CONTAINMENT BREACH, reverted (see stderr above)"
+      RESULTS+=("vci|behavior|$pm|FAIL|CONTAINMENT BREACH -- reverted, see stderr above")
+      echo "[FAIL] behavior/vci: $pm -- CONTAINMENT BREACH, reverted (see stderr above)"
       rm -rf "$tmp"
       i=$((i + 1))
       continue
@@ -199,8 +199,8 @@ run_vcheck_behavior() {
     verdict="FAIL"
     echo "$output" | grep -q "$sig" && verdict="PASS"
     if [ "$verdict" = "PASS" ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); fi
-    RESULTS+=("vcheck|behavior|$pm|$verdict|expected \"$sig\" in output")
-    echo "[$verdict] behavior/vcheck: $pm (expected \"$sig\" in output)"
+    RESULTS+=("vci|behavior|$pm|$verdict|expected \"$sig\" in output")
+    echo "[$verdict] behavior/vci: $pm (expected \"$sig\" in output)"
     rm -rf "$tmp"
     i=$((i + 1))
   done
@@ -253,12 +253,12 @@ run_vreview_behavior() {
   rm -rf "$tmp"
 }
 
-echo "=== Trigger evals: vcheck ==="
-run_trigger_evals vcheck
+echo "=== Trigger evals: vci ==="
+run_trigger_evals vci
 echo "=== Trigger evals: vreview ==="
 run_trigger_evals vreview
-echo "=== Behavior evals: vcheck ==="
-run_vcheck_behavior
+echo "=== Behavior evals: vci ==="
+run_vci_behavior
 echo "=== Behavior evals: vreview ==="
 run_vreview_behavior
 
