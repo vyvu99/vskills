@@ -108,7 +108,7 @@ WRAP-UP — FORMAT + CLEANUP
 
 1. After all steps are done (including SUGGESTION items already asked about) → auto-detect and run the project's format command: look in `package.json` scripts in this order `format` → `format:fix` → `lint:fix`. If none found → skip.
 2. Append one line per item in `.code-review/REPORT.md` to `.code-review-history.jsonl` at the repo root (create if absent) — JSON per line: `{date, rule_or_source, file, status}`, reading each item's final `Status:` value. Do this regardless of whether the user later confirms or declines deletion — it's the persistent record that survives either way.
-3. Run `vcheck` (typecheck + build) on the package(s) touched during this run — fixing many violations across multiple batches easily leaves a stray type error. If it reports failures, fix them before moving to the next step.
+3. Run `vci` (typecheck + build) on the package(s) touched during this run — fixing many violations across multiple batches easily leaves a stray type error. If it reports failures, fix them before moving to the next step.
 4. Before deleting `.code-review/` (or the report path used): ask the user for confirmation — always default to assuming the user has NOT necessarily finished reading the report; always ask, never assume.
 5. User confirms → delete the report directory. User wants to keep it → leave it as-is, done.
 6. Check `~/.claude/scripts/lint-rules/violation-history.jsonl`: if any `rule_id` involved in this run shows a high rate of being rejected/skipped across historical entries, note it in the final summary as a candidate for tightening or retiring that rule (via `vreview --harvest` or editing the rule directly).
@@ -128,4 +128,4 @@ HARD RULES
 NEXT STEPS
 ═══════════════════════════════════════════════════════
 
-Look at what was actually fixed in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what was actually fixed in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.

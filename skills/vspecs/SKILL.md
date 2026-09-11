@@ -71,6 +71,7 @@ Once the user confirms, start the loop. Each round:
 After each round of 5 cases:
 - Stop and wait for the user to decide on each case
 - Update the specs file directly (Decisions, Edge Cases, Out of Scope for deferred/rejected cases) — no recap, no explaining the change
+- Any P1/P2 Open Question already in the file and still unresolved this round → bump its carry-over counter (`_(carried over N×)_`, starts at 2× on the first carry-over)
 - Ask: continue or not?
 
 ---
@@ -92,6 +93,8 @@ Only do this after the user confirms there are no more edge cases to cover. Add 
 ---
 
 ## Step 5 — Self-check pass
+
+Before the checks below: scan Open Questions for any P1/P2 item whose counter reads `_(carried over 3×)_` or higher. For each, stop and use `AskUserQuestion` with 3 options: (a) **Resolve now** — turn it into a Decision with Acceptance right there; (b) **Won't Fix / Out of Scope** — move it into `## Out of Scope`, marked closed, never re-asked; (c) **Still open** — reaffirm it's genuinely open, reset the counter. P0 Open Questions are unaffected — rule 3 below already hard-blocks them.
 
 After Experience Specs is filled in, before finalizing: re-read the whole specs file and check:
 
@@ -141,9 +144,12 @@ When a new file is needed:
 ## Open Questions
 
 1. ...
+2. ... _(carried over 2×)_
 ```
 
 The `ID` column reuses the same Type-Number scheme as Edge Cases (e.g. `UI-1`, `FLOW-3`) — `vplan` references this exact value as `[Case ID]`.
+
+P1/P2 Open Questions pick up `_(carried over N×)_` each time they survive a run unresolved (see Step 3). At N=3 the self-check step (Step 5) surfaces them via `AskUserQuestion` instead of leaving them to rot indefinitely. P0 questions skip this — they already hard-block finalizing.
 
 ---
 
@@ -161,4 +167,4 @@ The `ID` column reuses the same Type-Number scheme as Edge Cases (e.g. `UI-1`, `
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.

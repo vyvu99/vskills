@@ -108,7 +108,7 @@ WRAP-UP — FORMAT + DỌN DẸP
 
 1. Sau khi tất cả các bước đã xong (kể cả các item SUGGESTION đã hỏi) → tự động phát hiện và chạy format command của project: tìm trong scripts của `package.json` theo thứ tự `format` → `format:fix` → `lint:fix`. Nếu không tìm thấy → bỏ qua.
 2. Append mỗi item trong `.code-review/REPORT.md` thành 1 dòng vào `.code-review-history.jsonl` ở repo root (tạo file nếu chưa có) — mỗi dòng JSON: `{date, rule_or_source, file, status}`, đọc giá trị `Status:` cuối cùng của từng item. Làm bước này bất kể sau đó user xác nhận hay từ chối xoá — đây là bản ghi bền vững tồn tại độc lập với cả hai lựa chọn.
-3. Chạy `vcheck` (typecheck + build) trên (các) package đã bị đụng tới trong lần chạy này — fix nhiều violation qua nhiều batch rất dễ để sót một type error lẻ. Nếu vcheck báo lỗi, fix trước khi qua bước tiếp theo.
+3. Chạy `vci` (typecheck + build) trên (các) package đã bị đụng tới trong lần chạy này — fix nhiều violation qua nhiều batch rất dễ để sót một type error lẻ. Nếu vci báo lỗi, fix trước khi qua bước tiếp theo.
 4. Trước khi xoá `.code-review/` (hoặc report path đã dùng): hỏi user xác nhận — luôn mặc định là user CHƯA CHẮC đã đọc xong report; luôn hỏi, không bao giờ tự cho là đã đọc xong.
 5. User xác nhận → xoá report directory. User muốn giữ lại → để nguyên, xong.
 6. Kiểm tra `~/.claude/scripts/lint-rules/violation-history.jsonl`: nếu `rule_id` nào liên quan trong lần chạy này có tỷ lệ bị reject/skip cao qua các lần lịch sử, ghi chú vào summary cuối cùng như một ứng viên cần siết lại hoặc retire rule đó (qua `vreview --harvest` hoặc sửa trực tiếp rule).
@@ -128,4 +128,4 @@ QUY TẮC CỨNG
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Nhìn vào những gì thực sự đã fix trong lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào những gì thực sự đã fix trong lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.

@@ -13,11 +13,11 @@ Personal Claude Code skills — opinionated checklists layered on top of everyda
 | `vcook` | Implement via a 9-step checklist: branch, test-first, SDK client, review, PR | Have a plan (or a quick description), need to code |
 | `vreview` | 4-phase code review (+ optional pre-scan / lint-harvest phases) using parallel subagents + an adversarial pass | Need to review a branch/PR |
 | `vfix` | Fix issues from a `vreview` report in a fixed priority order | Have a review report that needs fixing |
-| `vcheck` | Typecheck + build in parallel across a JS/TS workspace (any package manager) | Quick check before committing |
-| `vissues` | Create/update a GitHub epic + sub-issues from a plan | Need to track a plan on GitHub |
+| `vci` | Typecheck + build in parallel across a JS/TS workspace (any package manager) | Quick check before committing |
+| `vtickets` | Create/update a GitHub epic + sub-issues from a plan | Need to track a plan on GitHub |
 | `vdesign` | Redesign UI/UX to a personal aesthetic (audit-driven, no depth flags; `--wow` for Awwwards-tier creative freedom) | Need to upgrade a page/component's UI |
-| `vrules` | Extract patterns from a bot's PR review → propose a new CLAUDE.md rule | A bot just finished reviewing a PR |
-| `vmigrate-rollback` | Roll back a migration on a local DB + delete its tracking record | Need to undo a migration locally |
+| `vlearn` | Extract patterns from a bot's PR review → propose a new CLAUDE.md rule | A bot just finished reviewing a PR |
+| `vrollback` | Roll back a migration on a local DB + delete its tracking record | Need to undo a migration locally |
 
 Full detail lives in each `skills/<name>/SKILL.md`.
 
@@ -32,13 +32,13 @@ flowchart LR
     review --> fix["/vfix"]
     fix --> ship(["ship"])
 
-    plan -. track on GitHub .-> issues["/vissues"]
-    cook -. before opening PR .-> check["/vcheck"]
+    plan -. track on GitHub .-> issues["/vtickets"]
+    cook -. before opening PR .-> check["/vci"]
     cook -. UI work .-> design["/vdesign"]
-    review -. after a bot review .-> rules["/vrules"]
+    review -. after a bot review .-> rules["/vlearn"]
 ```
 
-`/vmigrate-rollback` runs independently whenever a local migration needs undoing — not part of this pipeline.
+`/vrollback` runs independently whenever a local migration needs undoing — not part of this pipeline.
 
 ## Use cases
 
@@ -68,19 +68,19 @@ flowchart LR
 
 **Make sure the whole monorepo still builds before opening a PR:**
 ```bash
-/vcheck
+/vci
 ```
 → typecheck + build every package in the workspace in parallel (background commands), auto-fixes on failure.
 
 **Track a large plan on GitHub for a PM/non-technical stakeholder:**
 ```bash
-/vissues plans/appointment-rebooking
+/vtickets plans/appointment-rebooking
 ```
 → creates an epic issue + sub-issues grouped by phase, plain non-technical language, idempotent (re-running doesn't create duplicates).
 
 **Accidentally ran the wrong migration locally:**
 ```bash
-/vmigrate-rollback 0007_add_appointment_status
+/vrollback 0007_add_appointment_status
 ```
 → auto-detects ORM/DB/container, rolls back + deletes the tracking record — local DB only, always confirms before running.
 
@@ -98,7 +98,7 @@ cd vskills
 
 Skills are symlinked, not copied — editing a `SKILL.md` in `~/.claude/skills/` or in this repo is the same file. `scripts/lint-rules/` is skipped by default: those are rules harvested from `vreview` on the author's own projects and may not fit yours. Every skill has a Vietnamese translation (`SKILL.vi.md` next to `SKILL.md`) — pick the language once at install time with `--lang`, both can't be active at once.
 
-`vreview`, `vcook`, and `vrules` read/write `~/.claude/CLAUDE.md` directly — if you don't already have one, `--with-claude-md` copies a generic starter (`claude-md/CLAUDE.md`) into place. It's copied, not symlinked, since you're expected to customize it right away; if `~/.claude/CLAUDE.md` already exists, install.sh warns and leaves it untouched.
+`vreview`, `vcook`, and `vlearn` read/write `~/.claude/CLAUDE.md` directly — if you don't already have one, `--with-claude-md` copies a generic starter (`claude-md/CLAUDE.md`) into place. It's copied, not symlinked, since you're expected to customize it right away; if `~/.claude/CLAUDE.md` already exists, install.sh warns and leaves it untouched.
 
 ## How to use
 
@@ -125,19 +125,19 @@ I have a coding task
 │  └─ /vfix
 │
 ├─ "Need typecheck + build before committing"
-│  └─ /vcheck
+│  └─ /vci
 │
 ├─ "Need to create/sync GitHub issues from a plan"
-│  └─ /vissues
+│  └─ /vtickets
 │
 ├─ "Need to redesign UI/UX"
 │  └─ /vdesign
 │
 ├─ "A bot just reviewed a PR, want to pull out a new rule"
-│  └─ /vrules
+│  └─ /vlearn
 │
 └─ "Need to roll back a migration locally"
-   └─ /vmigrate-rollback
+   └─ /vrollback
 ```
 
 ---

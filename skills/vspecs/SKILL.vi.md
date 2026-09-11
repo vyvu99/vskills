@@ -71,6 +71,7 @@ Sau khi user xác nhận, bắt đầu vòng lặp. Mỗi vòng:
 Sau mỗi vòng 5 case:
 - Dừng lại và chờ user quyết định từng case
 - Cập nhật trực tiếp vào file specs (Decisions, Edge Cases, Out of Scope cho case bị deferred/rejected) — không recap, không giải thích thay đổi
+- Case Open Question P1/P2 nào đã có sẵn trong file mà vòng này vẫn chưa resolve → tăng bộ đếm tồn đọng (`_(tồn đọng N lần)_`, lần tồn đọng đầu tiên bắt đầu từ 2 lần)
 - Hỏi: tiếp tục hay dừng?
 
 ---
@@ -92,6 +93,8 @@ Chỉ làm bước này sau khi user xác nhận không còn edge case nào cầ
 ---
 
 ## Bước 5 — Self-check pass
+
+Trước các check bên dưới: quét Open Questions tìm case P1/P2 nào có counter `_(tồn đọng 3 lần)_` trở lên. Với mỗi case đó, dừng lại và dùng `AskUserQuestion` với 3 lựa chọn: (a) **Resolve now** — chuyển thành Decision kèm Acceptance ngay tại đây; (b) **Won't Fix / Out of Scope** — chuyển vào `## Out of Scope`, đánh dấu đã đóng, không hỏi lại nữa; (c) **Still open** — xác nhận vẫn thực sự còn mở, reset counter. Case P0 không bị ảnh hưởng — rule 3 bên dưới đã hard-block chúng rồi.
 
 Sau khi đã điền xong Experience Specs, trước khi finalize: đọc lại toàn bộ file specs và kiểm tra:
 
@@ -141,9 +144,12 @@ Khi cần tạo file mới:
 ## Open Questions
 
 1. ...
+2. ... _(tồn đọng 2 lần)_
 ```
 
 Cột `ID` dùng lại đúng scheme Type-Number như ở Edge Cases (ví dụ: `UI-1`, `FLOW-3`) — `vplan` sẽ tham chiếu đúng giá trị này làm `[Case ID]`.
+
+Case Open Question P1/P2 sẽ có thêm `_(tồn đọng N lần)_` mỗi lần sống sót qua một lần chạy mà vẫn chưa resolve (xem Bước 3). Đến N=3, bước self-check (Bước 5) sẽ đưa case đó ra hỏi user qua `AskUserQuestion` thay vì để nó tồn đọng mãi. Case P0 không áp dụng cơ chế này — vì đã bị hard-block khi finalize rồi.
 
 ---
 
@@ -161,4 +167,4 @@ Cột `ID` dùng lại đúng scheme Type-Number như ở Edge Cases (ví dụ: 
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vcheck, vissues, vdesign, vrules, vmigrate-rollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
