@@ -14,6 +14,8 @@ You are a senior engineer implementing this task end-to-end via the mandatory 9-
 
 **BEFORE YOU START:** Create a 9-step checklist with `TodoWrite` (one item per step). After finishing each step → mark it `completed` before moving to the next. Do NOT mark completed before the work is actually done. Exception: Step 1 is a standing rule applied across every other step, not a one-time task — keep it `in_progress` until Step 9 completes, don't mark it `completed` early.
 
+If this session is interrupted, resume by reading TodoWrite's step statuses + `git status`/`git diff` against the branch created in Step 2 + (Mode A) the plan file — reconstruct which of steps 2-9 are actually done from real repo state, don't trust a stale TodoWrite status alone since code state is the source of truth.
+
 ═══════════════════════════════════════════════════════
 STEP 1: PARALLELIZE READ-ONLY WORK INTO SUBAGENTS
 ═══════════════════════════════════════════════════════
@@ -26,6 +28,8 @@ Before doing each step below, evaluate which parts are independent → delegate 
 Scope: subagents in this step are READ-ONLY (research, reading plan/codebase, reviewing against CLAUDE.md). Implementation code-writing (step 5) is NOT delegated to parallel subagents in this step — write the actual code yourself, sequentially, in this session.
 
 Purpose: reduce main-agent token usage — the main agent only synthesizes results.
+
+Every subagent spawned under this step must write its findings to `{work_context}/plans/reports/<agent-type>-<HHMMSS>-<slug>.md` before replying, per `_vskills-shared/repo-profile.md` §6 — the orchestrator reads that file back to synthesize, not just the conversational reply. This is what keeps Step 1's repeated spawns safe across a long Step 1→9 session.
 
 If genuinely parallel *implementation* work is needed (multiple independent writers touching different files/features at once, not just parallel read-only research) → each parallel writer should use its own git worktree to avoid working-tree collisions.
 
@@ -65,7 +69,7 @@ STEP 4: WRITE TEST CASES + EDGE CASES BEFORE CODING
 - **Mandatory** for API/backend logic: for every new or modified function/endpoint —
   1. List existing tests that touch the code about to change (grep test files / follow the import graph for the module).
   2. Write the new test covering happy path + edge cases (null/undefined/empty/0/negative/boundary/concurrent).
-  3. Run it and confirm it FAILS before writing the implementation — paste the failing output into the task's progress notes. A test that passes immediately is invalid — rewrite it.
+  3. Run it and confirm it FAILS before writing the implementation — paste the failing output into the TodoWrite item's note for Step 4 (or, for long output, append to `{work_context}/plans/reports/vcook-test-log-<HHMMSS>.md` and link it from the TodoWrite note). A test that passes immediately is invalid — rewrite it.
 - **Not mandatory** for pure UI (style/layout only, no business logic). If skipped → state the reason clearly in the checklist ("pure UI, skipping test-first").
 
 ═══════════════════════════════════════════════════════
@@ -138,4 +142,4 @@ Resolve the VCS profile first: read `~/.claude/skills/_vskills-shared/repo-profi
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

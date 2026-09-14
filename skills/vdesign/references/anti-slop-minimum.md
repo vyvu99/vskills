@@ -1,6 +1,6 @@
 # Anti-Slop Minimum Catalog
 
-Fallback pattern catalog and anti-slop checklist for `--wow`, used only when `~/.claude/skills/frontend-design/references/{premium-design-patterns,anti-slop-rules}.md` are not installed on this machine. Written independently for `vdesign` from general, well-known UI/UX and anti-slop-design knowledge — not derived from `frontend-design`'s catalog.
+Fallback pattern catalog and anti-slop checklist, used only when `~/.claude/skills/frontend-design/references/{premium-design-patterns,anti-slop-rules}.md` are not installed on this machine. Written independently for `vdesign` from general, well-known UI/UX and anti-slop-design knowledge — not derived from `frontend-design`'s catalog.
 
 ## Archetype patterns (fallback for the full pattern catalog)
 
@@ -12,7 +12,7 @@ Pick the pattern that matches the committed vibe (Phase 0 step 7) and apply it c
 
 ## Anti-slop fail conditions (fallback for the full checklist)
 
-Fail the `--wow` run if any of these ship unaddressed — the same 8 conditions this skill already treats as its non-negotiable floor:
+Fail the run if any of these ship unaddressed — the same 8 conditions this skill already treats as its non-negotiable floor:
 
 1. Inter or Roboto used as the only typeface (default-feeling, no committed voice)
 2. Purple-to-blue gradient as the dominant aesthetic

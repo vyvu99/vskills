@@ -14,6 +14,8 @@ Bạn là một senior engineer implement task này từ đầu đến cuối qu
 
 **TRƯỚC KHI BẮT ĐẦU:** Tạo checklist 9 bước bằng `TodoWrite` (mỗi item ứng với 1 bước). Sau khi hoàn thành mỗi bước → đánh dấu `completed` trước khi chuyển sang bước tiếp theo. KHÔNG đánh dấu completed trước khi công việc thực sự xong. Ngoại lệ: bước 1 là rule áp dụng xuyên suốt các bước khác, không phải task 1 lần — giữ `in_progress` đến khi bước 9 xong, không đánh dấu completed sớm.
 
+Nếu session bị gián đoạn, resume bằng cách đọc trạng thái các bước trong TodoWrite + `git status`/`git diff` so với branch đã tạo ở bước 2 + (Mode A) file plan — xác định lại bước nào trong 2-9 đã thực sự xong dựa trên state thật của repo, đừng tin tuyệt đối vào TodoWrite status cũ vì code state mới là nguồn sự thật.
+
 ═══════════════════════════════════════════════════════
 BƯỚC 1: SONG SONG HOÁ CÔNG VIỆC READ-ONLY VÀO SUBAGENT
 ═══════════════════════════════════════════════════════
@@ -26,6 +28,8 @@ Trước khi thực hiện mỗi bước dưới đây, đánh giá phần nào 
 Phạm vi: subagent ở bước này là READ-ONLY (research, đọc plan/codebase, review đối chiếu CLAUDE.md). Việc viết code implementation (bước 5) KHÔNG được delegate cho subagent song song ở bước này — tự viết code thật, tuần tự, trong session này.
 
 Mục đích: giảm token usage của main agent — main agent chỉ tổng hợp kết quả.
+
+Mọi subagent được spawn trong bước này PHẢI ghi findings vào `{work_context}/plans/reports/<agent-type>-<HHMMSS>-<slug>.md` trước khi trả lời, theo `_vskills-shared/repo-profile.md` §6 — orchestrator đọc lại file đó để tổng hợp, không chỉ dựa vào câu trả lời hội thoại. Đây là điều giữ cho các lần spawn lặp lại ở Bước 1 an toàn xuyên suốt một session Bước 1→9 dài.
 
 Nếu cần công việc *implementation* song song thực sự (nhiều writer độc lập chạm vào file/feature khác nhau cùng lúc, không chỉ research read-only song song) → mỗi parallel writer nên dùng git worktree riêng để tránh xung đột working-tree.
 
@@ -65,7 +69,7 @@ BƯỚC 4: VIẾT TEST CASE + EDGE CASE TRƯỚC KHI CODE
 - **Bắt buộc** với API/backend logic: với mỗi function/endpoint mới hoặc sửa đổi —
   1. Liệt kê test hiện có đang chạm vào đoạn code sắp thay đổi (grep file test / theo import graph của module).
   2. Viết test mới bao phủ happy path + edge case (null/undefined/empty/0/negative/boundary/concurrent).
-  3. Chạy test và xác nhận nó FAIL trước khi viết implementation — paste output fail vào progress notes của task. Test pass ngay lập tức là không hợp lệ — viết lại.
+  3. Chạy test và xác nhận nó FAIL trước khi viết implementation — paste output fail vào note của item TodoWrite tương ứng bước 4 (hoặc, nếu output dài, append vào `{work_context}/plans/reports/vcook-test-log-<HHMMSS>.md` rồi link từ note TodoWrite). Test pass ngay lập tức là không hợp lệ — viết lại.
 - **Không bắt buộc** với pure UI (chỉ style/layout, không business logic). Nếu bỏ qua → ghi rõ lý do trong checklist ("pure UI, skipping test-first").
 
 ═══════════════════════════════════════════════════════
@@ -138,4 +142,4 @@ Resolve VCS profile trước: đọc `~/.claude/skills/_vskills-shared/repo-prof
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Theo convention Next Steps trong `_vskills-shared/repo-profile.md` §7.

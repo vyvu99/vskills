@@ -89,4 +89,4 @@ Sau khi xóa tracking row, hỏi user có muốn xóa luôn file migration trên
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Theo convention Next Steps trong `_vskills-shared/repo-profile.md` §7.

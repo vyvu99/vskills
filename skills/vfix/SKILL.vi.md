@@ -27,7 +27,7 @@ INPUT
 THỨ TỰ XỬ LÝ (BẮT BUỘC — KHÔNG được bỏ bước, KHÔNG được chạy song song GIỮA các bước)
 ═══════════════════════════════════════════════════════
 
-Trong MỖI bước, các sub-group có thể chạy song song (ví dụ nhiều subagent cùng fix nhiều file độc lập một lúc), nhưng bước tiếp theo chỉ bắt đầu khi bước trước đã xong hoàn toàn + đã commit (nếu bước đó cần commit).
+Trong MỖI bước, các sub-group có thể chạy song song (ví dụ nhiều subagent cùng fix nhiều file độc lập một lúc — mỗi fixer chạy song song gộp lý do root-cause của mình vào nội dung commit message), nhưng bước tiếp theo chỉ bắt đầu khi bước trước đã xong hoàn toàn + đã commit (nếu bước đó cần commit).
 
 ──────────────────────────────────────────────────────
 BƯỚC 1 — SCRIPT_SCAN.json
@@ -50,12 +50,12 @@ BƯỚC 2 — Issue CRITICAL (REPORT.md)
 4. TRƯỚC khi fix, kiểm tra STOP-GATE (xem phần "DỪNG LẠI VÀ HỎI USER" bên dưới) cho từng issue trong batch.
 5. Sau khi xong một batch → verify (test/build liên quan) → commit 1 lần cho cả batch: `fix: {short batch description}` — KHÔNG commit từng issue riêng lẻ nếu chúng phụ thuộc lẫn nhau.
 6. Nếu batch thay đổi shared schema hoặc API route → chạy SDK/codegen (xem phần "SDK GENERATE").
-7. Khi quyết định outcome của từng item, ghi chú lại (fix / reject / defer) nhưng CHƯA ghi `Status:` vội. Ngay sau khi batch commit của bước này hoàn tất, đi một lượt qua từng item vừa xử lý và cập nhật dòng `Status:` của nó trong `.code-review/REPORT.md` thành `FIXED (commit <sha>)` (dùng sha commit thật của batch đó) / `REJECTED (<lý do ngắn gọn>)` / `DEFERRED (<lý do ngắn gọn>)`.
+7. Khi quyết định outcome của từng item, ghi chú lại (fix / reject / defer) nhưng CHƯA ghi `Status:` vội. Ngay sau khi **commit của riêng từng batch** hoàn tất (không phải một lần cho cả bước), đi một lượt qua từng item vừa xử lý và cập nhật dòng `Status:` của nó trong `.code-review/REPORT.md` thành `FIXED (commit <sha>)` (dùng sha commit thật của batch đó) / `REJECTED (<lý do ngắn gọn>)` / `DEFERRED (<lý do ngắn gọn>)`.
 
 ──────────────────────────────────────────────────────
 BƯỚC 3 — Issue WARNING (REPORT.md)
 ──────────────────────────────────────────────────────
-Lặp lại đúng quy trình của BƯỚC 2 (gom theo dependency → batch → stop-gate → fix → verify → commit → sdk generate nếu cần → ghi `Status:` sau khi batch commit của bước này hoàn tất) nhưng áp dụng cho phần WARNING.
+Lặp lại đúng quy trình của BƯỚC 2 (gom theo dependency → batch → stop-gate → fix → verify → commit → sdk generate nếu cần → ghi `Status:` ngay sau khi **commit của riêng từng batch** hoàn tất, không phải một lần cho cả bước) nhưng áp dụng cho phần WARNING.
 
 ──────────────────────────────────────────────────────
 BƯỚC 4 — CROSS-GROUP ISSUES (REPORT.md)
@@ -65,7 +65,7 @@ BƯỚC 4 — CROSS-GROUP ISSUES (REPORT.md)
 2. Mỗi cross-group issue là một batch riêng (vì theo định nghĩa nó đã trải rộng nhiều file/group).
 3. Fix → verify TẤT CẢ file liên quan ở CẢ HAI phía → commit riêng: `fix: {cross-group issue description}`.
 4. Nếu một trong hai phía thay đổi shared schema hoặc API route → chạy SDK/codegen (xem phần "SDK GENERATE").
-5. Khi quyết định outcome của item, ghi chú lại nhưng CHƯA ghi `Status:` vội. Ngay sau khi commit của issue này hoàn tất, cập nhật dòng `Status:` của nó trong `.code-review/REPORT.md` thành `FIXED (commit <sha>)` / `REJECTED (<lý do ngắn gọn>)` / `DEFERRED (<lý do ngắn gọn>)`.
+5. Khi quyết định outcome của item, ghi chú lại nhưng CHƯA ghi `Status:` vội. Ngay sau khi **commit của riêng từng batch** hoàn tất (không phải một lần cho cả bước), cập nhật dòng `Status:` của nó trong `.code-review/REPORT.md` thành `FIXED (commit <sha>)` / `REJECTED (<lý do ngắn gọn>)` / `DEFERRED (<lý do ngắn gọn>)`.
 
 ──────────────────────────────────────────────────────
 BƯỚC 5 — Issue SUGGESTION (REPORT.md)
@@ -128,4 +128,4 @@ QUY TẮC CỨNG
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Nhìn vào những gì thực sự đã fix trong lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào những gì thực sự đã fix trong lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn. (Xem convention chung tại `_vskills-shared/repo-profile.md` §7.)

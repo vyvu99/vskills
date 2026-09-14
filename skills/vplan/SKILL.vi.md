@@ -26,7 +26,7 @@ Nếu đường dẫn không tồn tại → báo lỗi và dừng. **Không t�
 ## Bước 1 — Đọc specs + Scout codebase (trước khi làm bất cứ gì khác)
 
 1. Đọc TOÀN BỘ file specs được chỉ định — bảng Decisions, Edge Cases, Experience Specs.
-2. Scout codebase liên quan đến feature này TRƯỚC khi phân tích: routes, services, schemas, UI components, seed data, các file migration hiện có.
+2. Scout codebase liên quan đến feature này TRƯỚC khi phân tích: routes, services, schemas, UI components, seed data, các file migration hiện có. Nếu việc scout này được delegate cho subagent, findings của nó ghi ra `plans/reports/` theo `_vskills-shared/repo-profile.md` §6.
 3. Đọc các file khác trong `plans/specs/` (nếu có) để tránh xung đột với specs của các feature liên quan.
 4. Xác định `[feature-slug]` (từ tên file specs hoặc tên feature, dạng kebab-case).
 
@@ -35,6 +35,8 @@ Nếu đường dẫn không tồn tại → báo lỗi và dừng. **Không t�
 ## Bước 2 — So sánh từng case: specs vs code
 
 Với MỌI case trong specs (mỗi dòng của bảng Decisions, mỗi Edge Case) — **tự mình verify bằng cách đọc code**, không được đoán:
+
+Ngay khi verdict PASS/FAIL/MISSING của một case được xác định, ghi luôn dòng đó vào bảng Case Summary của `plan.md` đang được dựng dở (tạo file này ngay từ đầu Bước 2 nếu chưa có) thay vì giữ toàn bộ so sánh trong bộ nhớ hội thoại tới tận Bước 4. Cột Handling Phase / Effort cứ để trống — Bước 4 sẽ điền sau khi phase được gán.
 
 **Format cho mỗi case:**
 
@@ -59,7 +61,7 @@ Dùng tư duy edge-case tương tự vspecs (input rỗng/null, concurrency, ph�
 
 ## Bước 4 — Sinh plan
 
-Sinh `plan.md` tổng quan + mỗi phase một file `phase-XX-*.md` chi tiết, theo đúng khung mẫu literal bên dưới.
+Sinh `plan.md` tổng quan + mỗi phase một file `phase-XX-*.md` chi tiết, theo đúng khung mẫu literal bên dưới. Bảng Case Summary đã được khởi tạo từ Bước 2 — bước này chỉ còn điền bảng Phases, Key Dependencies, Risks/Rollback, và từng phase file, cộng thêm cột Handling Phase / Effort còn để trống từ Bước 2.
 
 **Khung mẫu `plan.md`:**
 
@@ -157,13 +159,13 @@ Sau đó handoff — dùng `AskUserQuestion` để đề xuất: (a) implement n
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Theo đúng convention Next Steps ở `_vskills-shared/repo-profile.md` §7.
 
 ---
 
 ## Hard rules
 
-- KHÔNG BAO GIỜ viết "cần verify", "chưa rõ", "có thể" cho bất kỳ case nào nếu code có thể đọc được và trả lời được câu hỏi đó — phải tự đọc code trước khi kết luận status.
+- Xem `_vskills-shared/repo-profile.md` §8 (Verification honesty rule).
 - Nếu đã tìm kỹ mà không thấy code liên quan → nêu rõ "đã tìm tại {path/pattern}, không thấy" thay vì để trống.
 - Migration mặc định gộp vào duy nhất Phase 1 — chỉ tách sang phase riêng khi migration đó thực sự độc lập (không chung table/key) với các migration khác ở Phase 1, và phải nêu rõ điều đó.
 - Mỗi mục trong Implementation Steps phải có File + Logic + Validate đầy đủ, cụ thể — KHÔNG BAO GIỜ viết chung chung kiểu "fix cho đúng" hay "test lại".

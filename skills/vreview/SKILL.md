@@ -159,7 +159,7 @@ When unioning multiple branches, note which branch each file came from:
 
 1.2 Read the rules
 
-Read the ENTIRE ~/.claude/CLAUDE.md. Extract EVERY rule into a numbered list.
+Read the ENTIRE ~/.claude/CLAUDE.md. Extract EVERY rule into a numbered list. Immediately append the RULES block to `.code-review/CONTEXT.txt` (create the file with its header block first — BRANCHES REVIEWED/TOTAL CHANGED FILES/PROFILE/INCREMENTAL, from 1.1 — if this run hasn't written it yet) rather than holding it until 1.5.
 
 1.3 Build the dependency graph
 
@@ -227,9 +227,11 @@ Group files based on the following principles:
 - Each group is capped at ~400 total changed lines (sum of the changed-line counts recorded in 1.1), not a flat file count — sizes 5 tiny files and 1 huge file appropriately instead of treating them as equal-sized work units
 - Isolated files (only config, type, or constant changes) → their own group
 
-1.5 Phase 1 output
+As soon as a group's file list + dependency graph (from 1.3/1.3d) is finalized, immediately append its CHANGED FILES + DEPENDENCIES TO READ block (format in 1.5) to `.code-review/CONTEXT.txt` — don't hold it until every group is grouped.
 
-Write into .code-review/CONTEXT.txt:
+1.5 CONTEXT.txt format reference
+
+The blocks below are written incrementally as each becomes ready (header block once 1.1 resolves it, RULES block at 1.2, each GROUP block as it's finalized in 1.4) — not saved up and dumped in one shot at the end of Phase 1. Full format:
 
 ────────────────────────────────────────
 CONTEXT
@@ -275,6 +277,8 @@ GROUP B: ...
 ═══════════════════════════════════════════════════════
 PHASE 2: SUBAGENT REVIEW (In parallel, each subagent = 1 group)
 ═══════════════════════════════════════════════════════
+
+Before spawning, check whether `.code-review/{GROUP_NAME}.txt` already exists and contains a REVIEW header — if so, skip spawning a subagent for that group and treat its file as this run's output.
 
 Create a subagent for EACH group. Each subagent receives the prompt below (fill in the group name).
 
@@ -421,7 +425,7 @@ Purpose: ADVERSARIAL.txt is a single subagent's single pass — nothing verifies
 For EACH "NEW ISSUE" in ADVERSARIAL.txt, AND for EACH [CRITICAL] item in REPORT.md's CRITICAL ISSUES section (100% of Phase 2/3's CRITICAL findings, not just adversarial's):
   1. Main agent (not a subagent) reads the cited file:line directly.
   2. Confirm the code at that location actually matches the claimed issue — the attack vector is real and the line does what's claimed.
-  3. Match confirmed → merge into REPORT.md as normal.
+  3. Match confirmed → update REPORT.md immediately after each confirmed match; do not accumulate all matches before writing.
   4. Match fails (line doesn't exist, code doesn't match the claim, attack vector doesn't apply) → drop the finding, note it in REPORT.md's CONFIDENCE NOTES: "Adversarial finding '{title}' dropped — {reason}".
 
 This is a read-only spot-check (no re-analysis, no new grep) — cost is a handful of Read calls, not a new agent spawn.
@@ -451,7 +455,7 @@ Read `references/lint-harvest-prompt.md` and use its content **verbatim** as the
 ──────────────────────────────────────────────────────
 
 Main agent after the subagent completes:
-- Read the subagent's terminal output
+- Read `.code-review/LINT_HARVEST.txt`
 - Append to .code-review/REPORT.md:
 
 ## Lint Harvest
@@ -481,4 +485,4 @@ GENERAL RULES
 NEXT STEPS
 ═══════════════════════════════════════════════════════
 
-Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly. (see the shared convention in `_vskills-shared/repo-profile.md` §7)

@@ -55,7 +55,7 @@ Với MỖI package trong danh sách, spawn một background command, bọc tron
 - pnpm + workspace, không có script `typecheck` → `{ time timeout 600s pnpm --filter <package> exec tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &` (mặc định hiện tại, y hệt)
 - npm + single-package → `{ time timeout 600s npm exec -- tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &`
 
-Spawn tất cả package trước, rồi mới `wait` — KHÔNG chạy tuần tự từng cái một.
+Spawn tất cả package trước, rồi mới `wait` — KHÔNG chạy tuần tự từng cái một. Nếu resume sau khi bị gián đoạn, tái dùng `/tmp/tsc-<sanitized-package>.log` sẵn có (nếu còn fresh) thay vì spawn lại check cho package đó.
 
 Sau `wait`, đọc từng `/tmp/tsc-<sanitized-package>.log`:
 - Không có lỗi → báo pass, kèm wall-time mà `time` in ở cuối log
@@ -76,7 +76,7 @@ Tương tự bước 1, spawn một background command cho mỗi package, bọc 
 
 `<build script>` = script `build` khai báo của package đó (Bước -1 — không có fallback raw; package không có script `build` thì bị skip, không chạy bằng lệnh thay thế). Ví dụ minh hoạ: pnpm + workspace → `{ time timeout 600s pnpm --filter <package> build ; } > /tmp/build-<sanitized-package>.log 2>&1 &` (mặc định hiện tại, y hệt).
 
-Spawn tất cả → `wait` → parse log từng package (pass/fail, kèm wall-time). Package fail → fix, recheck chỉ package đó.
+Spawn tất cả → `wait` → parse log từng package (pass/fail, kèm wall-time). Package fail → fix, recheck chỉ package đó. Nếu resume sau khi bị gián đoạn, tái dùng `/tmp/build-<sanitized-package>.log` sẵn có (nếu còn fresh) thay vì spawn lại check cho package đó.
 
 ## Bước 2.5 — Lint song song
 
@@ -88,7 +88,7 @@ Với MỖI package trong danh sách, spawn một background command:
 timeout 600s <pm workspace/root exec template từ Bước -1> <lint cmd> > /tmp/lint-<sanitized-package>.log 2>&1 &
 ```
 
-Spawn tất cả → `wait` → parse log từng package (pass/fail). Package fail → fix, recheck chỉ package đó — quy tắc giống Bước 1-2.
+Spawn tất cả → `wait` → parse log từng package (pass/fail). Package fail → fix, recheck chỉ package đó — quy tắc giống Bước 1-2. Nếu resume sau khi bị gián đoạn, tái dùng `/tmp/lint-<sanitized-package>.log` sẵn có (nếu còn fresh) thay vì spawn lại check cho package đó.
 
 ## Bước 3 — Format
 
@@ -116,4 +116,4 @@ Thử lần lượt, dừng ở lựa chọn đầu tiên áp dụng được:
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Theo convention Next Steps trong `_vskills-shared/repo-profile.md` §7.

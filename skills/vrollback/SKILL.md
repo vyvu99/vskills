@@ -89,4 +89,4 @@ After deleting the tracking row, ask the user whether to also delete the migrati
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

@@ -159,7 +159,7 @@ Khi union nhiều branch, ghi chú file đó đến từ branch nào:
 
 1.2 Đọc rules
 
-Đọc TOÀN BỘ ~/.claude/CLAUDE.md. Trích XUẤT MỖI rule vào một danh sách đánh số.
+Đọc TOÀN BỘ ~/.claude/CLAUDE.md. Trích XUẤT MỖI rule vào một danh sách đánh số. Append ngay block RULES vào `.code-review/CONTEXT.txt` (tạo file kèm header block trước — BRANCHES REVIEWED/TOTAL CHANGED FILES/PROFILE/INCREMENTAL, từ 1.1 — nếu lần chạy này chưa ghi) thay vì giữ tới 1.5.
 
 1.3 Xây dựng dependency graph
 
@@ -227,9 +227,11 @@ Group file theo các nguyên tắc sau:
 - Mỗi group giới hạn ở ~400 dòng thay đổi tổng cộng (tổng số dòng thay đổi ghi nhận ở 1.1), không phải flat file count — để 5 file nhỏ và 1 file khổng lồ được tính work unit khác nhau thay vì coi như bằng nhau
 - File độc lập (chỉ thay đổi config, type, hoặc constant) → group riêng
 
-1.5 Output Phase 1
+Ngay khi file list + dependency graph (từ 1.3/1.3d) của một group được chốt, append ngay block CHANGED FILES + DEPENDENCIES TO READ của group đó (định dạng ở 1.5) vào `.code-review/CONTEXT.txt` — không giữ tới khi tất cả group được group xong.
 
-Ghi vào .code-review/CONTEXT.txt:
+1.5 Định dạng tham chiếu CONTEXT.txt
+
+Các block bên dưới được ghi tăng dần ngay khi sẵn sàng (header block ngay khi 1.1 resolve xong, block RULES ở 1.2, mỗi block GROUP ngay khi được chốt ở 1.4) — không dồn lại ghi một lần ở cuối Phase 1. Định dạng đầy đủ:
 
 ────────────────────────────────────────
 CONTEXT
@@ -275,6 +277,8 @@ GROUP B: ...
 ═══════════════════════════════════════════════════════
 PHASE 2: SUBAGENT REVIEW (Chạy song song, mỗi subagent = 1 group)
 ═══════════════════════════════════════════════════════
+
+Trước khi spawn, check xem `.code-review/{GROUP_NAME}.txt` đã tồn tại và chứa header REVIEW chưa — nếu có, bỏ qua spawn subagent cho group đó và coi file hiện có là output của lần chạy này.
 
 Tạo 1 subagent cho MỖI group. Mỗi subagent nhận prompt bên dưới (điền tên group).
 
@@ -421,7 +425,7 @@ Mục đích: ADVERSARIAL.txt là 1 pass duy nhất của 1 subagent — không 
 Với MỖI "NEW ISSUE" trong ADVERSARIAL.txt, VÀ MỖI item [CRITICAL] trong section CRITICAL ISSUES của REPORT.md (100% CRITICAL finding từ Phase 2/3, không chỉ của adversarial):
   1. Main agent (không phải subagent) đọc trực tiếp file:line được trích dẫn.
   2. Xác nhận code tại vị trí đó thực sự khớp với vấn đề được nêu — attack vector là thật và dòng code làm đúng như bị cáo buộc.
-  3. Khớp → merge vào REPORT.md như bình thường.
+  3. Khớp → cập nhật REPORT.md ngay sau mỗi match được xác nhận; không gom hết rồi mới ghi.
   4. Không khớp (dòng không tồn tại, code không khớp claim, attack vector không áp dụng được) → bỏ finding đó, ghi chú vào CONFIDENCE NOTES của REPORT.md: "Adversarial finding '{title}' dropped — {lý do}".
 
 Đây là spot-check read-only (không phân tích lại, không grep mới) — chi phí chỉ vài lệnh Read, không phải spawn agent mới.
@@ -451,7 +455,7 @@ PROMPT CHO SUBAGENT LINT HARVEST:
 ──────────────────────────────────────────────────────
 
 Main agent sau khi subagent hoàn thành:
-- Đọc output terminal của subagent
+- Đọc `.code-review/LINT_HARVEST.txt`
 - Append vào .code-review/REPORT.md:
 
 ## Lint Harvest
@@ -481,4 +485,4 @@ QUY TẮC CHUNG
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn. (xem convention chung ở `_vskills-shared/repo-profile.md` §7)

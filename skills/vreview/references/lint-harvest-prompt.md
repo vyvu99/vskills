@@ -135,7 +135,7 @@ done
 SAVE all scripts (new + updated) to: ~/.claude/scripts/lint-rules/rules/{filename}
 Chmod: chmod +x ~/.claude/scripts/lint-rules/rules/{filename}
 
-FINAL OUTPUT — print to terminal:
+Write into .code-review/LINT_HARVEST.txt:
 LINT HARVEST SUMMARY:
   Semantic issues processed: {N}
   Script-confirmed rules reviewed: {M}

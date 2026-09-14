@@ -1,6 +1,6 @@
 # Catalog Anti-Slop Tối Thiểu
 
-Catalog pattern và checklist anti-slop dự phòng cho `--wow`, chỉ dùng khi `~/.claude/skills/frontend-design/references/{premium-design-patterns,anti-slop-rules}.md` chưa được cài trên máy này. Viết độc lập cho `vdesign` từ kiến thức UI/UX và anti-slop-design phổ thông, đã được công nhận rộng rãi — không lấy từ catalog của `frontend-design`.
+Catalog pattern và checklist anti-slop dự phòng, chỉ dùng khi `~/.claude/skills/frontend-design/references/{premium-design-patterns,anti-slop-rules}.md` chưa được cài trên máy này. Viết độc lập cho `vdesign` từ kiến thức UI/UX và anti-slop-design phổ thông, đã được công nhận rộng rãi — không lấy từ catalog của `frontend-design`.
 
 ## Archetype pattern (dự phòng cho catalog pattern đầy đủ)
 
@@ -12,7 +12,7 @@ Chọn pattern khớp với vibe đã chốt (Phase 0 step 7) và áp dụng nh�
 
 ## Điều kiện fail anti-slop (dự phòng cho checklist đầy đủ)
 
-Fail run `--wow` nếu bất kỳ điều nào sau còn tồn tại khi báo done — cùng 8 điều kiện skill này đã coi là sàn bắt buộc:
+Fail run nếu bất kỳ điều nào sau còn tồn tại khi báo done — cùng 8 điều kiện skill này đã coi là sàn bắt buộc:
 
 1. Inter hoặc Roboto là typeface duy nhất (cảm giác mặc định, chưa chốt giọng riêng)
 2. Gradient tím-xanh là thẩm mỹ chủ đạo

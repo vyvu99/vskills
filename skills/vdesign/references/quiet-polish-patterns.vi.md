@@ -1,6 +1,6 @@
 # Quiet Polish Patterns (Tinh Chỉnh Tĩnh Lặng)
 
-Một tier pattern cho `--wow`, nằm giữa mặc định B2B phẳng và catalog Awwwards ồn ào (`premium-design-patterns.md`). Dùng khi vibe đã chốt cần sự ấm áp/thân thiện/tinh tế thay vì táo bạo — form sức khỏe/giáo dục/consumer, luồng onboarding, khảo sát — không phải hero landing page. Luôn đọc và merge thêm cùng catalog đầy đủ đang áp dụng (`premium-design-patterns.md` hoặc archetype của `anti-slop-minimum.vi.md`) — đây là bổ sung thường trực, không phải dự phòng.
+Một tier pattern cho khi Design Brief cần sự ấm áp hơn là táo bạo, nằm giữa mặc định thuần chức năng và catalog Awwwards ồn ào (`premium-design-patterns.md`). Dùng khi brief cần sự ấm áp/thân thiện/tinh tế thay vì táo bạo — form sức khỏe/giáo dục/consumer, luồng onboarding, khảo sát — không phải hero landing page. Luôn đọc và merge thêm cùng catalog đầy đủ đang áp dụng (`premium-design-patterns.md` hoặc archetype của `anti-slop-minimum.vi.md`) — đây là bổ sung thường trực, không phải dự phòng.
 
 Khoảng trống mà file này vá: catalog ồn ào giả định "ấn tượng hơn = effect to hơn" (glassmorphism panel, particle explosion, kinetic type). Quiet polish giả định "ấn tượng hơn = được cân nhắc kỹ hơn" — những nước đi nhỏ, tiết chế, mang cảm giác con người, đọc ra như sự chăm chút, không phải trang trí vì trang trí.
 
@@ -40,6 +40,6 @@ Khoảng trống mà file này vá: catalog ồn ào giả định "ấn tượn
 
 ## Khi nào dùng tier này thay vì catalog ồn ào
 
-- Vibe là Soft Neumorphic / Organic Asymmetric / Maximal Minimal / Authentic Humanist / Flow-First System → kéo chủ yếu từ đây.
-- Vibe là Neo-Brutalist / Chromatic Dopamine / Kinetic-Motion-First / Spatial 3D → kéo chủ yếu từ `premium-design-patterns.md`, dùng tier này rất hạn chế nếu có (1 icon anchor vẫn có thể hợp; tinted sub-card thường không khớp vibe brutalist).
+- Vibe đã chốt nghiêng về ấm áp/tiết chế/nhân bản — shadow mềm, hình khối bo tròn, đường cong hữu cơ, một điểm nhấn tĩnh lặng duy nhất, flow dẫn dắt theo hành trình → kéo chủ yếu từ đây.
+- Vibe đã chốt nghiêng về táo bạo/đồ họa/năng lượng cao — đường nét dày và contrast thô, màu saturated là điểm nhấn chính, motion mạnh, chiều sâu spatial/3D → kéo chủ yếu từ `premium-design-patterns.md`, dùng tier này rất hạn chế nếu có (1 icon anchor vẫn có thể hợp; tinted sub-card thường không khớp vibe táo bạo/đồ họa).
 - Dù chọn nhánh nào: không bao giờ kết hợp quá 2-3 pattern của tier này trong 1 view — quiet polish mất tác dụng nếu mọi thứ đều có tint, chip, và sparkle cùng lúc.
