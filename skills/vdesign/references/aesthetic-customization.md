@@ -84,6 +84,7 @@ Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 
     - *Experimental/bold* — pushes norms, unexpected choices, genuine creative freedom, may depart from the existing system entirely
     - *Functional/minimalist* — content-first, no decoration beyond what clarity needs
     - *Trend-forward* — actively pulls from current (2025-2026) real-world design trends
+    - *Game-inspired/Arcade* — HUD-style panels, glow/neon accents, chunky tactile feedback (squash/bounce on press), weighty satisfying motion; art direction borrowed from game UI, not gamification mechanics (no points/levels/streaks added)
 
 ## Round 5 — Content & States
 
@@ -105,7 +106,7 @@ Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 
 
 ## What the answers drive
 
-- **Domain Research** (Phase 0, next step) runs only when it earns its cost: criterion 14 answered *Trend-forward* or *Experimental/bold*, or the user's own answers elsewhere explicitly invoke "what's current right now." *Brand-centric* or *Functional/minimalist* skip it — there's nothing live to ground those in, use the answers directly.
+- **Domain Research** (Phase 0, next step) runs only when it earns its cost: criterion 14 answered *Trend-forward*, *Experimental/bold*, or *Game-inspired/Arcade*, or the user's own answers elsewhere explicitly invoke "what's current right now." *Brand-centric* or *Functional/minimalist* skip it — there's nothing live to ground those in, use the answers directly.
 - **Phase 3 Fix** executes the Design Brief (see below), not a flag. Every place the old `--wow` flag used to unlock something (new brand colors, new dependencies, decorative motion, structural layout changes) is now unlocked or not by the matching criterion answer above, per-run, explicit — never inferred.
 - Hard technical rules (accessibility, no tech-stack migration, no logic/API changes, GPU-safe motion) are never affected by any answer here — they are safety/engineering constraints, not aesthetic ones.
 

@@ -84,6 +84,7 @@ Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Desi
     - *Experimental/bold* — vượt chuẩn, lựa chọn bất ngờ, tự do sáng tạo thật sự, có thể tách hẳn khỏi hệ thống hiện có
     - *Functional/minimalist* — content-first, không trang trí ngoài những gì rõ ràng cần
     - *Trend-forward* — chủ động lấy từ trào lưu thiết kế thật hiện hành (2025-2026)
+    - *Game-inspired/Arcade* — panel kiểu HUD, glow/neon accent, phản hồi tactile chunky (squash/bounce khi bấm), motion nặng-đầm-thoả mãn; art direction mượn từ game UI, không phải cơ chế gamification (không thêm điểm/level/streak)
 
 ## Vòng 5 — Nội Dung & State
 
@@ -105,7 +106,7 @@ Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Desi
 
 ## Câu trả lời dẫn tới gì
 
-- **Domain Research** (Phase 0, bước sau) chỉ chạy khi đáng chi phí: tiêu chí 14 trả lời *Trend-forward* hoặc *Experimental/bold*, hoặc các câu trả lời khác của user tường minh gọi tới "cái gì đang thật sự hiện hành". *Brand-centric* hoặc *Functional/minimalist* bỏ qua bước này — không có gì sống để lấy làm căn cứ, dùng thẳng các câu trả lời.
+- **Domain Research** (Phase 0, bước sau) chỉ chạy khi đáng chi phí: tiêu chí 14 trả lời *Trend-forward*, *Experimental/bold*, hoặc *Game-inspired/Arcade*, hoặc các câu trả lời khác của user tường minh gọi tới "cái gì đang thật sự hiện hành". *Brand-centric* hoặc *Functional/minimalist* bỏ qua bước này — không có gì sống để lấy làm căn cứ, dùng thẳng các câu trả lời.
 - **Phase 3 Fix** thực thi Design Brief (xem bên dưới), không phải 1 flag. Mọi chỗ flag `--wow` cũ từng mở khóa (màu brand mới, dependency mới, motion trang trí, đổi cấu trúc layout) giờ được mở hay không tùy vào tiêu chí tương ứng ở trên, theo từng lần chạy, tường minh — không bao giờ suy đoán.
 - Hard rule kỹ thuật (accessibility, không đổi tech stack, không phá logic/API, motion GPU-safe) không bao giờ bị ảnh hưởng bởi câu trả lời nào ở đây — đó là ràng buộc an toàn/kỹ thuật, không phải thẩm mỹ.
 
