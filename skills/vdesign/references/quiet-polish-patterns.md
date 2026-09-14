@@ -1,6 +1,6 @@
 # Quiet Polish Patterns
 
-A pattern tier for `--wow` that sits between the flat B2B default and the loud Awwwards catalog (`premium-design-patterns.md`). Use when the committed vibe calls for warmth/friendliness/refinement rather than boldness — a wellness/education/consumer-health form, an onboarding flow, a survey — not a landing-page hero. Always read and merge alongside whichever full catalog applies (`premium-design-patterns.md` or `anti-slop-minimum.md`'s archetypes) — this is a permanent supplement, not a fallback.
+A pattern tier for when the Design Brief calls for warmth over boldness, sitting between a plain functional default and the loud Awwwards catalog (`premium-design-patterns.md`). Use when the brief calls for warmth/friendliness/refinement rather than boldness — a wellness/education/consumer-health form, an onboarding flow, a survey — not a landing-page hero. Always read and merge alongside whichever full catalog applies (`premium-design-patterns.md` or `anti-slop-minimum.md`'s archetypes) — this is a permanent supplement, not a fallback.
 
 The gap this closes: the loud catalog assumes "more impressive = bigger effect" (glassmorphism panels, particle explosions, kinetic type). Quiet polish assumes "more impressive = more considered" — small, restrained, human-feeling moves that read as care, not decoration for its own sake.
 
@@ -40,6 +40,6 @@ A static reference image (mockup, competitor screenshot, AI-generated concept) i
 
 ## When to reach for this tier vs. the loud catalog
 
-- Vibe is Soft Neumorphic / Organic Asymmetric / Maximal Minimal / Authentic Humanist / Flow-First System → pull primarily from here.
-- Vibe is Neo-Brutalist / Chromatic Dopamine / Kinetic-Motion-First / Spatial 3D → pull primarily from `premium-design-patterns.md`, use this tier sparingly if at all (a single icon anchor can still work; tinted sub-cards usually don't fit a brutalist vibe).
+- Committed vibe leans warm/restrained/human — soft shadows, rounded forms, organic curves, one calm focal element, journey-driven flow → pull primarily from here.
+- Committed vibe leans bold/graphic/high-energy — thick lines and raw contrast, saturated color as the point, heavy motion, spatial/3D depth → pull primarily from `premium-design-patterns.md`, use this tier sparingly if at all (a single icon anchor can still work; tinted sub-cards usually don't fit a bold/graphic vibe).
 - Either way: never combine more than 2-3 of these patterns in one view — quiet polish loses its effect if everything gets a tint, a chip, and a sparkle at once.

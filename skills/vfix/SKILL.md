@@ -1,6 +1,6 @@
 ---
 name: vfix
-description: "Fix issues in a fixed priority order: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (ask per item). Consumes vreview output (`.code-review/`) by default. Root-cause diagnosis via the underlying `fix` skill — vfix only decides priority order + stop-gate + auto sdk-generate/format."
+description: "Fix issues in a fixed priority order: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (ask per item). Consumes vreview output (`.code-review/`) by default. Root-cause diagnosis via the underlying `fix` skill — vfix owns priority order, batching, stop-gate, verify/commit per batch, and wrap-up (sdk-generate/format/vci/history log)."
 argument-hint: "[path to report dir, default .code-review/]"
 user-invocable: true
 disable-model-invocation: true
@@ -27,7 +27,7 @@ INPUT
 PROCESSING ORDER (MANDATORY — do NOT skip steps, do NOT parallelize BETWEEN steps)
 ═══════════════════════════════════════════════════════
 
-Within EACH step, sub-groups may be parallelized (e.g. multiple subagents fixing multiple independent files at once), but the next step only starts once the previous step is fully done + committed (if a commit applies).
+Within EACH step, sub-groups may be parallelized (e.g. multiple subagents fixing multiple independent files at once — each parallel fixer folds its root-cause rationale into the commit message body), but the next step only starts once the previous step is fully done + committed (if a commit applies).
 
 ──────────────────────────────────────────────────────
 STEP 1 — SCRIPT_SCAN.json
@@ -50,12 +50,12 @@ STEP 2 — CRITICAL issues (REPORT.md)
 4. BEFORE fixing, check the STOP-GATE (see "STOP AND ASK THE USER" section below) for each issue in the batch.
 5. After finishing a batch → verify (relevant test/build) → commit once for the whole batch: `fix: {short batch description}` — do NOT commit issues individually if they depend on each other.
 6. If the batch changes a shared schema or API route → run SDK/codegen (see "SDK GENERATE" section).
-7. As you decide each item's outcome, note it (fix / reject / defer) but do not write `Status:` yet. Immediately after this step's batch commit completes, do one pass over every item just handled and update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` (using that batch's real commit sha) / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
+7. As you decide each item's outcome, note it (fix / reject / defer) but do not write `Status:` yet. Immediately after **each batch's own** commit completes (not once for the whole step), do one pass over every item just handled and update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` (using that batch's real commit sha) / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
 
 ──────────────────────────────────────────────────────
 STEP 3 — WARNING issues (REPORT.md)
 ──────────────────────────────────────────────────────
-Repeat the exact same process as STEP 2 (group by dependency → batch → stop-gate → fix → verify → commit → sdk generate if needed → write `Status:` after that step's batch commit completes) but for the WARNING section.
+Repeat the exact same process as STEP 2 (group by dependency → batch → stop-gate → fix → verify → commit → sdk generate if needed → write `Status:` immediately after **each batch's own** commit completes, not once for the whole step) but for the WARNING section.
 
 ──────────────────────────────────────────────────────
 STEP 4 — CROSS-GROUP ISSUES (REPORT.md)
@@ -65,7 +65,7 @@ STEP 4 — CROSS-GROUP ISSUES (REPORT.md)
 2. Each cross-group issue is its own batch (since by definition it already spans multiple files/groups).
 3. Fix → verify ALL files involved on BOTH sides → commit separately: `fix: {cross-group issue description}`.
 4. If either side touches a shared schema or API route → run SDK/codegen (see "SDK GENERATE" section).
-5. As you decide each item's outcome, note it but do not write `Status:` yet. Immediately after this issue's commit completes, update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
+5. As you decide each item's outcome, note it but do not write `Status:` yet. Immediately after **each batch's own** commit completes (not once for the whole step), update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
 
 ──────────────────────────────────────────────────────
 STEP 5 — SUGGESTION issues (REPORT.md)
@@ -121,11 +121,11 @@ HARD RULES
 - Do NOT apply SUGGESTION items on your own without asking about each one via `AskUserQuestion`.
 - Do NOT refactor code outside the scope of the issue being fixed — root-cause that exact issue, don't sneak in extra changes "while you're at it".
 - Do NOT commit issues individually within a batch that has interdependencies — commit per batch.
-- ALWAYS use `AskUserQuestion` when a STOP-GATE condition (a/b/c) matches — never decide on the user's behalf.
+- ALWAYS use `AskUserQuestion` when a STOP-GATE condition (a/b/c/d) matches — never decide on the user's behalf.
 - ALWAYS ask for confirmation before deleting `.code-review/` or the report dir that was used.
 
 ═══════════════════════════════════════════════════════
 NEXT STEPS
 ═══════════════════════════════════════════════════════
 
-Look at what was actually fixed in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Look at what was actually fixed in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly. (See the shared convention in `_vskills-shared/repo-profile.md` §7.)

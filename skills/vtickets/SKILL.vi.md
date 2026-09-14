@@ -115,7 +115,7 @@ Tìm epic theo chuỗi fallback sau, check nào rẻ nhất và đáng tin nhấ
 
 ## Bước 4 — Nội dung issue (cả epic lẫn sub-issue đều theo format này)
 
-Ngôn ngữ đơn giản, phi kỹ thuật — không tên file, không tên hàm, không tên table DB, không tên biến. Tập trung vào vấn đề mà end user gặp phải + kết quả mong muốn.
+Ngôn ngữ đơn giản, phi kỹ thuật — không tên file, không tên hàm, không tên table DB, không tên biến. Tập trung vào vấn đề mà end user gặp phải + kết quả mong muốn. Ngôn ngữ của body: resolve theo `repo-profile.md` §4 (giống cách vcook resolve cho PR body) — title luôn giữ tiếng Anh (Bước 2/3), chỉ nội dung body theo ngôn ngữ đã resolve.
 
 ```md
 ## Current problem
@@ -145,6 +145,8 @@ Cuối lần chạy, in ra 1 bảng liệt kê mọi issue đã đụng tới tr
 
 Đồng thời lưu bảng này vào `<plan-path>/issues.md`, để lần chạy sau của skill trên cùng plan có thể đọc trực tiếp thay vì phải search lại trên GitHub.
 
+Vì việc tìm/link epic và sub-issue (Bước 2-3) là idempotent và luôn suy lại state từ GitHub + `issues.md` ở mỗi lần chạy, một lần chạy bị gián đoạn sẽ tự phục hồi chỉ bằng cách chạy lại `/vtickets <plan-path>` trên cùng plan directory — không cần quy trình recovery riêng.
+
 ---
 
 ## Hard rules
@@ -163,4 +165,4 @@ Cuối lần chạy, in ra 1 bảng liệt kê mọi issue đã đụng tới tr
 
 ## Bước tiếp theo
 
-Nhìn vào kết quả thực tế của lần chạy này và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn.
+Theo convention Next Steps trong `_vskills-shared/repo-profile.md` §7.

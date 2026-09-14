@@ -26,7 +26,7 @@ If the path doesn't exist → report the error and stop. **Do not create the spe
 ## Step 1 — Read specs + Scout the codebase (before anything else)
 
 1. Read the ENTIRE specified specs file — Decisions table, Edge Cases, Experience Specs.
-2. Scout the codebase relevant to this feature BEFORE analyzing: routes, services, schemas, UI components, seed data, existing migration files.
+2. Scout the codebase relevant to this feature BEFORE analyzing: routes, services, schemas, UI components, seed data, existing migration files. If this scouting is delegated to a subagent, its findings write to `plans/reports/` per `_vskills-shared/repo-profile.md` §6.
 3. Read other files in `plans/specs/` (if any) to avoid conflicts with specs of related features.
 4. Determine the `[feature-slug]` (from the specs file name or feature name, kebab-case).
 
@@ -35,6 +35,8 @@ If the path doesn't exist → report the error and stop. **Do not create the spe
 ## Step 2 — Compare each case: specs vs code
 
 For EVERY case in the specs (each row of the Decisions table, each Edge Case) — **verify it yourself by reading the code**, don't guess:
+
+As each case's PASS/FAIL/MISSING verdict is determined, append its row directly to a `plan.md` Case Summary table under construction (create the file at the start of Step 2 if it doesn't exist yet) rather than holding the full comparison in conversation memory until Step 4. Leave the Handling Phase / Effort columns blank for now — Step 4 fills those in once phases are assigned.
 
 **Format for each case:**
 
@@ -59,7 +61,7 @@ Using edge-case thinking similar to vspecs (empty/null input, concurrency, permi
 
 ## Step 4 — Generate the plan
 
-Generate the overview `plan.md` + one detailed `phase-XX-*.md` per phase, using the literal skeletons below.
+Generate the overview `plan.md` + one detailed `phase-XX-*.md` per phase, using the literal skeletons below. The Case Summary table was already started during Step 2 — this step fills in the Phases table, Key Dependencies, Risks/Rollback, and each phase file, plus the Handling Phase / Effort columns left blank in Step 2.
 
 **`plan.md` skeleton:**
 
@@ -157,13 +159,13 @@ Then hand off — use `AskUserQuestion` to offer: (a) implement now via `vcook <
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.
 
 ---
 
 ## Hard rules
 
-- Never write "needs verification", "unclear", "possibly" for any case if the code can be read and answer that question — you must read the code yourself before concluding a status.
+- See `_vskills-shared/repo-profile.md` §8 (Verification honesty rule).
 - If you genuinely searched and found no related code → state clearly "searched at {path/pattern}, not found" instead of leaving it blank.
 - Migrations go into a single Phase 1 by default — only split one into its own phase when it is genuinely independent (no shared table/key) from Phase 1's other migrations, and say so explicitly.
 - Every entry in Implementation Steps must have complete, specific File + Logic + Validate — never write generic phrases like "fix it properly" or "test again".

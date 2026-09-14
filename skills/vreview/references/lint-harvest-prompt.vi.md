@@ -135,7 +135,7 @@ done
 LƯU tất cả script (mới + update) vào: ~/.claude/scripts/lint-rules/rules/{filename}
 Chmod: chmod +x ~/.claude/scripts/lint-rules/rules/{filename}
 
-OUTPUT CUỐI CÙNG — in ra terminal:
+Ghi vào .code-review/LINT_HARVEST.txt:
 LINT HARVEST SUMMARY:
   Semantic issues processed: {N}
   Script-confirmed rules reviewed: {M}

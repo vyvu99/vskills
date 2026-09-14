@@ -55,7 +55,7 @@ For EACH package in the list, spawn a background command, wrapped in `time` so t
 - pnpm + workspace, no `typecheck` script → `{ time timeout 600s pnpm --filter <package> exec tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &` (today's default, byte-identical)
 - npm + single-package → `{ time timeout 600s npm exec -- tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &`
 
-Spawn all packages first, then `wait` — do not run them sequentially one by one.
+Spawn all packages first, then `wait` — do not run them sequentially one by one. If resuming after an interruption, reuse an existing fresh `/tmp/tsc-<sanitized-package>.log` if present instead of re-spawning the check for that package.
 
 After `wait`, read each `/tmp/tsc-<sanitized-package>.log`:
 - No errors → report pass, with the wall-time `time` printed at the end of the log
@@ -76,7 +76,7 @@ Same as step 1, spawn a background command for each package, wrapped in `time`:
 
 `<build script>` = the package's declared `build` script (Step -1 — no raw fallback; a package with no `build` script is skipped, not run with a substitute). Worked example: pnpm + workspace → `{ time timeout 600s pnpm --filter <package> build ; } > /tmp/build-<sanitized-package>.log 2>&1 &` (today's default, byte-identical).
 
-Spawn all → `wait` → parse each package's log (pass/fail, with wall-time). Failing package → fix, recheck only that package.
+Spawn all → `wait` → parse each package's log (pass/fail, with wall-time). Failing package → fix, recheck only that package. If resuming after an interruption, reuse an existing fresh `/tmp/build-<sanitized-package>.log` if present instead of re-spawning the check for that package.
 
 ## Step 2.5 — Parallel lint
 
@@ -88,7 +88,7 @@ For EACH package in the list, spawn a background command:
 timeout 600s <pm workspace/root exec template from Step -1> <lint cmd> > /tmp/lint-<sanitized-package>.log 2>&1 &
 ```
 
-Spawn all → `wait` → parse each package's log (pass/fail). Failing package → fix, recheck only that package — same rules as Steps 1-2.
+Spawn all → `wait` → parse each package's log (pass/fail). Failing package → fix, recheck only that package — same rules as Steps 1-2. If resuming after an interruption, reuse an existing fresh `/tmp/lint-<sanitized-package>.log` if present instead of re-spawning the check for that package.
 
 ## Step 3 — Format
 
@@ -116,4 +116,4 @@ Try, in order, stopping at the first one that applies:
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

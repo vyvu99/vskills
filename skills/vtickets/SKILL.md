@@ -115,7 +115,7 @@ Discover the epic through this fallback chain, cheapest and most reliable check 
 
 ## Step 4 — Issue content (both epic and sub-issues follow this format)
 
-Plain, non-technical language — no file names, function names, DB table names, or variable names. Focus on the problem the end user faces + the desired outcome.
+Plain, non-technical language — no file names, function names, DB table names, or variable names. Focus on the problem the end user faces + the desired outcome. Body language: resolve per `repo-profile.md` §4 (same resolution vcook uses for the PR body) — title stays English regardless (Step 2/3), only the body content follows the resolved language.
 
 ```md
 ## Current problem
@@ -145,6 +145,8 @@ At the end of the run, print a table of every issue touched this run (epic + all
 
 Also save this same table to `<plan-path>/issues.md`, so a future re-run of this skill on the same plan can read it directly instead of re-searching GitHub.
 
+Because epic/sub-issue discovery and linking (Steps 2-3) are idempotent and re-derive state from GitHub + `issues.md` on every run, an interrupted run recovers by simply re-running `/vtickets <plan-path>` on the same plan directory — no separate recovery procedure is needed.
+
 ---
 
 ## Hard rules
@@ -163,4 +165,4 @@ Also save this same table to `<plan-path>/issues.md`, so a future re-run of this
 
 ## Next steps
 
-Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.
