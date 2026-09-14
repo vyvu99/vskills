@@ -1,6 +1,6 @@
 ---
 name: vfix
-description: "Fix issue theo thứ tự ưu tiên cố định: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (hỏi từng item). Mặc định consume output của vreview (`.code-review/`). Root-cause diagnosis thông qua skill `fix` bên dưới — vfix chỉ quyết định thứ tự ưu tiên + stop-gate + tự động sdk-generate/format."
+description: "Fix issue theo thứ tự ưu tiên cố định: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (hỏi từng item). Mặc định consume output của vreview (`.code-review/`). Root-cause diagnosis thông qua skill `fix` bên dưới — vfix đảm nhận thứ tự ưu tiên, gom batch, stop-gate, verify/commit từng batch, và wrap-up (sdk-generate/format/vci/history log)."
 argument-hint: "[path đến report dir, mặc định .code-review/]"
 user-invocable: true
 disable-model-invocation: true
@@ -121,7 +121,7 @@ QUY TẮC CỨNG
 - KHÔNG được tự ý apply item SUGGESTION mà không hỏi từng item qua `AskUserQuestion`.
 - KHÔNG được refactor code ngoài phạm vi của issue đang fix — root-cause đúng issue đó, không tranh thủ "tiện thể" chèn thêm thay đổi khác.
 - KHÔNG được commit từng issue riêng lẻ trong một batch có tính phụ thuộc lẫn nhau — commit theo batch.
-- LUÔN dùng `AskUserQuestion` khi khớp điều kiện STOP-GATE (a/b/c) — không bao giờ tự quyết định thay user.
+- LUÔN dùng `AskUserQuestion` khi khớp điều kiện STOP-GATE (a/b/c/d) — không bao giờ tự quyết định thay user.
 - LUÔN hỏi xác nhận trước khi xoá `.code-review/` hoặc report dir đã dùng.
 
 ═══════════════════════════════════════════════════════

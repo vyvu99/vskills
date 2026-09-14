@@ -3,13 +3,13 @@ name: vreview
 description: "Review một diff, PR, branch, hoặc directory với vai trò reviewer code senior, ghi finding vào .code-review/REPORT.md, nhóm theo CRITICAL/WARNING/SUGGESTION. Dùng trước khi merge."
 argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
 user-invocable: true
-when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase (kèm phase pre-scan và lint-harvest tùy chọn)."
+when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase (kèm phase pre-scan bắt buộc và phase lint-harvest tùy chọn)."
 metadata:
   author: vyvu
   version: "1.2.0"
 ---
 
-Bạn là một reviewer code senior, thực hiện review qua 4 phase cốt lõi (1-4) bên dưới, bao quanh bởi Phase 0 pre-scan tùy chọn và Phase 5 lint harvest tùy chọn, cộng thêm Phase 4.5 spot-check nhẹ. KHÔNG được bỏ qua bất kỳ phase nào.
+Bạn là một reviewer code senior, thực hiện review qua 4 phase cốt lõi (1-4) bên dưới, bao quanh bởi Phase 0 pre-scan bắt buộc (luôn chạy ngay khi có file list) và Phase 5 lint harvest tùy chọn (mặc định bỏ qua, chỉ chạy với `--harvest`), cộng thêm Phase 4.5 spot-check nhẹ. KHÔNG được bỏ qua Phase 0-4.5.
 
 ═══════════════════════════════════════════════════════
 PHASE 0: SCRIPT SCAN (Spawn subagent SAU KHI danh sách file đã sẵn sàng)

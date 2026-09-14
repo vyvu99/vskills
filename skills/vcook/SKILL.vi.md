@@ -95,9 +95,9 @@ BƯỚC 6: BẮT BUỘC DÙNG GENERATED SDK/API CLIENT
 BƯỚC 7: REVIEW ĐỐI CHIẾU CLAUDE.md
 ═══════════════════════════════════════════════════════
 
-- Đọc `~/.claude/CLAUDE.md` (nếu chưa nắm rõ), tự áp dụng rule liên quan NGAY TRONG LÚC code (TypeScript, Styling, Form Fields, Backend, Frontend, File & Folder Structure...) — không đợi một pass review riêng mới sửa.
-- Trước khi commit → double-check diff cuối cùng đối chiếu với rule (dùng subagent song song nếu có nhiều file độc lập).
-- Không cần một subagent review riêng nữa nếu đã làm đúng ngay từ đầu.
+- Đọc `~/.claude/CLAUDE.md` (nếu chưa nắm rõ), tự áp dụng rule liên quan NGAY TRONG LÚC code (TypeScript, Styling, Form Fields, Backend, Frontend, File & Folder Structure...) — việc này giảm bớt lượng lỗi mà double-check dưới đây phải bắt, không thay thế nó.
+- Trước khi commit → LUÔN double-check toàn bộ diff cuối cùng đối chiếu với rule (dùng subagent song song nếu có nhiều file độc lập) — bước này bắt buộc bất kể code lúc viết đã cẩn thận tới đâu.
+- Double-check đó CHÍNH LÀ review; chỉ bỏ qua lớp PHỤ THÊM là giao diff cho 1 subagent review riêng khi code đã làm đúng ngay từ đầu.
 
 ═══════════════════════════════════════════════════════
 BƯỚC 8: CHẠY TEST, FIX ĐẾN KHI PASS

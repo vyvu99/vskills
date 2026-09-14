@@ -1,6 +1,6 @@
 ---
 name: vfix
-description: "Fix issues in a fixed priority order: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (ask per item). Consumes vreview output (`.code-review/`) by default. Root-cause diagnosis via the underlying `fix` skill — vfix only decides priority order + stop-gate + auto sdk-generate/format."
+description: "Fix issues in a fixed priority order: SCRIPT_SCAN → CRITICAL → WARNING → cross-group → SUGGESTION (ask per item). Consumes vreview output (`.code-review/`) by default. Root-cause diagnosis via the underlying `fix` skill — vfix owns priority order, batching, stop-gate, verify/commit per batch, and wrap-up (sdk-generate/format/vci/history log)."
 argument-hint: "[path to report dir, default .code-review/]"
 user-invocable: true
 disable-model-invocation: true
@@ -121,7 +121,7 @@ HARD RULES
 - Do NOT apply SUGGESTION items on your own without asking about each one via `AskUserQuestion`.
 - Do NOT refactor code outside the scope of the issue being fixed — root-cause that exact issue, don't sneak in extra changes "while you're at it".
 - Do NOT commit issues individually within a batch that has interdependencies — commit per batch.
-- ALWAYS use `AskUserQuestion` when a STOP-GATE condition (a/b/c) matches — never decide on the user's behalf.
+- ALWAYS use `AskUserQuestion` when a STOP-GATE condition (a/b/c/d) matches — never decide on the user's behalf.
 - ALWAYS ask for confirmation before deleting `.code-review/` or the report dir that was used.
 
 ═══════════════════════════════════════════════════════

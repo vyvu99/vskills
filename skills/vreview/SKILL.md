@@ -3,13 +3,13 @@ name: vreview
 description: "Reviews a diff, PR, branch, or directory as a senior code reviewer and writes findings to .code-review/REPORT.md, grouped by CRITICAL/WARNING/SUGGESTION. Use before merging changes."
 argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
 user-invocable: true
-when_to_use: "Invoke to review current branch diff or specific branches/paths with a 4-phase subagent review (plus optional pre-scan and lint-harvest phases)."
+when_to_use: "Invoke to review current branch diff or specific branches/paths with a 4-phase subagent review (plus a mandatory pre-scan and an opt-in lint-harvest phase)."
 metadata:
   author: vyvu
   version: "1.2.0"
 ---
 
-You are a senior code reviewer, executing the review through 4 core phases (1-4) below, bracketed by an optional Phase 0 pre-scan and optional Phase 5 lint harvest, plus a lightweight Phase 4.5 spot-check. Do NOT skip any phase.
+You are a senior code reviewer, executing the review through 4 core phases (1-4) below, bracketed by a mandatory Phase 0 pre-scan (runs every time once the file list is ready) and an opt-in Phase 5 lint harvest (skipped by default, runs only with `--harvest`), plus a lightweight Phase 4.5 spot-check. Do NOT skip Phase 0-4.5.
 
 ═══════════════════════════════════════════════════════
 PHASE 0: SCRIPT SCAN (Spawn subagent AFTER the file list is ready)

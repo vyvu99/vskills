@@ -95,9 +95,9 @@ STEP 6: GENERATED SDK/API CLIENT IS MANDATORY
 STEP 7: REVIEW AGAINST CLAUDE.md
 ═══════════════════════════════════════════════════════
 
-- Read `~/.claude/CLAUDE.md` (if not already familiar), apply relevant rules yourself AS YOU code (TypeScript, Styling, Form Fields, Backend, Frontend, File & Folder Structure...) — don't wait for a separate review pass to fix it.
-- Before committing → double-check the final diff against the rules (parallel subagents if multiple independent files).
-- No need for a separate review by another subagent if it was done right from the start.
+- Read `~/.claude/CLAUDE.md` (if not already familiar), apply relevant rules yourself AS YOU code (TypeScript, Styling, Form Fields, Backend, Frontend, File & Folder Structure...) — this reduces how much the double-check below needs to catch, it doesn't replace it.
+- Before committing → always double-check the final diff against the rules in full (parallel subagents if multiple independent files) — this step is mandatory regardless of how carefully you coded.
+- That double-check is the review; skip only the EXTRA layer of handing the diff to a separate review subagent on top of it, when the code was done right from the start.
 
 ═══════════════════════════════════════════════════════
 STEP 8: RUN TESTS, FIX UNTIL PASSING

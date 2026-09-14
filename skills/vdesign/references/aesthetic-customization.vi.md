@@ -1,8 +1,8 @@
 # Aesthetic Customization
 
-Chạy ở **mọi** lần gọi `vdesign` — không có flag nào gate nó. Trước khi Phase 3 đụng vào code, dẫn user qua 4 vòng `AskUserQuestion` (≤4 câu/vòng, 14 tiêu chí tổng) phủ hết mọi trục thật sự làm thay đổi diện mạo và cảm giác của bản redesign. Agent không tự âm thầm chọn hướng; user luôn là người chọn, tường minh, mỗi lần chạy. Chỉ bỏ qua tiêu chí nào không áp dụng được về mặt cấu trúc cho target (ví dụ Dark Mode Stance khi project không hề có hệ thống theming nào — nói rõ điều đó, đừng hỏi 1 câu không có câu trả lời thật).
+Chạy ở **mọi** lần gọi `vdesign` — không có flag nào gate nó. Trước khi Phase 3 đụng vào code, dẫn user qua 5 vòng `AskUserQuestion` (≤4 câu/vòng, 17 tiêu chí tổng) phủ hết mọi trục thật sự làm thay đổi diện mạo và cảm giác của bản redesign. Agent không tự âm thầm chọn hướng; user luôn là người chọn, tường minh, mỗi lần chạy. Chỉ bỏ qua tiêu chí nào không áp dụng được về mặt cấu trúc cho target (ví dụ Dark Mode Stance khi project không hề có hệ thống theming nào, hoặc Mật độ Data & Table khi target không có bề mặt data-heavy nào — nói rõ điều đó, đừng hỏi 1 câu không có câu trả lời thật).
 
-Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Theme Builder, Relume, Figma design tokens, các design system Fluent 2 / Atlassian / Cloudscape / SAP Fiori, bài viết của Smashing Magazine về CSS `corner-shape`, và thực hành creative-brief chuẩn — không bịa từ đầu, và không phải catalog cố định để học thuộc: coi các lựa chọn bên dưới là sàn, không phải trần — đề xuất 1 lựa chọn riêng cho project khi nó rõ ràng hợp hơn.
+Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 / Theme Builder, Relume, Figma design tokens, các design system Fluent 2 / Atlassian / Cloudscape / SAP Fiori, Ant Design, Carbon Design System, Linear, nghiên cứu về empty-state của Nielsen Norman Group, bài viết của Smashing Magazine về CSS `corner-shape`, và thực hành creative-brief chuẩn — không bịa từ đầu, và không phải catalog cố định để học thuộc: coi các lựa chọn bên dưới là sàn, không phải trần — đề xuất 1 lựa chọn riêng cho project khi nó rõ ràng hợp hơn.
 
 ## Vòng 1 — Nền Tảng Thị Giác
 
@@ -85,6 +85,24 @@ Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Them
     - *Functional/minimalist* — content-first, không trang trí ngoài những gì rõ ràng cần
     - *Trend-forward* — chủ động lấy từ trào lưu thiết kế thật hiện hành (2025-2026)
 
+## Vòng 5 — Nội Dung & State
+
+15. **Mật độ data & table** — cách dựng bề mặt dày dữ liệu (table, dashboard, list).
+    - *Spreadsheet-dense* (kiểu Cloudscape/Fiori) — tối đa row/màn hình, cell nén, chrome sort/filter luôn hiện
+    - *Card/row-hybrid* — vẫn là table nhưng mỗi row đọc như mini-card (avatar, badge, nhiều khoảng thở hơn)
+    - *Chart-first dashboard* — trực quan hoá (chart/sparkline) đi trước bảng thô, table chỉ để drill-down
+    - *Minimal/inline* — dữ liệu gói vào prose/list đơn giản, không chrome table trừ khi dataset đòi hỏi
+16. **Style form & input** — cách xử lý input về hình ảnh + tương tác, không chỉ màu.
+    - *Floating label* (Material) — label bay vào input khi focus/có giá trị
+    - *Top label + helper text* (Fluent, Carbon) — label luôn hiện phía trên, helper/error bên dưới
+    - *Inline/borderless* (kiểu Linear) — chỉ underline hoặc không viền, label gần như placeholder
+    - *Grouped/segmented* — field liên quan gom vào khung bo viền, nhịp field-to-field rõ ràng
+17. **Style empty / loading / error state.**
+    - *Skeleton screens* — khối xám giữ chỗ khi loading, khớp layout thật
+    - *Spinner/minimal* — spinner/progress bar đơn giản, không giả layout
+    - *Illustrated* — minh hoạ/icon riêng + copy thân thiện cho state rỗng/lỗi
+    - *Text-only/utilitarian* — chỉ text, không minh hoạ, nhẹ và nhanh làm nhất
+
 ## Câu trả lời dẫn tới gì
 
 - **Domain Research** (Phase 0, bước sau) chỉ chạy khi đáng chi phí: tiêu chí 14 trả lời *Trend-forward* hoặc *Experimental/bold*, hoặc các câu trả lời khác của user tường minh gọi tới "cái gì đang thật sự hiện hành". *Brand-centric* hoặc *Functional/minimalist* bỏ qua bước này — không có gì sống để lấy làm căn cứ, dùng thẳng các câu trả lời.
@@ -93,4 +111,4 @@ Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Them
 
 ## Design Brief
 
-Sau cả 4 vòng, viết 1 brief ngắn gọn cụ thể (5-10 dòng, không phải 1 nhãn-một-từ cho mỗi tiêu chí) dịch 14 câu trả lời — cộng kết quả Domain Research nếu có chạy — thành quyết định cụ thể: tên typeface thật, cách tiếp cận bảng màu thật, timing/easing motion thật, hướng shape/icon/imagery thật, spacing scale thật, hệ thống layout thật, tone thật, và mức độ táo bạo thật. Nói rõ ra trước khi Phase 1 bắt đầu. Đây là nguồn sự thật duy nhất Phase 3 thực thi theo — 1 đống 14 câu trả lời thô chưa tổng hợp không phải là brief.
+Sau cả 5 vòng, viết 1 brief ngắn gọn cụ thể (5-10 dòng, không phải 1 nhãn-một-từ cho mỗi tiêu chí) dịch 17 câu trả lời — cộng kết quả Domain Research nếu có chạy — thành quyết định cụ thể: tên typeface thật, cách tiếp cận bảng màu thật, timing/easing motion thật, hướng shape/icon/imagery thật, spacing scale thật, hệ thống layout thật, tone thật, mức độ táo bạo thật, và (khi áp dụng) cách xử lý data/table, form, và empty/loading/error thật. Nói rõ ra trước khi Phase 1 bắt đầu. Đây là nguồn sự thật duy nhất Phase 3 thực thi theo — 1 đống 17 câu trả lời thô chưa tổng hợp không phải là brief.

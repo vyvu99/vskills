@@ -1,8 +1,8 @@
 # Aesthetic Customization
 
-Runs on **every** `vdesign` invocation — no flag gates it. Before Phase 3 touches any code, walk the user through 4 rounds of `AskUserQuestion` (≤4 questions each, 14 criteria total) covering every axis that actually changes how a redesign looks and feels. The agent does not silently pick a direction; the user always does, explicitly, per run. Skip only the criteria that are structurally inapplicable to the target (e.g. Dark Mode Stance when the project has no theming system at all — say so, don't ask a question with no real answer).
+Runs on **every** `vdesign` invocation — no flag gates it. Before Phase 3 touches any code, walk the user through 5 rounds of `AskUserQuestion` (≤4 questions each, 17 criteria total) covering every axis that actually changes how a redesign looks and feels. The agent does not silently pick a direction; the user always does, explicitly, per run. Skip only the criteria that are structurally inapplicable to the target (e.g. Dark Mode Stance when the project has no theming system at all, or Data & Table Density when the target has no data-heavy surface at all — say so, don't ask a question with no real answer).
 
-Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Theme Builder, Relume, Figma design tokens, Fluent 2 / Atlassian / Cloudscape / SAP Fiori design systems, Smashing Magazine's CSS `corner-shape` coverage, and standard creative-brief practice — not invented from scratch, and not a fixed catalog to memorize verbatim: treat the options below as the floor, not a ceiling — offer a project-specific option when one obviously fits better.
+Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 / Theme Builder, Relume, Figma design tokens, Fluent 2 / Atlassian / Cloudscape / SAP Fiori design systems, Ant Design, Carbon Design System, Linear, Nielsen Norman Group's empty-state research, Smashing Magazine's CSS `corner-shape` coverage, and standard creative-brief practice — not invented from scratch, and not a fixed catalog to memorize verbatim: treat the options below as the floor, not a ceiling — offer a project-specific option when one obviously fits better.
 
 ## Round 1 — Visual Foundation
 
@@ -85,6 +85,24 @@ Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Theme Bui
     - *Functional/minimalist* — content-first, no decoration beyond what clarity needs
     - *Trend-forward* — actively pulls from current (2025-2026) real-world design trends
 
+## Round 5 — Content & States
+
+15. **Data & table density** — how data-heavy surfaces (tables, dashboards, lists) get built.
+    - *Spreadsheet-dense* (Cloudscape/Fiori-style) — maximal rows-per-screen, compact cells, sort/filter chrome always visible
+    - *Card/row-hybrid* — table semantics but each row reads like a mini-card (avatar, badges, more breathing room)
+    - *Chart-first dashboard* — data visualized (charts/sparklines) before raw tables, tables are drill-down only
+    - *Minimal/inline* — data folded into prose or simple lists, no table chrome unless the dataset demands it
+16. **Form & input style** — visual + interaction treatment of inputs, not just color.
+    - *Floating label* (Material) — label animates into the input on focus/fill
+    - *Top label + helper text* (Fluent, Carbon) — label always visible above, helper/error text below
+    - *Inline/borderless* (minimal, Linear-style) — underline or no border, label as placeholder-adjacent
+    - *Grouped/segmented* — related fields visually grouped in a bordered card, clear field-to-field rhythm
+17. **Empty / loading / error state style** — how the UI represents "nothing here yet" / "still working" / "something broke".
+    - *Skeleton screens* — gray content-shaped placeholders while loading, matches final layout
+    - *Spinner/minimal* — simple spinner or progress bar, no layout mimicry
+    - *Illustrated* — custom illustration/icon + friendly copy for empty/error states (onboarding feel)
+    - *Text-only/utilitarian* — plain text message, no illustration, fastest to build and lowest visual weight
+
 ## What the answers drive
 
 - **Domain Research** (Phase 0, next step) runs only when it earns its cost: criterion 14 answered *Trend-forward* or *Experimental/bold*, or the user's own answers elsewhere explicitly invoke "what's current right now." *Brand-centric* or *Functional/minimalist* skip it — there's nothing live to ground those in, use the answers directly.
@@ -93,4 +111,4 @@ Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Theme Bui
 
 ## Design Brief
 
-After all 4 rounds, write a short concrete brief (5-10 lines, not a one-word label per criterion) translating the 14 answers — plus Domain Research findings when it ran — into specific decisions: the actual typeface names, the actual palette approach, the actual motion timing/easing, the actual shape/icon/imagery direction, the actual spacing scale, the actual layout system, the actual tone, and the actual boldness level. State it out loud before Phase 1 starts. This is the single source of truth Phase 3 executes against — an un-synthesized pile of 14 raw answers is not a brief.
+After all 5 rounds, write a short concrete brief (5-10 lines, not a one-word label per criterion) translating the 17 answers — plus Domain Research findings when it ran — into specific decisions: the actual typeface names, the actual palette approach, the actual motion timing/easing, the actual shape/icon/imagery direction, the actual spacing scale, the actual layout system, the actual tone, the actual boldness level, and (when applicable) the actual data/table, form, and empty/loading/error treatment. State it out loud before Phase 1 starts. This is the single source of truth Phase 3 executes against — an un-synthesized pile of 17 raw answers is not a brief.
