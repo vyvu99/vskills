@@ -1,8 +1,17 @@
 # Aesthetic Customization
 
-Chạy ở **mọi** lần gọi `vdesign` — không có flag nào gate nó. Trước khi Phase 3 đụng vào code, dẫn user qua 5 vòng `AskUserQuestion` (≤4 câu/vòng, 17 tiêu chí tổng) phủ hết mọi trục thật sự làm thay đổi diện mạo và cảm giác của bản redesign. Agent không tự âm thầm chọn hướng; user luôn là người chọn, tường minh, mỗi lần chạy. Chỉ bỏ qua tiêu chí nào không áp dụng được về mặt cấu trúc cho target (ví dụ Dark Mode Stance khi project không hề có hệ thống theming nào, hoặc Mật độ Data & Table khi target không có bề mặt data-heavy nào — nói rõ điều đó, đừng hỏi 1 câu không có câu trả lời thật).
+Chạy ở **mọi** lần gọi `vdesign` — không có flag nào gate nó. Trước khi Phase 3 đụng vào code, dẫn user qua 7 vòng `AskUserQuestion` (≤4 câu/vòng, 18 tiêu chí tổng cộng thêm 1 câu hỏi vét cuối) phủ hết mọi trục thật sự làm thay đổi diện mạo và cảm giác của bản redesign. Agent không tự âm thầm chọn hướng; user luôn là người chọn, tường minh, mỗi lần chạy. Chỉ bỏ qua tiêu chí nào không áp dụng được về mặt cấu trúc cho target (ví dụ Dark Mode Stance khi project không hề có hệ thống theming nào, hoặc Mật độ Data & Table khi target không có bề mặt data-heavy nào — nói rõ điều đó, đừng hỏi 1 câu không có câu trả lời thật).
 
 Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 / Theme Builder, Relume, Figma design tokens, các design system Fluent 2 / Atlassian / Cloudscape / SAP Fiori, Ant Design, Carbon Design System, Linear, nghiên cứu về empty-state của Nielsen Norman Group, bài viết của Smashing Magazine về CSS `corner-shape`, và thực hành creative-brief chuẩn — không bịa từ đầu, và không phải catalog cố định để học thuộc: coi các lựa chọn bên dưới là sàn, không phải trần — đề xuất 1 lựa chọn riêng cho project khi nó rõ ràng hợp hơn.
+
+**Đề xuất trước.** Trước khi đưa ra các lựa chọn của mỗi tiêu chí, agent tự tính 1 đáp án đề xuất dựa trên Project Profile đã resolve (design token hiện có, dependency trong `package.json`, mục "Good reference UI", và code component đã đọc được), xếp đáp án đó lên đầu danh sách `AskUserQuestion`, gắn thêm `(Recommended)` vào label kèm 1 câu lý do ngắn trong description — bám vào token/file/pattern cụ thể tìm thấy, không phải lời khen chung chung. Khi không có tín hiệu rõ ràng cho 1 tiêu chí (project mới, chưa có tiền lệ), nói thẳng điều đó và đề xuất lựa chọn phổ biến/an toàn nhất thay vì đoán bừa. User vẫn là người chọn tường minh cuối cùng — đề xuất chỉ rút ngắn thời gian quyết định, không thay thế quyết định.
+
+## Vòng 0 — Tự Do Cấu Trúc
+
+0. **Tự do cấu trúc** — cấu trúc của page/component được đổi tới đâu, không chỉ style.
+   - *Giữ nguyên cấu trúc* — giữ nguyên thứ tự/số lượng section/view-type hiện tại; lần chạy này chỉ restyle, không bao giờ đổi cấu trúc
+   - *Refine nếu audit phát hiện lệch* (mặc định — khớp hành vi hiện tại) — audit ở Phase 2 được phép gộp/đổi thứ tự/tách section khi phát hiện vấn đề fit cấu trúc thật sự, vẫn bị bó "tương xứng với cái thực sự hỏng"
+   - *Tự do đổi hẳn* — Phase 2/3 được tự do đổi view-type (list → kanban, table → card, v.v.) khi nó phục vụ data/task tốt hơn (theo bước Data & Mục đích ở Phase 1) — không bị bó "tương xứng" riêng cho các nước đi cấu trúc
 
 ## Vòng 1 — Nền Tảng Thị Giác
 
@@ -12,10 +21,10 @@ Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Desi
    - *Code/Technical* (JetBrains Mono, Fira Code, Space Grotesk) — dev-tool, sáng tạo
    - *Startup/Modern* (Satoshi, Cabinet Grotesk, Inter Tight) — hiện đại, thân thiện
 2. **Triết lý bảng màu** — cách xây bảng màu.
-   - *Giữ token hiện có* — nhất quán hoàn toàn với codebase hiện tại
-   - *Chỉ thêm accent* — giữ primary, thêm 1 accent brand mới
-   - *Redesign toàn bộ bảng màu* — bảng màu mới từ brand color, xây lại từ đầu
-   - *Dynamic/tự sinh* — bảng màu do tool sinh, có sẵn accessibility (kiểu Material Theme Builder)
+   - *Giữ token hiện có* — nhất quán hoàn toàn với codebase hiện tại. Khoá: không đổi được màu brand nào suốt run này.
+   - *Chỉ thêm accent* — giữ primary, thêm 1 accent brand mới. Mở: đúng 1 màu accent mới; token primary/base giữ nguyên.
+   - *Redesign toàn bộ bảng màu* — bảng màu mới từ brand color, xây lại từ đầu. Mở: thay toàn bộ bảng màu — mọi color token trong phạm vi đều được đổi.
+   - *Dynamic/tự sinh* — bảng màu do tool sinh, có sẵn accessibility (kiểu Material Theme Builder). Mở: thay toàn bộ bảng màu như "Redesign toàn bộ", chỉ khác là do tool sinh thay vì chọn tay.
 3. **Triết lý motion/animation** — UI mang bao nhiêu chuyển động.
    - *Minimal* — chỉ transition 150-300ms, không micro-interaction
    - *Balanced* — transition + vài micro-interaction chính (hover, page transition)
@@ -104,12 +113,23 @@ Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Desi
     - *Illustrated* — minh hoạ/icon riêng + copy thân thiện cho state rỗng/lỗi
     - *Text-only/utilitarian* — chỉ text, không minh hoạ, nhẹ và nhanh làm nhất
 
+## Vòng 6 — Còn Gì Khác Không?
+
+Câu hỏi vét cuối — Vòng 0 cộng Vòng 1-5 phủ 18 tiêu chí, nhưng đó là sàn, không phải danh sách đầy đủ. Hỏi đúng 1 `AskUserQuestion`:
+
+- "Còn điều gì về hướng thiết kế bạn muốn nói rõ mà các câu trên chưa hỏi tới?"
+  - *Không có gì thêm — các câu trên đã đủ*
+  - *Có — tôi sẽ ghi rõ ở Other*
+
+Ghi lại câu trả lời nguyên văn vào Design Brief dưới 1 dòng mới `## Ghi chú thêm (Vòng 6)` — ghi "Không có" nếu user chọn lựa chọn đầu, ngược lại ghi câu trả lời tự do.
+
 ## Câu trả lời dẫn tới gì
 
+- **Tự Do Cấu Trúc** (Vòng 0) chi phối mức độ finding Information Architecture ở Phase 2 và scope Fix ở Phase 3 được đổi cấu trúc target — *Giữ nguyên cấu trúc* khoá cứng cấu trúc hiện tại, *Refine nếu audit phát hiện lệch* là default có bó hiện tại, *Tự do đổi hẳn* gỡ trần "tương xứng với audit finding" của Phase 3 CHỈ cho nước đi cấu trúc/view-type — mọi category khác (màu, dependency, motion, v.v.) vẫn theo đúng tiêu chí riêng của nó.
 - **Domain Research** (Phase 0, bước sau) chỉ chạy khi đáng chi phí: tiêu chí 14 trả lời *Trend-forward*, *Experimental/bold*, hoặc *Game-inspired/Arcade*, hoặc các câu trả lời khác của user tường minh gọi tới "cái gì đang thật sự hiện hành". *Brand-centric* hoặc *Functional/minimalist* bỏ qua bước này — không có gì sống để lấy làm căn cứ, dùng thẳng các câu trả lời.
 - **Phase 3 Fix** thực thi Design Brief (xem bên dưới), không phải 1 flag. Mọi chỗ flag `--wow` cũ từng mở khóa (màu brand mới, dependency mới, motion trang trí, đổi cấu trúc layout) giờ được mở hay không tùy vào tiêu chí tương ứng ở trên, theo từng lần chạy, tường minh — không bao giờ suy đoán.
 - Hard rule kỹ thuật (accessibility, không đổi tech stack, không phá logic/API, motion GPU-safe) không bao giờ bị ảnh hưởng bởi câu trả lời nào ở đây — đó là ràng buộc an toàn/kỹ thuật, không phải thẩm mỹ.
 
 ## Design Brief
 
-Sau cả 5 vòng, viết 1 brief ngắn gọn cụ thể (5-10 dòng, không phải 1 nhãn-một-từ cho mỗi tiêu chí) dịch 17 câu trả lời — cộng kết quả Domain Research nếu có chạy — thành quyết định cụ thể: tên typeface thật, cách tiếp cận bảng màu thật, timing/easing motion thật, hướng shape/icon/imagery thật, spacing scale thật, hệ thống layout thật, tone thật, mức độ táo bạo thật, và (khi áp dụng) cách xử lý data/table, form, và empty/loading/error thật. Nói rõ ra trước khi Phase 1 bắt đầu. Đây là nguồn sự thật duy nhất Phase 3 thực thi theo — 1 đống 17 câu trả lời thô chưa tổng hợp không phải là brief.
+Sau cả 7 vòng, viết 1 brief ngắn gọn cụ thể (5-10 dòng, không phải 1 nhãn-một-từ cho mỗi tiêu chí) dịch 18 câu trả lời cộng ghi chú vét ở Vòng 6 — cộng kết quả Domain Research nếu có chạy — thành quyết định cụ thể: tên typeface thật, cách tiếp cận bảng màu thật, timing/easing motion thật, hướng shape/icon/imagery thật, spacing scale thật, hệ thống layout thật, tone thật, mức độ táo bạo thật, và (khi áp dụng) cách xử lý data/table, form, và empty/loading/error thật. Nói rõ ra trước khi Phase 1 bắt đầu. Đây là nguồn sự thật duy nhất Phase 3 thực thi theo — 1 đống 18 câu trả lời thô chưa tổng hợp không phải là brief.

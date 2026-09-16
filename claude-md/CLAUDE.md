@@ -13,6 +13,11 @@ A generic starter `CLAUDE.md` — the rule set that `vreview`, `vcook`, and `vle
 - A comment/docstring that says A while the code does B must be fixed immediately — a wrong comment is worse than no comment.
 - Self-check before finishing: would a senior engineer call this overcomplicated? If yes, simplify before moving on.
 
+## Delegation
+
+- Delegating to a subagent isn't free — it starts from empty context (has to be re-briefed on the task) and costs real time/tokens to spin up and summarize back. Reserve it for work that's genuinely large: reading many files, wide codebase exploration, deep research, or a full review.
+- Below that bar — a 1-2 file read, a lookup a single grep would answer, a one-line edit — just do it directly. Delegating a trivial task "to be safe" is the same over-engineering this file already warns against.
+
 ## Hard Gates — Stop and Ask
 
 Before doing any of the following, stop and ask the user instead of deciding alone:
