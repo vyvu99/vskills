@@ -26,8 +26,8 @@ If the path doesn't exist → report the error and stop. **Do not create the spe
 ## Step 1 — Read specs + Scout the codebase (before anything else)
 
 1. Read the ENTIRE specified specs file — Decisions table, Edge Cases, Experience Specs.
-2. Scout the codebase relevant to this feature BEFORE analyzing: routes, services, schemas, UI components, seed data, existing migration files. If this scouting is delegated to a subagent, its findings write to `plans/reports/` per `_vskills-shared/repo-profile.md` §6.
-3. Read other files in `plans/specs/` (if any) to avoid conflicts with specs of related features.
+2. Scout the codebase relevant to this feature BEFORE analyzing: routes, services, schemas, UI components, seed data, existing migration files. Scouting delegated to a subagent → its findings write to `plans/reports/` per `_vskills-shared/repo-profile.md` §6.
+3. Read other files in `plans/specs/` (if any) to avoid conflicts with related features' specs.
 4. Determine the `[feature-slug]` (from the specs file name or feature name, kebab-case).
 
 ---
@@ -36,7 +36,7 @@ If the path doesn't exist → report the error and stop. **Do not create the spe
 
 For EVERY case in the specs (each row of the Decisions table, each Edge Case) — **verify it yourself by reading the code**, don't guess:
 
-As each case's PASS/FAIL/MISSING verdict is determined, append its row directly to a `plan.md` Case Summary table under construction (create the file at the start of Step 2 if it doesn't exist yet) rather than holding the full comparison in conversation memory until Step 4. Leave the Handling Phase / Effort columns blank for now — Step 4 fills those in once phases are assigned.
+As each case's PASS/FAIL/MISSING verdict is determined, append its row directly to a `plan.md` Case Summary table under construction (create the file at the start of Step 2 if it doesn't exist yet) rather than holding the full comparison in conversation memory until Step 4. Leave Handling Phase / Effort blank for now — Step 4 fills those in once phases are assigned.
 
 **Format for each case:**
 
@@ -134,13 +134,13 @@ The `**Generated against commit:**` stamp exists so a reader (or `vcook` running
 
 **Rules beyond the skeleton:**
 
-1. **Phases are split by RELATED CASE GROUPS** (not by file/layer). Example: "Phase 2: Validate cart item quantity" groups every case related to quantity limits, even if those cases touch different routes + services + UI.
+1. **Phases are split by RELATED CASE GROUPS** (not by file/layer). Example: "Phase 2: Validate cart item quantity" groups every case related to quantity limits, even across different routes + services + UI.
 2. Each entry in a phase's Implementation Steps MUST spell out 3 parts, no vagueness allowed:
    - **File:** the specific path
-   - **Logic:** exactly what changes (don't write generic "update logic" — must state the exact condition/branch/field being changed)
-   - **Validate:** if a test framework exists in the repo — name the specific test (existing or new) and state that it must fail before the change (red) and pass after the change (green); if no test framework exists — a specific manual verify command/step with the expected observation stated explicitly (not "check the UI" — the exact result that confirms success)
-3. **Migration grouping:** migrations go into a single **first Phase** by default. A migration may be split into its own case's phase only when it is genuinely independent (no shared table/key) from Phase 1's other migrations — state that independence explicitly when splitting. If a later phase needs an additional schema change discovered while writing the plan and it isn't independent → go back and update Phase 1, don't split off a new migration phase.
-4. At the top of `plan.md`, the **"Case Summary"** table summarizes every case from Step 2 + Step 3: Case ID | Status (PASS/FAIL/MISSING) | Handling Phase (phase number, or "—" if PASS and nothing needs to change) | Effort (the handling phase's `effort` frontmatter value; "—" for PASS rows). Effort is a rough relative-sizing estimate, not a committed/calibrated estimate — read it as a coarse bucket (S/M/L), never as a false-precision hour count or a promised timeline.
+   - **Logic:** exactly what changes (never generic "update logic" — state the exact condition/branch/field being changed)
+   - **Validate:** test framework exists in the repo → name the specific test (existing or new), state it must fail before the change (red) and pass after (green); no test framework → a specific manual verify command/step with the expected observation stated explicitly (not "check the UI" — the exact result confirming success)
+3. **Migration grouping:** migrations go into a single **first Phase** by default. Split one into its own case's phase only when genuinely independent (no shared table/key) from Phase 1's other migrations — state that independence explicitly. A later phase needs an additional, non-independent schema change discovered while writing the plan → go back and update Phase 1, don't split off a new migration phase.
+4. At the top of `plan.md`, the **"Case Summary"** table summarizes every case from Step 2 + Step 3: Case ID | Status (PASS/FAIL/MISSING) | Handling Phase (phase number, or "—" if PASS and nothing needs to change) | Effort (the handling phase's `effort` frontmatter value; "—" for PASS rows). Effort is a rough relative-sizing estimate, not calibrated — a coarse bucket (S/M/L), never a false-precision hour count or a promised timeline.
 5. Fill in `## Risks / Rollback` for every phase, not just Phase 1 — state what state (code/DB) is left behind if that phase fails partway through, and how to roll it back.
 
 ---
@@ -151,9 +151,9 @@ After generating plan.md + phase files, before handoff, verify:
 
 1. Every Case ID from Step 2 + Step 3 appears exactly once in the Case Summary table.
 2. Every FAIL/MISSING case has a Handling Phase.
-3. Every phase traces back to at least one case in the Case Summary — a phase that doesn't trace to any case is flagged as possible scope creep.
+3. Every phase traces back to at least one case in the Case Summary — a phase tracing to none is flagged as possible scope creep.
 
-Fix plan.md/phase files for any check that fails before proceeding.
+Fix plan.md/phase files for any failing check before proceeding.
 
 Then hand off — use `AskUserQuestion` to offer: (a) implement now via `vcook <plan-path>`, (b) create GitHub tracking issues first via `vtickets <plan-dir>`, or (c) end the session.
 
@@ -166,8 +166,8 @@ Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.
 ## Hard rules
 
 - See `_vskills-shared/repo-profile.md` §8 (Verification honesty rule).
-- If you genuinely searched and found no related code → state clearly "searched at {path/pattern}, not found" instead of leaving it blank.
-- Migrations go into a single Phase 1 by default — only split one into its own phase when it is genuinely independent (no shared table/key) from Phase 1's other migrations, and say so explicitly.
-- Every entry in Implementation Steps must have complete, specific File + Logic + Validate — never write generic phrases like "fix it properly" or "test again".
-- Never create or edit the specs file yourself — if you find the specs are missing an important case that requires a user decision (something that can't be inferred from the code), stop and suggest running `/vspecs` to add it before continuing.
-- Never skip Step 1 (scout the codebase) even if a case looks simple — a PASS/FAIL/MISSING status is only valid once you've actually read the real code.
+- Genuinely searched and found no related code → state clearly "searched at {path/pattern}, not found" instead of leaving it blank.
+- Migrations go into a single Phase 1 by default — only split one into its own phase when genuinely independent (no shared table/key) from Phase 1's other migrations, and say so explicitly.
+- Every entry in Implementation Steps must have complete, specific File + Logic + Validate — never generic phrases like "fix it properly" or "test again".
+- Never create or edit the specs file yourself — specs missing an important case that requires a user decision (not inferrable from code) → stop, suggest running `/vspecs` to add it before continuing.
+- Never skip Step 1 (scout the codebase) even for a simple-looking case — a PASS/FAIL/MISSING status is only valid once you've actually read the real code.

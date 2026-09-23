@@ -26,7 +26,7 @@ $ARGUMENTS
 
 Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (nếu có) để xác định package manager (`pm`), workspace shape, và tên script typecheck/build/format. Nếu file không tồn tại, giả định pnpm + workspace (`pnpm --filter <pkg> exec …`) — mặc định hiện tại. Nếu §1 báo "not a JS/TS project", dừng ở đây và nói rõ — vci không có gì để làm trong repo không phải JS/TS.
 
-Nếu có `turbo.json` hoặc `nx.json` ở gốc repo, ưu tiên dùng orchestrator cho Bước 1-2: `turbo run typecheck build` (hoặc `nx run-many --target=typecheck,build`) có sẵn cache hit và topological ordering. Ghi nhận đây là đường ưu tiên khi phát hiện; nếu không có thì fallback về cách spawn thủ công từng package bên dưới — chỉ bổ sung, không thay thế hành vi hiện tại.
+Có `turbo.json` hoặc `nx.json` ở gốc repo → ưu tiên dùng orchestrator cho Bước 1-2: `turbo run typecheck build` (hoặc `nx run-many --target=typecheck,build`) có sẵn cache hit và topological ordering miễn phí. Ngược lại, fallback về cách spawn thủ công từng package bên dưới.
 
 ## Bước 0 — Xác định danh sách package
 
@@ -60,7 +60,7 @@ Spawn tất cả package trước, rồi mới `wait` — KHÔNG chạy tuần t
 Sau `wait`, đọc từng `/tmp/tsc-<sanitized-package>.log`:
 - Không có lỗi → báo pass, kèm wall-time mà `time` in ở cuối log
 - Có lỗi → trích xuất file:line + message cụ thể, fix, rồi recheck **chỉ package vừa fix** (chạy lại đúng 1 lệnh tsc cho package đó, không chạy lại toàn bộ danh sách)
-- Nếu package không có `tsconfig.json`, coi lỗi đó là "không có config typecheck" chứ không phải lỗi type, và skip/báo cáo tương ứng thay vì coi đó là bug trong code
+- Không có `tsconfig.json` → coi là "không có config typecheck", không phải lỗi type — skip/báo cáo tương ứng
 
 ## Bước 2 — Build song song
 

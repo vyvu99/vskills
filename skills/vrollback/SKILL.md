@@ -12,9 +12,9 @@ metadata:
 
 # vrollback
 
-Roll back one migration on the local DB, delete its tracking record, as if the migration had never run. Generic across any framework/DB — auto-detected.
+Roll back one migration on the local DB and delete its tracking record, as if it never ran. Framework/DB auto-detected.
 
-> ⚠️ **LOCAL/DEV ONLY.** This is a destructive operation — never run it against staging/production.
+> ⚠️ **LOCAL/DEV ONLY.** Destructive — never run against staging/production.
 
 Read input from the user:
 
@@ -31,8 +31,8 @@ If `$ARGUMENTS` is empty — ask the user for the name or version of the migrati
 1. **Migration framework:**
    - Check `package.json` dependencies: `drizzle-orm`/`drizzle-kit` (Drizzle), `@prisma/client`/`prisma` (Prisma), `knex` (Knex), `typeorm` (TypeORM), or a custom raw SQL tool (custom script under `scripts/migrate*`)
    - Find the matching config file: `drizzle.config.ts`, `prisma/schema.prisma`, `knexfile.js`/`knexfile.ts`, `ormconfig.json`/`data-source.ts`
-2. **Database type:** read the connection string in `.env`/config — `postgres://` / `mysql://` / a `.sqlite`/`.db` file — and extract the host from the connection string; if it is not `localhost`/`127.0.0.1`/an internal container, **STOP immediately** and warn the user.
-3. **Docker container:** `docker ps` → find a container whose name/image matches the DB type (postgres, mysql, mariadb). If multiple containers match → ask the user to pick the right one. If **no** matching container is found → treat the DB as running natively on the host (localhost) or as a SQLite file, and run commands directly against it, skipping `docker exec`.
+2. **Database type:** read the connection string in `.env`/config — `postgres://` / `mysql://` / a `.sqlite`/`.db` file — extract the host; not `localhost`/`127.0.0.1`/an internal container → **STOP immediately**, warn the user.
+3. **Docker container:** `docker ps` → find a container whose name/image matches the DB type (postgres, mysql, mariadb). Multiple matches → ask the user to pick. No match → treat the DB as running natively on the host (localhost) or as a SQLite file, run commands directly, skip `docker exec`.
 
 ## Step 2 — Identify the migration to roll back
 
@@ -48,13 +48,13 @@ If `$ARGUMENTS` is empty — ask the user for the name or version of the migrati
 
 ## Step 3 — Confirm with the user (mandatory, no skipping)
 
-Present clearly before running any actual commands:
+Present before running any command:
 - Which migration will be rolled back (name/version, file path)
-- Which DB is affected (DB name, which container, host)
+- Which DB is affected (DB name, container, host)
 - The exact command/SQL that will run
-- This only reverts the **schema**. Any data this migration inserted/updated/deleted will **not** be restored — if the migration file contains `INSERT`/`UPDATE`/`DELETE` on existing rows (not just DDL), say so explicitly and require an extra explicit confirmation.
-- Before running anything destructive, back up the DB (`pg_dump`/`mysqldump`/copy the `.sqlite` file) to a temp path and tell the user where it went — skip only if the user explicitly says not needed.
-- Ask the user to type the exact DB name shown above as part of their confirmation (not just "yes") — catches a copy-paste host that passes the localhost check but is actually the wrong database. Also flag (don't silently proceed) if the DB/role name contains `prod`/`live`/`production` even when the host is local.
+- This only reverts the **schema**. Data this migration inserted/updated/deleted is **not** restored — if the migration file contains `INSERT`/`UPDATE`/`DELETE` on existing rows (not just DDL), say so explicitly and require an extra confirmation.
+- Back up the DB (`pg_dump`/`mysqldump`/copy the `.sqlite` file) to a temp path before running anything destructive, tell the user where it went — skip only if the user explicitly says not needed.
+- Ask the user to type the exact DB name shown above as part of their confirmation (not just "yes") — catches a copy-paste host that passes the localhost check but is the wrong database. Flag (don't silently proceed) if the DB/role name contains `prod`/`live`/`production` even on a local host.
 
 **Stop and wait for the user's confirmation before proceeding to Step 4.**
 
@@ -66,9 +66,9 @@ Present clearly before running any actual commands:
   - Knex: `knex migrate:rollback`
   - TypeORM: `typeorm migration:revert`
 - **Framework has no automatic down** (e.g. Drizzle doesn't auto-generate down migrations) → read the up migration file, infer the inverse operation (DROP TABLE instead of CREATE TABLE, DROP COLUMN instead of ADD COLUMN, etc.), write the rollback SQL, show it to the user before running
-- **Prefer a tool-generated inverse over hand-inference.** For Drizzle: if the pre-migration `schema.ts` is recoverable from git history, check it out to a temp path and run `drizzle-kit generate` against it to let the tool produce the down SQL. Only fall back to manually reading the up migration and inferring the inverse (DROP TABLE↔CREATE TABLE, DROP COLUMN↔ADD COLUMN, etc.) when the prior schema state isn't recoverable.
-- Wrap the rollback SQL in a transaction (`BEGIN; ... COMMIT;`) for Postgres/SQLite so a partial failure doesn't leave the schema half-migrated. MySQL DDL is not transactional — say so explicitly and back up first (per Step 3) instead.
-- Run the rollback SQL/command via `docker exec` into the container identified in Step 1 (if Docker) or directly against the DB (if native/SQLite)
+- **Prefer a tool-generated inverse over hand-inference.** For Drizzle: if the pre-migration `schema.ts` is recoverable from git history, check it out to a temp path and run `drizzle-kit generate` against it to let the tool produce the down SQL. Fall back to manually inferring the inverse only when the prior schema state isn't recoverable.
+- Wrap the rollback SQL in a transaction (`BEGIN; ... COMMIT;`) for Postgres/SQLite so a partial failure doesn't leave the schema half-migrated. MySQL DDL isn't transactional — say so explicitly and back up first (per Step 3).
+- Run the rollback SQL/command via `docker exec` into the container from Step 1 (if Docker) or directly against the DB (if native/SQLite)
 
 ## Step 5 — Delete the tracking record
 

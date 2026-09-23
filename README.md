@@ -13,7 +13,7 @@ Personal Claude Code skills — opinionated checklists layered on top of everyda
 | `vcook` | Implement via a 9-step checklist: branch, test-first, SDK client, review, PR | Have a plan (or a quick description), need to code |
 | `vreview` | 4-phase code review (+ optional pre-scan / lint-harvest phases) using parallel subagents + an adversarial pass | Need to review a branch/PR |
 | `vfix` | Fix issues from a `vreview` report in a fixed priority order | Have a review report that needs fixing |
-| `vci` | Typecheck + build in parallel across a JS/TS workspace (any package manager) | Quick check before committing |
+| `vci` | Typecheck + build + format (+ optional test) in parallel across a JS/TS workspace (any package manager) | Quick check before committing |
 | `vtickets` | Create/update a GitHub epic + sub-issues from a plan | Need to track a plan on GitHub |
 | `vdesign` | Redesign UI/UX to a personal aesthetic (audit-driven, no depth flags; `--wow` for Awwwards-tier creative freedom) | Need to upgrade a page/component's UI |
 | `vlearn` | Extract patterns from a bot's PR review → propose a new CLAUDE.md rule | A bot just finished reviewing a PR |
@@ -70,7 +70,7 @@ flowchart LR
 ```bash
 /vci
 ```
-→ typecheck + build every package in the workspace in parallel (background commands), auto-fixes on failure.
+→ typecheck + build + format every package in the workspace in parallel (background commands), auto-fixes on failure.
 
 **Track a large plan on GitHub for a PM/non-technical stakeholder:**
 ```bash

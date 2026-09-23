@@ -111,3 +111,10 @@ A skill's own `## Next steps` section should read: "Follow the Next Steps conven
 ## §8 — Verification honesty rule
 
 Never write "needs verification" (or equivalent hedging) for a case/claim when the code that answers it exists and can be read — read it and state PASS/FAIL/MISSING with a `file:line` citation instead. "Needs verification" is only valid for something genuinely outside the codebase (a business decision, an external system's behavior not observable from code).
+
+## §9 — Default branch detection
+
+When no base/target branch is given explicitly:
+1. `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'`
+2. Empty → try `git rev-parse --verify main 2>/dev/null` → use `main`
+3. `main` doesn't exist → use `master`

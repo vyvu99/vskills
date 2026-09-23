@@ -25,9 +25,7 @@ Trước khi thực hiện mỗi bước dưới đây, đánh giá phần nào 
 - Research pattern/docs cho các thư viện đang dùng → subagent song song
 - Review đối chiếu CLAUDE.md trên nhiều file độc lập (bước 7) → subagent song song
 
-Phạm vi: subagent ở bước này là READ-ONLY (research, đọc plan/codebase, review đối chiếu CLAUDE.md). Việc viết code implementation (bước 5) KHÔNG được delegate cho subagent song song ở bước này — tự viết code thật, tuần tự, trong session này.
-
-Mục đích: giảm token usage của main agent — main agent chỉ tổng hợp kết quả.
+Phạm vi: subagent ở bước này là READ-ONLY (research, đọc plan/codebase, review đối chiếu CLAUDE.md). Việc viết code implementation (bước 5) KHÔNG được delegate cho subagent song song ở bước này — tự viết code thật, tuần tự, trong session này. Mục đích: giảm token usage của main agent — main agent chỉ tổng hợp kết quả.
 
 Mọi subagent được spawn trong bước này PHẢI ghi findings vào `{work_context}/plans/reports/<agent-type>-<HHMMSS>-<slug>.md` trước khi trả lời, theo `_vskills-shared/repo-profile.md` §6 — orchestrator đọc lại file đó để tổng hợp, không chỉ dựa vào câu trả lời hội thoại. Đây là điều giữ cho các lần spawn lặp lại ở Bước 1 an toàn xuyên suốt một session Bước 1→9 dài.
 
@@ -39,7 +37,7 @@ BƯỚC 2: XÁC ĐỊNH BRANCH
 
 1. Kiểm tra branch hiện tại: nếu tên/nội dung đã khớp với task đang làm (user đang chủ ý tiếp tục trên branch đó) → BỎ QUA bước tạo branch, dùng branch hiện tại.
 2. Nếu không khớp:
-   - Tự động detect default branch: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'` → nếu rỗng, thử `git rev-parse --verify main 2>/dev/null` → dùng `main`; nếu `main` không tồn tại → dùng `master`.
+   - Tự động detect default branch theo `_vskills-shared/repo-profile.md` §9.
    - Chạy `git status --porcelain`; nếu có output (working tree dirty) → DỪNG LẠI, hỏi user (stash / commit / tiếp tục trên branch hiện tại) trước khi tiếp tục.
    - `git checkout <default_branch>` → `git pull` → `git checkout -b <descriptive-branch-name>`
    - Tên branch: kebab-case, tiếng Anh, mô tả chính xác phạm vi thay đổi (không gắn prefix theo tool/agent trừ khi repo bắt buộc theo convention riêng).
@@ -85,9 +83,7 @@ BƯỚC 6: BẮT BUỘC DÙNG GENERATED SDK/API CLIENT
 ═══════════════════════════════════════════════════════
 
 - Mọi API call phía client/web-app → PHẢI dùng generated SDK. Raw `fetch`/`axios` là CẤM.
-- Tự động detect xem SDK có tồn tại không:
-  - grep `package.json` tìm script `sdk:generate` / `api:generate` / `codegen`
-  - hoặc tìm thư mục `generated/`, `__generated__/`, `sdk/`, hoặc pattern đặc trưng của Fern/openapi-generator/orval
+- Tự động detect xem SDK có tồn tại không: grep `package.json` tìm script `sdk:generate` / `api:generate` / `codegen`, hoặc tìm thư mục `generated/`, `__generated__/`, `sdk/`, hoặc pattern đặc trưng của Fern/openapi-generator/orval.
 - Route BE mới trả về `void`/thiếu response schema → thêm response schema vào shared schema package TRƯỚC, rồi chạy generate command đã tìm được (tối thiểu map trên BE nếu FE chưa cần dùng ngay).
 - Không tìm thấy generate script/SDK directory → project không có SDK layer riêng, dùng API client hiện có của project (vẫn KHÔNG raw fetch/axios trực tiếp) hoặc hỏi user nếu chưa rõ.
 

@@ -39,7 +39,7 @@ for file in "$@"; do
   [[ "$file" =~ packages/(shared|ui)/ ]] && continue
 
   # Match cả có và không có type annotation: const FOO = ... hoặc const FOO: Type = ...
-  grep -nE "^(export\s+)?const [A-Z][A-Z_0-9]+(\s*:[^=]+)?=" "$file" 2>/dev/null \
+  grep -nE "^(export\s+)?const [A-Z][A-Z_0-9]+\s*(:[^=]+)?\s*=" "$file" 2>/dev/null \
     | while IFS= read -r hit; do
         const_name=$(echo "${hit#*:}" | grep -oE "[A-Z][A-Z_0-9]+" | head -1)
         if [[ -n "$const_name" ]] && grep -qxF "$const_name" "$SHARED_CONSTS_FILE" 2>/dev/null; then
