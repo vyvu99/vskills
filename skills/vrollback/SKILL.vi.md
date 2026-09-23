@@ -48,7 +48,7 @@ Nếu `$ARGUMENTS` rỗng — hỏi user tên hoặc version của migration c�
 
 ## Bước 3 — Xác nhận với user (bắt buộc, không được bỏ qua)
 
-Trình bày rõ ràng trước khi chạy bất kỳ command thật nào:
+Trình bày trước khi chạy bất kỳ command nào:
 - Migration nào sẽ được rollback (tên/version, đường dẫn file)
 - DB nào bị ảnh hưởng (tên DB, container nào, host)
 - Command/SQL chính xác sẽ được chạy
@@ -66,8 +66,8 @@ Trình bày rõ ràng trước khi chạy bất kỳ command thật nào:
   - Knex: `knex migrate:rollback`
   - TypeORM: `typeorm migration:revert`
 - **Framework không có down tự động** (ví dụ Drizzle không tự sinh down migration) → đọc file up migration, suy ra thao tác nghịch đảo (DROP TABLE thay vì CREATE TABLE, DROP COLUMN thay vì ADD COLUMN, v.v.), viết rollback SQL, hiển thị cho user trước khi chạy
-- **Ưu tiên dùng inverse do tool tự sinh hơn là suy luận thủ công.** Với Drizzle: nếu `schema.ts` trước migration còn recover được từ git history, checkout nó ra một temp path rồi chạy `drizzle-kit generate` với schema đó để tool tự sinh down SQL. Chỉ fallback sang đọc thủ công up migration và suy ra inverse (DROP TABLE↔CREATE TABLE, DROP COLUMN↔ADD COLUMN, v.v.) khi không recover được schema state trước đó.
-- Bọc rollback SQL trong transaction (`BEGIN; ... COMMIT;`) với Postgres/SQLite để tránh trường hợp fail giữa chừng làm schema bị half-migrated. DDL của MySQL không transactional — phải nói rõ điều này và backup trước (theo Bước 3) thay vì dùng transaction.
+- **Ưu tiên dùng inverse do tool tự sinh hơn là suy luận thủ công.** Với Drizzle: nếu `schema.ts` trước migration còn recover được từ git history, checkout nó ra một temp path rồi chạy `drizzle-kit generate` với schema đó để tool tự sinh down SQL. Chỉ fallback sang suy luận thủ công inverse khi không recover được schema state trước đó.
+- Bọc rollback SQL trong transaction (`BEGIN; ... COMMIT;`) với Postgres/SQLite để tránh trường hợp fail giữa chừng làm schema bị half-migrated. DDL của MySQL không transactional — phải nói rõ điều này và backup trước (theo Bước 3).
 - Chạy rollback SQL/command qua `docker exec` vào container đã xác định ở Bước 1 (nếu dùng Docker) hoặc chạy trực tiếp vào DB (nếu native/SQLite)
 
 ## Bước 5 — Xóa tracking record

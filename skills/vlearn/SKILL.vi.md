@@ -49,7 +49,7 @@ Chạy 3 lệnh trên cho từng PR trả về, gộp toàn bộ comment lại t
 
 Không phải GitHub hoặc thiếu `gh` → in thông báo §2 dành cho vlearn (`⚠️ không lấy được comment review vì thiếu gh — paste nội dung vào, tôi sẽ tiếp tục từ Bước 3`) rồi tiếp tục Bước 3 với comment user paste vào.
 
-Lọc theo author là bot review tự động (thường có hậu tố `[bot]` hoặc tên app tuỳ chỉnh). Không chắc tên account bot → thử auto-detect trước, trước khi hỏi:
+Lọc theo author là bot review tự động (thường có hậu tố `[bot]` hoặc tên app tuỳ chỉnh). Không chắc tên account bot → thử auto-detect trước:
 ```bash
 gh api repos/<owner>/<repo>/collaborators --jq '.[] | select(.type == "Bot" or (.login | endswith("[bot]"))) | .login'
 ```
@@ -89,9 +89,9 @@ Patch theo đúng rule Document Updates đã định nghĩa sẵn trong chính C
 
 ## Bước 7 — Gắn cờ rule hiện có không còn hiệu quả
 
-Đối chiếu danh sách rule ở Bước 1 với `scripts/lint-rules/violation-history.jsonl` (các entry `rule`/`count` tổng hợp) và báo cáo cũ của `vreview`. Một rule có 0 hit ở cả hai nguồn qua đủ lịch sử là ứng viên để gắn cờ siết chặt hoặc xoá — KHÔNG tự xoá — vì mỗi rule trong CLAUDE.md là một chi phí context phải trả mỗi session.
+Đối chiếu danh sách rule ở Bước 1 với `scripts/lint-rules/violation-history.jsonl` (các entry `rule`/`count` tổng hợp) và báo cáo cũ của `vreview`. 0 hit ở cả hai nguồn qua đủ lịch sử → gắn cờ ứng viên siết chặt/xoá (không tự xoá) — mỗi rule trong CLAUDE.md là một chi phí context phải trả mỗi session.
 
-Đừng dừng lại ở 0 hit: đọc cả field `count` trên những rule đã có entry. Một rule có count thấp hoặc giảm dần so với thời gian nó đã nằm trong CLAUDE.md (ví dụ chỉ vài hit tổng cộng, hoặc hit tập trung ở entry cũ, không có entry gần đây) là ứng viên phụ, độ tin cậy thấp hơn — rule này từng có ý nghĩa nhưng giờ hiếm khi kích hoạt. Trình bày tách riêng khỏi danh sách 0-hit, vì "chưa từng kích hoạt lần nào" là tín hiệu mạnh, còn "hiếm khi kích hoạt / từng kích hoạt nhiều hơn" là tín hiệu yếu hơn — user cần phân biệt được hai loại này.
+Đừng dừng lại ở 0 hit: đọc cả field `count` trên những rule đã có entry. Một rule có count thấp hoặc giảm dần so với thời gian nó đã nằm trong CLAUDE.md (ví dụ chỉ vài hit tổng cộng, hoặc hit tập trung ở entry cũ, không có entry gần đây) là ứng viên phụ, độ tin cậy thấp hơn — rule này từng có ý nghĩa nhưng giờ hiếm khi kích hoạt. Trình bày tách riêng khỏi danh sách 0-hit — "chưa từng kích hoạt" là tín hiệu mạnh, "hiếm khi kích hoạt" là tín hiệu yếu hơn.
 
 Trình bày rule bị gắn cờ dưới dạng hai danh sách ngắn, và append vào chung file `plans/reports/vlearn-<PR-or-last-N>-<HHMMSS>.md` từ Bước 4 thay vì chỉ để trong chat reply:
 - **0 hit** — nội dung rule + "0 hit trong violation-history.jsonl, 0 lần được cite trong report"

@@ -65,7 +65,7 @@ BƯỚC 4 — CROSS-GROUP ISSUES (REPORT.md)
 2. Mỗi cross-group issue là một batch riêng (vì theo định nghĩa nó đã trải rộng nhiều file/group).
 3. Fix → verify TẤT CẢ file liên quan ở CẢ HAI phía → commit riêng: `fix: {cross-group issue description}`.
 4. Nếu một trong hai phía thay đổi shared schema hoặc API route → chạy SDK/codegen (xem phần "SDK GENERATE").
-5. Khi quyết định outcome của item, ghi chú lại nhưng CHƯA ghi `Status:` vội. Ngay sau khi **commit của riêng từng batch** hoàn tất (không phải một lần cho cả bước), cập nhật dòng `Status:` của nó trong `.code-review/REPORT.md` thành `FIXED (commit <sha>)` / `REJECTED (<lý do ngắn gọn>)` / `DEFERRED (<lý do ngắn gọn>)`.
+5. Áp dụng đúng rule ghi `Status:` write-back như Bước 2 điểm 7 — ghi chú outcome, rồi cập nhật `.code-review/REPORT.md` ngay sau khi commit của riêng batch đó hoàn tất.
 
 ──────────────────────────────────────────────────────
 BƯỚC 5 — Issue SUGGESTION (REPORT.md)
@@ -95,12 +95,7 @@ Issue nào không khớp cả 4 điều kiện → fix trực tiếp theo đúng
 SDK GENERATE (sau MỖI batch làm thay đổi shared schema / API route)
 ═══════════════════════════════════════════════════════
 
-Tự động phát hiện script trong `package.json` (root và/hoặc package bị ảnh hưởng), theo thứ tự ưu tiên:
-1. `sdk:generate`
-2. `api:generate`
-3. `codegen`
-
-Script nào tìm thấy → chạy script đó (ưu tiên qua package manager của project: pnpm/npm/yarn, tự động phát hiện qua lockfile). Nếu không tìm thấy script nào → bỏ qua, không tự tạo script mới.
+Tự động detect script trong `package.json` (root và/hoặc package bị ảnh hưởng), thứ tự ưu tiên: `sdk:generate` → `api:generate` → `codegen`. Tìm thấy → chạy (ưu tiên qua package manager của project, tự động phát hiện qua lockfile). Không tìm thấy → bỏ qua, không tự tạo script mới.
 
 ═══════════════════════════════════════════════════════
 WRAP-UP — FORMAT + DỌN DẸP
@@ -109,7 +104,7 @@ WRAP-UP — FORMAT + DỌN DẸP
 1. Sau khi tất cả các bước đã xong (kể cả các item SUGGESTION đã hỏi) → tự động phát hiện và chạy format command của project: tìm trong scripts của `package.json` theo thứ tự `format` → `format:fix` → `lint:fix`. Nếu không tìm thấy → bỏ qua.
 2. Append mỗi item trong `.code-review/REPORT.md` thành 1 dòng vào `.code-review-history.jsonl` ở repo root (tạo file nếu chưa có) — mỗi dòng JSON: `{date, rule_or_source, file, status}`, đọc giá trị `Status:` cuối cùng của từng item. Làm bước này bất kể sau đó user xác nhận hay từ chối xoá — đây là bản ghi bền vững tồn tại độc lập với cả hai lựa chọn.
 3. Chạy `vci` (typecheck + build) trên (các) package đã bị đụng tới trong lần chạy này — fix nhiều violation qua nhiều batch rất dễ để sót một type error lẻ. Nếu vci báo lỗi, fix trước khi qua bước tiếp theo.
-4. Trước khi xoá `.code-review/` (hoặc report path đã dùng): hỏi user xác nhận — luôn mặc định là user CHƯA CHẮC đã đọc xong report; luôn hỏi, không bao giờ tự cho là đã đọc xong.
+4. Trước khi xoá `.code-review/` (hoặc report path đã dùng): hỏi user xác nhận — không bao giờ mặc định là user đã đọc xong report.
 5. User xác nhận → xoá report directory. User muốn giữ lại → để nguyên, xong.
 6. Kiểm tra `~/.claude/scripts/lint-rules/violation-history.jsonl`: nếu `rule_id` nào liên quan trong lần chạy này có tỷ lệ bị reject/skip cao qua các lần lịch sử, ghi chú vào summary cuối cùng như một ứng viên cần siết lại hoặc retire rule đó (qua `vreview --harvest` hoặc sửa trực tiếp rule).
 

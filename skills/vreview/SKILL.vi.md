@@ -11,6 +11,8 @@ metadata:
 
 Bạn là một reviewer code senior, thực hiện review qua 4 phase cốt lõi (1-4) bên dưới, bao quanh bởi Phase 0 pre-scan bắt buộc (luôn chạy ngay khi có file list) và Phase 5 lint harvest tùy chọn (mặc định bỏ qua, chỉ chạy với `--harvest`), cộng thêm Phase 4.5 spot-check nhẹ. KHÔNG được bỏ qua Phase 0-4.5.
 
+Mỗi phase bên dưới có spawn subagent đều nêu tên một file `references/*.md` là **Subagent prompt** — đọc file đó và dùng nội dung **nguyên văn** (không bao giờ tóm tắt hay diễn giải lại) làm prompt cho subagent, điền các placeholder được nêu.
+
 ═══════════════════════════════════════════════════════
 PHASE 0: SCRIPT SCAN (Spawn subagent SAU KHI danh sách file đã sẵn sàng)
 ═══════════════════════════════════════════════════════
@@ -24,14 +26,7 @@ Mục đích: Chạy các script lint tự động để phát hiện vi phạm 
 
 ⚠️ KHÔNG spawn Phase 0 trước Phase 1.1 — subagent sẽ nhận placeholder chưa điền → scan 0 file → kết quả sai hoàn toàn.
 
-──────────────────────────────────────────────────────
-PROMPT CHO SUBAGENT PHASE 0 (điền danh sách file thực tế trước khi spawn):
-──────────────────────────────────────────────────────
-
-Đọc `references/phase0-prescan-prompt.vi.md` và dùng nội dung đó **nguyên văn** làm prompt cho subagent ở phase này — không tóm tắt hay diễn giải lại khi truyền tiếp.
-
-──────────────────────────────────────────────────────
-
+**Subagent prompt:** `references/phase0-prescan-prompt.vi.md` (điền danh sách file thực tế trước khi spawn).
 
 ═══════════════════════════════════════════════════════
 PHASE 1: THU THẬP CONTEXT (Main agent tự làm, KHÔNG review)
@@ -126,9 +121,7 @@ PHÂN BIỆT `branch_list` VỚI `base_branch`:
 
 Auto-detect `base_branch` khi thiếu `--base` (không áp dụng khi dùng `--path`):
   1. Nếu tất cả args đều là PR ref VÀ full gh mode (theo §2) → lấy baseRefName từ gh pr view (thường là main/master). Degraded mode → chuyển sang bước 2.
-  2. Thử: `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'`
-  3. Nếu rỗng → thử `git rev-parse --verify main 2>/dev/null` → dùng `main`
-  4. Nếu `main` không tồn tại → dùng `master`
+  2. Ngược lại, theo `_vskills-shared/repo-profile.md` §9.
 
 Lấy danh sách file:
 
@@ -284,14 +277,7 @@ Tạo 1 subagent cho MỖI group. Mỗi subagent nhận prompt bên dưới (đi
 
 RULES cần paste: lọc danh sách rule đầy đủ của CONTEXT.txt xuống còn (a) rule áp dụng cho ngôn ngữ/framework của file trong group đó (theo tally §3 repo-profile.md) và (b) mọi rule security ngôn ngữ-agnostic (secret, injection, authz) — không bao giờ paste toàn bộ rule set bất kể nội dung group.
 
-──────────────────────────────────────────────────────
-PROMPT CHO SUBAGENT:
-──────────────────────────────────────────────────────
-
-Đọc `references/subagent-prompt.vi.md` và dùng nội dung đó **nguyên văn** làm prompt cho subagent ở phase này — không tóm tắt hay diễn giải lại khi truyền tiếp. Điền {GROUP_NAME}, RULES (theo filter ở trên), FILES ASSIGNED, DEPENDENCIES trước khi spawn.
-
-──────────────────────────────────────────────────────
-
+**Subagent prompt:** `references/subagent-prompt.vi.md`, điền {GROUP_NAME}, RULES (theo filter ở trên), FILES ASSIGNED, DEPENDENCIES trước khi spawn.
 
 ═══════════════════════════════════════════════════════
 PHASE 3: TỔNG HỢP & CROSS-CHECK (Main agent, đúng một lần)
@@ -405,16 +391,9 @@ CONFIDENCE NOTES
 PHASE 4: ADVERSARIAL PASS (một subagent duy nhất, sau Phase 3)
 ═══════════════════════════════════════════════════════
 
-Spawn 1 subagent với prompt bên dưới:
+Spawn 1 subagent.
 
-──────────────────────────────────────────────────────
-PROMPT CHO SUBAGENT ADVERSARIAL:
-──────────────────────────────────────────────────────
-
-Đọc `references/adversarial-prompt.vi.md` và dùng nội dung đó **nguyên văn** làm prompt cho subagent ở phase này — không tóm tắt hay diễn giải lại khi truyền tiếp.
-
-──────────────────────────────────────────────────────
-
+**Subagent prompt:** `references/adversarial-prompt.vi.md`.
 
 ═══════════════════════════════════════════════════════
 PHASE 4.5: MAIN AGENT SPOT-CHECK (không cần subagent — luôn bao phủ CRITICAL finding của Phase 3, cộng NEW issue của Phase 4 nếu có)
@@ -444,15 +423,9 @@ Skipped (use --harvest to enable)
 ```
 Sau đó kết thúc. KHÔNG spawn subagent.
 
-**NẾU user truyền `--harvest`**: Spawn 1 subagent sau khi Phase 4 hoàn thành:
+**NẾU user truyền `--harvest`**: Spawn 1 subagent sau khi Phase 4 hoàn thành.
 
-──────────────────────────────────────────────────────
-PROMPT CHO SUBAGENT LINT HARVEST:
-──────────────────────────────────────────────────────
-
-Đọc `references/lint-harvest-prompt.vi.md` và dùng nội dung đó **nguyên văn** làm prompt cho subagent ở phase này — không tóm tắt hay diễn giải lại khi truyền tiếp.
-
-──────────────────────────────────────────────────────
+**Subagent prompt:** `references/lint-harvest-prompt.vi.md`.
 
 Main agent sau khi subagent hoàn thành:
 - Đọc `.code-review/LINT_HARVEST.txt`
