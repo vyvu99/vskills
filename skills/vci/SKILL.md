@@ -12,7 +12,7 @@ metadata:
 
 # vci
 
-Runs typecheck + build (+ optional test) in parallel for packages in a JS/TS repo (monorepo or single package), using background commands + `wait`. Generic — no hardcoded package names or package manager.
+Runs typecheck + build (+ optional test) in parallel for packages in a JS/TS repo (monorepo or single package), using background commands + `wait`. No hardcoded package names or package manager.
 
 Read input from the user:
 
@@ -24,9 +24,9 @@ $ARGUMENTS
 
 ## Step -1 — Resolve the repo profile
 
-Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (if present) to resolve the package manager (`pm`), workspace shape, and the typecheck/build/format script names. If the file is absent, assume pnpm + workspace (`pnpm --filter <pkg> exec …`) — today's default. If §1 reports "not a JS/TS project", stop here and say so — vci has nothing to do in a non-JS/TS repo.
+Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (if present) to resolve the package manager (`pm`), workspace shape, and the typecheck/build/format script names. Absent → assume pnpm + workspace (`pnpm --filter <pkg> exec …`), today's default. §1 reports "not a JS/TS project" → stop, say so — vci has nothing to do in a non-JS/TS repo.
 
-If `turbo.json` or `nx.json` exists at the repo root, prefer the orchestrator for Steps 1-2: `turbo run typecheck build` (or `nx run-many --target=typecheck,build`) gets cache hits and topological ordering for free. Note this as the preferred path when detected; fall back to the manual per-package spawn below otherwise — additive, not a replacement of the existing behavior.
+`turbo.json` or `nx.json` exists at the repo root → prefer the orchestrator for Steps 1-2: `turbo run typecheck build` (or `nx run-many --target=typecheck,build`) gets cache hits and topological ordering for free. Fall back to the manual per-package spawn below otherwise.
 
 ## Step 0 — Determine the package list
 
@@ -41,11 +41,11 @@ If `turbo.json` or `nx.json` exists at the repo root, prefer the orchestrator fo
 
 ## Step 1 — Parallel typecheck
 
-Sanitize the package name for use as a filesystem path first: replace `/` and `@` with `_` (e.g. `@app/api` → `_app_api`) — a scoped package name written raw into `/tmp/tsc-<package>.log` breaks (creates an unintended subdirectory, or fails outright).
+Sanitize the package name for use as a filesystem path first: replace `/` and `@` with `_` (e.g. `@app/api` → `_app_api`) — a scoped name written raw into `/tmp/tsc-<package>.log` breaks (unintended subdirectory, or outright failure).
 
-If `turbo`/`nx` is preferred (Step -1), run the orchestrator's typecheck target instead of the loop below and skip straight to reading its output.
+`turbo`/`nx` preferred (Step -1) → run the orchestrator's typecheck target instead of the loop below, skip straight to reading its output.
 
-For EACH package in the list, spawn a background command, wrapped in `time` so the log carries per-package wall-time:
+For EACH package in the list, spawn a background command wrapped in `time` so the log carries per-package wall-time:
 
 ```
 { time timeout 600s <pm workspace/root exec template from Step -1> <typecheck cmd> ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &
@@ -55,20 +55,20 @@ For EACH package in the list, spawn a background command, wrapped in `time` so t
 - pnpm + workspace, no `typecheck` script → `{ time timeout 600s pnpm --filter <package> exec tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &` (today's default, byte-identical)
 - npm + single-package → `{ time timeout 600s npm exec -- tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &`
 
-Spawn all packages first, then `wait` — do not run them sequentially one by one. If resuming after an interruption, reuse an existing fresh `/tmp/tsc-<sanitized-package>.log` if present instead of re-spawning the check for that package.
+Spawn all packages first, then `wait` — never sequentially. Resuming after an interruption → reuse an existing fresh `/tmp/tsc-<sanitized-package>.log` if present instead of re-spawning that package's check.
 
 After `wait`, read each `/tmp/tsc-<sanitized-package>.log`:
 - No errors → report pass, with the wall-time `time` printed at the end of the log
-- Errors → extract the specific file:line + message, fix, then recheck **only the package just fixed** (rerun exactly 1 tsc command for that package, do not re-run the whole list)
-- If the package has no `tsconfig.json`, treat the failure as "no typecheck config" rather than a type error, and skip/report it accordingly instead of treating it as a code bug
+- Errors → extract file:line + message, fix, recheck **only the package just fixed** (rerun exactly 1 tsc command, do not re-run the whole list)
+- No `tsconfig.json` → treat as "no typecheck config", not a type error — skip/report accordingly
 
 ## Step 2 — Parallel build
 
-Sanitize the package name for use as a filesystem path first: replace `/` and `@` with `_` (e.g. `@app/api` → `_app_api`) — a scoped package name written raw into `/tmp/build-<package>.log` breaks (creates an unintended subdirectory, or fails outright).
+Sanitize the package name for use as a filesystem path first: replace `/` and `@` with `_` (e.g. `@app/api` → `_app_api`) — a scoped name written raw into `/tmp/build-<package>.log` breaks (unintended subdirectory, or outright failure).
 
-If `turbo`/`nx` is preferred (Step -1), run the orchestrator's build target instead of the loop below and skip straight to reading its output.
+`turbo`/`nx` preferred (Step -1) → run the orchestrator's build target instead of the loop below, skip straight to reading its output.
 
-Same as step 1, spawn a background command for each package, wrapped in `time`:
+Same as step 1: spawn a background command per package, wrapped in `time`:
 
 ```
 { time timeout 600s <pm workspace/root exec template from Step -1> <build script> ; } > /tmp/build-<sanitized-package>.log 2>&1 &
@@ -76,11 +76,11 @@ Same as step 1, spawn a background command for each package, wrapped in `time`:
 
 `<build script>` = the package's declared `build` script (Step -1 — no raw fallback; a package with no `build` script is skipped, not run with a substitute). Worked example: pnpm + workspace → `{ time timeout 600s pnpm --filter <package> build ; } > /tmp/build-<sanitized-package>.log 2>&1 &` (today's default, byte-identical).
 
-Spawn all → `wait` → parse each package's log (pass/fail, with wall-time). Failing package → fix, recheck only that package. If resuming after an interruption, reuse an existing fresh `/tmp/build-<sanitized-package>.log` if present instead of re-spawning the check for that package.
+Spawn all → `wait` → parse each package's log (pass/fail, with wall-time). Failing package → fix, recheck only that package. Resuming after an interruption → reuse an existing fresh `/tmp/build-<sanitized-package>.log` if present instead of re-spawning.
 
 ## Step 2.5 — Parallel lint
 
-Resolve a lint script the same way as typecheck/build (Step -1 pattern): `lint` → `lint:check` → direct `eslint .` fallback if neither script exists.
+Resolve a lint script the same way as typecheck/build (Step -1 pattern): `lint` → `lint:check` → direct `eslint .` fallback.
 
 For EACH package in the list, spawn a background command:
 
@@ -88,7 +88,7 @@ For EACH package in the list, spawn a background command:
 timeout 600s <pm workspace/root exec template from Step -1> <lint cmd> > /tmp/lint-<sanitized-package>.log 2>&1 &
 ```
 
-Spawn all → `wait` → parse each package's log (pass/fail). Failing package → fix, recheck only that package — same rules as Steps 1-2. If resuming after an interruption, reuse an existing fresh `/tmp/lint-<sanitized-package>.log` if present instead of re-spawning the check for that package.
+Spawn all → `wait` → parse each package's log (pass/fail). Failing package → fix, recheck only that package — same rules as Steps 1-2. Resuming after an interruption → reuse an existing fresh `/tmp/lint-<sanitized-package>.log` if present instead of re-spawning.
 
 ## Step 3 — Format
 

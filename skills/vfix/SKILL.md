@@ -10,119 +10,114 @@ metadata:
   version: "1.1.0"
 ---
 
-You are a senior engineer fixing issues from an existing report. For EACH issue/batch, invoke the `fix` skill (via the Skill tool) to do root-cause diagnosis + verify + prevention — but the order in which issues are processed, which batches get grouped, and whether to stop and ask the user are all decided by vfix, NOT left for `fix` to choose on its own.
+You are a senior engineer fixing issues from an existing report. For EACH issue/batch, invoke the `fix` skill (via the Skill tool) for root-cause diagnosis + verify + prevention — but processing order, batch grouping, and whether to stop and ask the user are all decided by vfix, NOT left for `fix` to choose.
 
 ═══════════════════════════════════════════════════════
 INPUT
 ═══════════════════════════════════════════════════════
 
-- By default, read from `.code-review/` (output of the vreview skill) if it exists:
+- By default, read from `.code-review/` (vreview's output) if it exists:
   - `SCRIPT_SCAN.json` — violations already confirmed by lint rules
   - `REPORT.md` — CRITICAL / WARNING / SUGGESTION / CROSS-GROUP ISSUES
-  - `ADVERSARIAL.txt` — issues from the adversarial pass; the logic has already been merged into REPORT.md, so treat CRITICAL/WARNING items here as equivalent to REPORT.md
-- If the user passes a different path via argument → use that path instead of `.code-review/`; the internal file structure must be the same (SCRIPT_SCAN.json / REPORT.md / ADVERSARIAL.txt) — if any file is missing, skip the corresponding step, no error.
-- If NO report exists (no `.code-review/`, no valid path) → ask the user: is there a specific issue to fix, or should we invoke the `fix` skill directly from a verbal bug description.
+  - `ADVERSARIAL.txt` — adversarial-pass issues; already merged into REPORT.md, so treat CRITICAL/WARNING items here as equivalent to REPORT.md
+- User passes a different path via argument → use it instead of `.code-review/`; same internal file structure (SCRIPT_SCAN.json / REPORT.md / ADVERSARIAL.txt) — missing file → skip that step, no error.
+- No report exists (no `.code-review/`, no valid path) → ask the user: a specific issue to fix, or invoke `fix` directly from a verbal bug description.
 
 ═══════════════════════════════════════════════════════
 PROCESSING ORDER (MANDATORY — do NOT skip steps, do NOT parallelize BETWEEN steps)
 ═══════════════════════════════════════════════════════
 
-Within EACH step, sub-groups may be parallelized (e.g. multiple subagents fixing multiple independent files at once — each parallel fixer folds its root-cause rationale into the commit message body), but the next step only starts once the previous step is fully done + committed (if a commit applies).
+Within EACH step, sub-groups may be parallelized (e.g. multiple subagents fixing multiple independent files at once — each folds its root-cause rationale into the commit message body), but the next step only starts once the previous is fully done + committed (if a commit applies).
 
 ──────────────────────────────────────────────────────
 STEP 1 — SCRIPT_SCAN.json
 ──────────────────────────────────────────────────────
-Why this goes first: already confirmed by lint rules, grep-detectable, clearest, lowest risk of misreading business logic.
+Goes first: already confirmed by lint rules, grep-detectable, clearest, lowest risk of misreading business logic.
 
-1. Read `SCRIPT_SCAN.json`. If empty/`{"error":...}` → skip this step.
+1. Read `SCRIPT_SCAN.json`. Empty/`{"error":...}` → skip this step.
 2. Group violations by `rule_id`.
-3. For EACH rule_id: read the rule script (`~/.claude/scripts/lint-rules/rules/{rule_id}.sh` — the `## PROBLEM` + `## FIX` sections) to understand the rule's intent correctly before fixing. If the rule script is missing, fall back to inferring intent from the `message` field for that `rule_id` in `~/.claude/scripts/lint-rules/config/rule-registry.json`; if that's also absent, skip the rule_id and note it in the report instead of failing the whole step.
-4. Fix EACH violation exactly as suggested in the `## FIX` section of the rule script — do not invent a different fix approach if the rule already spells it out. If applying the `## FIX` exactly as suggested causes a test/typecheck failure, do NOT invent a different fix — stop, report "rule `<rule_id>`'s FIX guidance appears wrong for this case," and suggest running `vreview --harvest` to tighten that rule, rather than silently patching around it.
-5. After fixing all violations for 1 rule_id → re-run that same rule against the files just fixed to confirm no violations remain, then move to the next rule_id.
-6. After STEP 1 is done → commit once: `fix: resolve {N} script-detected lint violations`.
+3. For EACH rule_id: read the rule script (`~/.claude/scripts/lint-rules/rules/{rule_id}.sh` — `## PROBLEM` + `## FIX` sections) to understand the rule's intent before fixing. Rule script missing → infer intent from the `message` field for that `rule_id` in `~/.claude/scripts/lint-rules/config/rule-registry.json`; also absent → skip the rule_id, note it in the report, don't fail the whole step.
+4. Fix EACH violation exactly as the rule script's `## FIX` section suggests — don't invent a different approach if it already spells one out. If applying `## FIX` exactly causes a test/typecheck failure, don't invent a different fix either — stop, report "rule `<rule_id>`'s FIX guidance appears wrong for this case," suggest running `vreview --harvest` to tighten that rule, rather than silently patching around it.
+5. After fixing all violations for 1 rule_id → re-run that rule against the fixed files to confirm none remain, then move to the next rule_id.
+6. STEP 1 done → commit once: `fix: resolve {N} script-detected lint violations`.
 
 ──────────────────────────────────────────────────────
 STEP 2 — CRITICAL issues (REPORT.md)
 ──────────────────────────────────────────────────────
 1. Read the entire CRITICAL section in `REPORT.md` (and CRITICAL in `ADVERSARIAL.txt` if present, without duplicating).
-2. Group by dependency — issues related to the same flow / file / type go in the same batch (don't split them up if fixing issue A without fixing issue B in the same batch would leave the code in a half-fixed state).
-3. For EACH batch: invoke the `fix` skill (Scout+Diagnose can be shortened since context is already available from the report — use file:line + the problem already documented in REPORT.md as the baseline instead of scouting from scratch; Fix+Verify must still be done in full).
-4. BEFORE fixing, check the STOP-GATE (see "STOP AND ASK THE USER" section below) for each issue in the batch.
-5. After finishing a batch → verify (relevant test/build) → commit once for the whole batch: `fix: {short batch description}` — do NOT commit issues individually if they depend on each other.
-6. If the batch changes a shared schema or API route → run SDK/codegen (see "SDK GENERATE" section).
-7. As you decide each item's outcome, note it (fix / reject / defer) but do not write `Status:` yet. Immediately after **each batch's own** commit completes (not once for the whole step), do one pass over every item just handled and update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` (using that batch's real commit sha) / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
+2. Group by dependency — issues sharing a flow/file/type go in the same batch (don't split A from B if fixing A alone would leave the code half-fixed).
+3. For EACH batch: invoke the `fix` skill (Scout+Diagnose can be shortened — use file:line + the problem already documented in REPORT.md as the baseline instead of scouting from scratch; Fix+Verify still done in full).
+4. BEFORE fixing, check the STOP-GATE (see "STOP AND ASK THE USER" below) for each issue in the batch.
+5. After finishing a batch → verify (relevant test/build) → commit once for the whole batch: `fix: {short batch description}` — never commit interdependent issues individually.
+6. Batch changes a shared schema or API route → run SDK/codegen (see "SDK GENERATE").
+7. As you decide each item's outcome, note it (fix / reject / defer) but don't write `Status:` yet. Immediately after **each batch's own** commit (not once for the whole step), pass over every item just handled and update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` (that batch's real sha) / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
 
 ──────────────────────────────────────────────────────
 STEP 3 — WARNING issues (REPORT.md)
 ──────────────────────────────────────────────────────
-Repeat the exact same process as STEP 2 (group by dependency → batch → stop-gate → fix → verify → commit → sdk generate if needed → write `Status:` immediately after **each batch's own** commit completes, not once for the whole step) but for the WARNING section.
+Repeat STEP 2's exact process (group by dependency → batch → stop-gate → fix → verify → commit → sdk generate if needed → write `Status:` immediately after each batch's own commit) for the WARNING section.
 
 ──────────────────────────────────────────────────────
 STEP 4 — CROSS-GROUP ISSUES (REPORT.md)
 ──────────────────────────────────────────────────────
 0. Before fixing, check STOP-GATE (same 4 conditions as Step 2/3).
-1. Read the separate "CROSS-GROUP ISSUES" section in REPORT.md — issues spanning ≥2 groups/files that don't fit neatly into a single CRITICAL/WARNING batch above.
-2. Each cross-group issue is its own batch (since by definition it already spans multiple files/groups).
-3. Fix → verify ALL files involved on BOTH sides → commit separately: `fix: {cross-group issue description}`.
-4. If either side touches a shared schema or API route → run SDK/codegen (see "SDK GENERATE" section).
-5. As you decide each item's outcome, note it but do not write `Status:` yet. Immediately after **each batch's own** commit completes (not once for the whole step), update its `Status:` line in `.code-review/REPORT.md` to `FIXED (commit <sha>)` / `REJECTED (<one-line reason>)` / `DEFERRED (<one-line reason>)`.
+1. Read the separate "CROSS-GROUP ISSUES" section — issues spanning ≥2 groups/files that don't fit a single CRITICAL/WARNING batch above.
+2. Each cross-group issue is its own batch (it already spans multiple files/groups by definition).
+3. Fix → verify ALL files on BOTH sides → commit separately: `fix: {cross-group issue description}`.
+4. Either side touches a shared schema or API route → run SDK/codegen (see "SDK GENERATE").
+5. Same `Status:` write-back rule as Step 2 point 7 — note the outcome, then update `.code-review/REPORT.md` immediately after each batch's own commit.
 
 ──────────────────────────────────────────────────────
 STEP 5 — SUGGESTION issues (REPORT.md)
 ──────────────────────────────────────────────────────
-DIFFERENT from the 4 steps above: do NOT apply arbitrarily.
+DIFFERENT from the 4 steps above: never apply arbitrarily.
 
 1. Read the SUGGESTION section.
-2. For EACH suggestion (one item at a time, no grouping): use `AskUserQuestion` to present the issue + proposed fix, and ask the user whether to apply it or skip it.
-3. User agrees → fix that item immediately → verify → write `Status: FIXED (pending commit)` → move on to the next item.
-4. User declines → write `Status: REJECTED (<one-line reason>)` immediately (no commit dependency) → move to the next item — do NOT ask again.
-5. After going through all SUGGESTION items → if at least 1 item was applied → commit together: `fix: apply {N} accepted suggestions` → then do one final pass over every `FIXED (pending commit)` item and replace it with `FIXED (commit <sha>)` using the real commit sha.
+2. For EACH suggestion (one item at a time, no grouping): use `AskUserQuestion` to present the issue + proposed fix, ask whether to apply or skip.
+3. User agrees → fix immediately → verify → write `Status: FIXED (pending commit)` → next item.
+4. User declines → write `Status: REJECTED (<one-line reason>)` immediately (no commit dependency) → next item — never ask again.
+5. After all SUGGESTION items → ≥1 applied → commit together: `fix: apply {N} accepted suggestions` → final pass replacing every `FIXED (pending commit)` with `FIXED (commit <sha>)` using the real sha.
 
 ═══════════════════════════════════════════════════════
 STOP-GATE — STOP AND ASK THE USER (applies to steps 2-4, do NOT decide on your own)
 ═══════════════════════════════════════════════════════
 
-Before fixing any issue, check the following 4 conditions — if ANY condition matches → stop, use `AskUserQuestion`, do NOT fix on your own:
+Before fixing any issue, check these 4 conditions — ANY match → stop, use `AskUserQuestion`, do NOT fix on your own:
 
-a. The report notes "verify with product" / "needs business-logic confirmation" / equivalent phrasing indicating the fix depends on an unclear business decision.
-b. The fix requires a database migration (adding/changing/removing a column, constraint, or enum value at the DB level).
-c. The fix affects a shared package (a package used by ≥2 apps in the monorepo — check whether `packages/` is imported by ≥2 `apps/`).
-d. The fix requires an `UPDATE`/`DELETE` on existing data (not just a schema change) — treat this with the same stop-and-ask weight as a migration, since it's equally risky.
+a. The report notes "verify with product" / "needs business-logic confirmation" / equivalent — fix depends on an unclear business decision.
+b. The fix requires a database migration (adding/changing/removing a column, constraint, or enum value).
+c. The fix affects a shared package (used by ≥2 apps in the monorepo — check whether `packages/` is imported by ≥2 `apps/`).
+d. The fix requires `UPDATE`/`DELETE` on existing data (not just a schema change) — same stop-and-ask weight as a migration, equally risky.
 
-Any issue that matches none of the 4 conditions → fix directly following the corresponding step's process.
+None match → fix directly following the corresponding step's process.
 
 ═══════════════════════════════════════════════════════
 SDK GENERATE (after EVERY batch that changes a shared schema / API route)
 ═══════════════════════════════════════════════════════
 
-Auto-detect the script in `package.json` (root and/or the affected package), in this priority order:
-1. `sdk:generate`
-2. `api:generate`
-3. `codegen`
-
-Whichever script is found → run it (preferably via the project's package manager: pnpm/npm/yarn, auto-detected via lockfile). If none found → skip, do not create a new script.
+Auto-detect the script in `package.json` (root and/or affected package), priority order: `sdk:generate` → `api:generate` → `codegen`. Found → run it (preferably via the project's package manager, auto-detected via lockfile). None found → skip, don't create a new script.
 
 ═══════════════════════════════════════════════════════
 WRAP-UP — FORMAT + CLEANUP
 ═══════════════════════════════════════════════════════
 
-1. After all steps are done (including SUGGESTION items already asked about) → auto-detect and run the project's format command: look in `package.json` scripts in this order `format` → `format:fix` → `lint:fix`. If none found → skip.
-2. Append one line per item in `.code-review/REPORT.md` to `.code-review-history.jsonl` at the repo root (create if absent) — JSON per line: `{date, rule_or_source, file, status}`, reading each item's final `Status:` value. Do this regardless of whether the user later confirms or declines deletion — it's the persistent record that survives either way.
-3. Run `vci` (typecheck + build) on the package(s) touched during this run — fixing many violations across multiple batches easily leaves a stray type error. If it reports failures, fix them before moving to the next step.
-4. Before deleting `.code-review/` (or the report path used): ask the user for confirmation — always default to assuming the user has NOT necessarily finished reading the report; always ask, never assume.
-5. User confirms → delete the report directory. User wants to keep it → leave it as-is, done.
-6. Check `~/.claude/scripts/lint-rules/violation-history.jsonl`: if any `rule_id` involved in this run shows a high rate of being rejected/skipped across historical entries, note it in the final summary as a candidate for tightening or retiring that rule (via `vreview --harvest` or editing the rule directly).
+1. All steps done (including SUGGESTION items) → auto-detect and run the project's format command: `package.json` scripts, order `format` → `format:fix` → `lint:fix`. None found → skip.
+2. Append one line per `.code-review/REPORT.md` item to `.code-review-history.jsonl` at the repo root (create if absent) — JSON per line: `{date, rule_or_source, file, status}`, from each item's final `Status:` value. Do this regardless of whether the user later confirms or declines deletion — it's the persistent record that survives either way.
+3. Run `vci` (typecheck + build) on the package(s) touched this run — fixing many violations across multiple batches easily leaves a stray type error. Failures → fix before moving on.
+4. Before deleting `.code-review/` (or the report path used): ask for confirmation — never assume the user has finished reading the report.
+5. Confirmed → delete the report directory. Wants to keep it → leave as-is, done.
+6. Check `~/.claude/scripts/lint-rules/violation-history.jsonl`: any `rule_id` in this run showing a high historical reject/skip rate → note it in the final summary as a candidate for tightening/retiring (via `vreview --harvest` or editing the rule directly).
 
 ═══════════════════════════════════════════════════════
 HARD RULES
 ═══════════════════════════════════════════════════════
 
-- Do NOT skip the priority order SCRIPT_SCAN → CRITICAL → WARNING → CROSS-GROUP → SUGGESTION — even if a step is empty, report "skip — no issues" before moving to the next step; never jump ahead.
-- Do NOT apply SUGGESTION items on your own without asking about each one via `AskUserQuestion`.
-- Do NOT refactor code outside the scope of the issue being fixed — root-cause that exact issue, don't sneak in extra changes "while you're at it".
-- Do NOT commit issues individually within a batch that has interdependencies — commit per batch.
+- Do NOT skip the priority order SCRIPT_SCAN → CRITICAL → WARNING → CROSS-GROUP → SUGGESTION — even an empty step reports "skip — no issues" before moving on; never jump ahead.
+- Do NOT apply SUGGESTION items without asking about each one via `AskUserQuestion`.
+- Do NOT refactor outside the scope of the issue being fixed — root-cause that exact issue, don't sneak in extra changes "while you're at it".
+- Do NOT commit interdependent issues within a batch individually — commit per batch.
 - ALWAYS use `AskUserQuestion` when a STOP-GATE condition (a/b/c/d) matches — never decide on the user's behalf.
-- ALWAYS ask for confirmation before deleting `.code-review/` or the report dir that was used.
+- ALWAYS confirm before deleting `.code-review/` or the report dir used.
 
 ═══════════════════════════════════════════════════════
 NEXT STEPS

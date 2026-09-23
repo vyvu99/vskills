@@ -14,7 +14,7 @@ metadata:
 
 Distill new rules for `~/.claude/CLAUDE.md` from recurring patterns in Claude bot's review comments — a self-improvement loop for the global rule file. Default: one PR; `--last <N>` runs cross-PR.
 
-**Precondition:** this skill requires that a bot review (e.g. a Claude Code review bot or equivalent) has already commented on the target PR(s) — without prior bot review activity there are no comments to cluster into patterns.
+**Precondition:** a bot review (Claude Code review bot or equivalent) must have already commented on the target PR(s) — no prior bot activity means no comments to cluster.
 
 Read input from the user:
 
@@ -28,7 +28,7 @@ If `$ARGUMENTS` is empty — ask whether to analyze one PR number or run `--last
 
 ## Step 1 — Extract existing rules
 
-Read the ENTIRE `~/.claude/CLAUDE.md`. Extract every rule/bullet into a numbered list (keep the original section, e.g. `[Backend-12]`, `[TypeScript-3]`) for cross-checking in Step 3. Do not summarize or paraphrase the rule content.
+Read the ENTIRE `~/.claude/CLAUDE.md`. Extract every rule/bullet into a numbered list (keep the original section, e.g. `[Backend-12]`, `[TypeScript-3]`) for cross-checking in Step 3. Do not summarize/paraphrase the rule content.
 
 ## Step 2 — Fetch Claude bot's review comments
 
@@ -49,17 +49,17 @@ Run the three commands above for each returned PR number, pool all comments toge
 
 Not GitHub or no `gh` → print the §2 vlearn message (`⚠️ can't fetch review comments without gh — paste them and I'll continue from Step 3`) and continue from Step 3 with user-pasted comments.
 
-Filter by author being the automated review bot (usually suffixed `[bot]` or a custom app name). Unsure of the exact bot account → try auto-detection first, before asking:
+Filter by author being the automated review bot (usually suffixed `[bot]` or a custom app name). Unsure of the exact bot account → try auto-detection first:
 ```bash
 gh api repos/<owner>/<repo>/collaborators --jq '.[] | select(.type == "Bot" or (.login | endswith("[bot]"))) | .login'
 ```
-Exactly one candidate → quick confirm with the user ("detected `<login>` as the review bot — use this?"). Multiple candidates or none found → fall back to asking the user which account to filter by, don't guess.
+Exactly one candidate → quick confirm ("detected `<login>` as the review bot — use this?"). Multiple or none found → ask the user which account to filter by, don't guess.
 
 ## Step 3 — Cluster patterns
 
 Group comments by recurring issue type (e.g. missing null check, N+1 query, leftover console.log) — never list individual comments.
 
-Count occurrences per pattern: single-PR mode counts occurrences within the PR; `--last <N>` mode counts the number of **distinct PRs** the pattern appears in, not raw occurrences — a pattern repeated twice within one PR is more likely one duplicated mistake than a generalizable rule.
+Count occurrences per pattern: single-PR mode counts occurrences within the PR; `--last <N>` counts **distinct PRs** the pattern appears in, not raw occurrences — twice within one PR reads as one duplicated mistake, not a generalizable rule.
 
 Cross-check each pattern against the Step 1 rule list:
 - **Already covered** → skip, quote the exact existing rule text (not just the section number) as the citation
@@ -67,7 +67,7 @@ Cross-check each pattern against the Step 1 rule list:
 
 ## Step 4 — Checkpoint clustered patterns
 
-Write the clustered pattern list (with occurrence/PR counts and the Step 1 rule citations already resolved) to `plans/reports/vlearn-<PR-or-last-N>-<HHMMSS>.md`, before starting the per-rule confirmation loop. Update that file's status column (proposed/confirmed/rejected) as each rule is resolved in Step 5-6, so an interrupted run can resume from the file instead of re-fetching and re-clustering.
+Write the clustered pattern list (occurrence/PR counts + Step 1 rule citations already resolved) to `plans/reports/vlearn-<PR-or-last-N>-<HHMMSS>.md` before starting the per-rule confirmation loop. Update its status column (proposed/confirmed/rejected) as each rule is resolved in Step 5-6, so an interrupted run resumes from the file instead of re-fetching/re-clustering.
 
 ## Step 5 — Propose new rules
 
@@ -89,11 +89,11 @@ Patch following the Document Updates rule already in CLAUDE.md itself:
 
 ## Step 7 — Flag ineffective existing rules
 
-Cross-reference the Step 1 rule list against `scripts/lint-rules/violation-history.jsonl` (aggregated `rule`/`count` entries) and `vreview`'s past reports. A rule with zero hits in either source across enough history is a candidate to flag for tightening or removal — not auto-remove — since every rule in CLAUDE.md is a context cost paid every session.
+Cross-reference the Step 1 rule list against `scripts/lint-rules/violation-history.jsonl` (`rule`/`count` entries) and `vreview`'s past reports. Zero hits in either across enough history → flag as a tightening/removal candidate (not auto-remove) — every CLAUDE.md rule is a context cost paid every session.
 
-Don't stop at zero-hit: also read the `count` field on rules that do have entries. A rule whose count is low or declining relative to how long it's been in CLAUDE.md (e.g. a handful of hits total, or hits clustered in older entries with none recent) is a weaker, secondary candidate — it once mattered but rarely fires now. Present these separately from the zero-hit list, since "never fired once" is a strong signal and "fires rarely / used to fire more" is a weaker one — the user should be able to tell them apart.
+Also check the `count` field on rules that do have entries: low or declining relative to how long the rule's been in CLAUDE.md (a handful of hits total, or hits clustered in older entries with none recent) is a weaker, secondary candidate — it once mattered but rarely fires now. Present separately from the zero-hit list — "never fired" is a strong signal, "fires rarely" a weaker one.
 
-Present flagged rules as two short lists, and append them to the same `plans/reports/vlearn-<PR-or-last-N>-<HHMMSS>.md` file from Step 4 instead of leaving them only in the chat reply:
+Present flagged rules as two short lists, appended to the same `plans/reports/vlearn-<PR-or-last-N>-<HHMMSS>.md` file from Step 4 (not just the chat reply):
 - **Zero hits** — rule text + "0 hits in violation-history.jsonl, 0 review-report citations"
 - **Low/declining hits** (secondary, lower-confidence) — rule text + count + trend note (e.g. "3 hits total, none in the last N entries")
 
