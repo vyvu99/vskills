@@ -13,7 +13,7 @@ Bộ skill Claude Code cá nhân — checklist theo phong cách riêng, đặt l
 | `vcook` | Implement theo checklist 9 bước: branch, test-first, SDK client, review, PR | Đã có plan (hoặc mô tả nhanh), cần code |
 | `vreview` | Code review 4-phase (+ pre-scan/lint-harvest tùy chọn) bằng subagent song song + adversarial pass | Cần review 1 branch/PR |
 | `vfix` | Fix issue từ report của `vreview` theo thứ tự ưu tiên cố định | Có report review cần fix |
-| `vci` | Typecheck + build song song cho JS/TS workspace (mọi package manager) | Check nhanh trước khi commit |
+| `vci` | Typecheck + build + format (+ test tuỳ chọn) song song cho JS/TS workspace (mọi package manager) | Check nhanh trước khi commit |
 | `vtickets` | Tạo/update GitHub epic + sub-issues từ 1 plan | Cần track plan trên GitHub |
 | `vdesign` | Redesign UI/UX theo thẩm mỹ cá nhân (audit-driven, không còn flag mức độ; `--wow` cho mức táo bạo tầm Awwwards) | Cần nâng cấp UI 1 page/component |
 | `vlearn` | Rút pattern từ PR review của bot → đề xuất rule mới cho CLAUDE.md | Bot vừa review xong 1 PR |
@@ -70,7 +70,7 @@ flowchart LR
 ```bash
 /vci
 ```
-→ typecheck + build song song mọi package trong workspace (background commands), tự fix nếu fail.
+→ typecheck + build + format song song mọi package trong workspace (background commands), tự fix nếu fail.
 
 **Track 1 plan lớn cho PM/non-tech xem tiến độ trên GitHub:**
 ```bash
