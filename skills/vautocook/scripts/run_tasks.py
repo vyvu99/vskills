@@ -106,6 +106,15 @@ SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
 PROMPT_FILE = SCRIPT_DIR / "prompt.md"
 LOGS_DIR = SCRIPT_DIR / "logs"
+PIPELINE_STATUS_FILE = SCRIPT_DIR / "pipeline_status.json"
+
+
+def write_pipeline_status(state: str, **extra) -> None:
+    """Sentinel a Claude session (e.g. the one that opened this run in a Warp
+    tab) can poll for instead of asking the user whether the run is done.
+    state: 'running' | 'completed' | 'stopped' | 'interrupted'."""
+    with open(PIPELINE_STATUS_FILE, 'w', encoding='utf-8') as f:
+        json.dump({'state': state, 'at': datetime.now().isoformat(), **extra}, f, indent=2)
 
 
 def load_tasks() -> dict:
@@ -368,6 +377,8 @@ def main():
         print("prompt.md not found.")
         sys.exit(1)
 
+    write_pipeline_status('running')
+
     config = load_tasks()
     tasks = config['tasks']
 
@@ -403,17 +414,20 @@ def main():
     if not pending:
         print("All tasks are done!")
         _print_merge_order(config)
+        write_pipeline_status('completed')
         return
 
     for task in pending:
         success = run_task(task, config)
         if not success:
             print(f"\nPipeline stopped. Fix task #{task['number']} and re-run.")
+            write_pipeline_status('stopped', failed_task=task['number'])
             sys.exit(1)
 
     print(f"\n{'=' * 60}")
     print(f"All {len(tasks)} tasks completed!")
     _print_merge_order(config)
+    write_pipeline_status('completed')
 
 
 if __name__ == "__main__":
@@ -421,4 +435,5 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print("\nInterrupted.")
+        write_pipeline_status('interrupted')
         sys.exit(130)

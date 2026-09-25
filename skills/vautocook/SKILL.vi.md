@@ -7,7 +7,7 @@ disable-model-invocation: true
 when_to_use: "Dùng khi đã có sẵn epic + sub-issues (ví dụ do vtickets tạo) và muốn triển khai tự động, lần lượt từng cái, không cần ngồi canh từng lượt /vcook."
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 Tự động triển khai từng sub-issue của 1 GitHub epic, tuần tự, không cần người canh. Mỗi sub-issue chạy như 1 phiên `/vcook` cô lập ở chế độ headless (`claude -p --dangerously-skip-permissions`) — có branch riêng, PR riêng, không hỏi lại ai giữa chừng. Dựa trên 2 script đi kèm trong thư mục `scripts/` của skill này; file này chỉ là hướng dẫn *khi nào và chạy sao*, bản thân nó không phải script.
@@ -66,15 +66,31 @@ Chỉ sau khi user xác nhận. Bước này có thể chạy hàng giờ, khôn
   commands = ["python3 ~/.claude/skills/vautocook/scripts/run_tasks.py"]
   ```
 
+  Báo cho user biết 1 tab Warp mới vừa mở chạy pipeline — phiên này không tự
+  chạy và không thấy được output live của nó; theo dõi/interrupt trực tiếp ở
+  tab đó. Warp's tab-config launcher chỉ hỗ trợ mở theo tên (không nhận tham
+  số qua CLI), đó là lý do config phải là 1 file phiên này ghi lại mỗi lần
+  thay vì 1 lệnh inline duy nhất. Không có cách gửi thêm input vào tab đó sau
+  khi đã mở — Warp's tab-config launch là one-shot, nên phiên này chỉ theo
+  dõi được lúc nào xong, không điều khiển được run giữa chừng.
+
+  Xoá sentinel trước rồi chờ nó bằng 1 lệnh Bash `run_in_background: true` là
+  cách phiên này biết lúc nào chạy xong mà không cần hỏi user — `run_tasks.py`
+  ghi đè file này 1 lần lúc bắt đầu (`"running"`) và 1 lần nữa khi kết thúc,
+  dù kết thúc kiểu gì:
+
   ```bash
+  rm -f ~/.claude/skills/vautocook/scripts/pipeline_status.json
   open 'warp://tab_config/vautocook'
   ```
 
-  Báo cho user biết 1 tab Warp mới vừa mở chạy pipeline — phiên này không tự
-  chạy và không thấy được output của nó; theo dõi/interrupt trực tiếp ở tab
-  đó. Warp's tab-config launcher chỉ hỗ trợ mở theo tên (không nhận tham số
-  qua CLI), đó là lý do config phải là 1 file phiên này ghi lại mỗi lần thay
-  vì 1 lệnh inline duy nhất.
+  ```bash
+  until [ -f ~/.claude/skills/vautocook/scripts/pipeline_status.json ] && grep -qE '"state": "(completed|stopped|interrupted)"' ~/.claude/skills/vautocook/scripts/pipeline_status.json; do sleep 30; done
+  ```
+
+  Lệnh này tự treo tới khi pipeline đạt trạng thái cuối; harness tự notify
+  phiên này khi lệnh thoát (giống mọi lệnh `run_in_background` chờ khác —
+  không cần tự polling trong hội thoại này).
 - **Trường hợp khác** (không phải macOS, hoặc chưa cài Warp): fallback về
   chạy trực tiếp như cũ:
 
@@ -94,7 +110,7 @@ Chỉ sau khi user xác nhận. Bước này có thể chạy hàng giờ, khôn
 
 ## Bước 4 — Báo cáo
 
-Chạy trong tab Warp → hỏi user xác nhận đã chạy xong chưa, rồi đọc lại `scripts/tasks.json` từ đầu (phiên này không hề thấy lượt chạy đó, đừng dựa vào bất kỳ gì đã in ra trước đó trong hội thoại này). Chạy trực tiếp trong Bash tool của chính phiên này → tóm tắt từ những gì đã quan sát được, như trước giờ. Dù theo cách nào: task nào xong trong lượt này kèm URL PR, task nào còn `pending`/`failed` (trỏ tới `scripts/logs/task-<number>-*.jsonl` để debug), và thứ tự merge. Không được im lặng dừng giữa epic mà không nói rõ task nào chặn lại.
+Chạy trong tab Warp → lệnh chờ `run_in_background` ở trên đã tự resolve khi `pipeline_status.json` đạt trạng thái cuối, nên đọc `state` của file đó trước (`completed` / `stopped` / `interrupted`), rồi đọc lại `scripts/tasks.json` từ đầu — phiên này không hề thấy lượt chạy đó, đừng dựa vào bất kỳ gì đã in ra trước đó trong hội thoại này. Chạy trực tiếp trong Bash tool của chính phiên này → tóm tắt từ những gì đã quan sát được, như trước giờ. Dù theo cách nào: task nào xong trong lượt này kèm URL PR, task nào còn `pending`/`failed` (trỏ tới `scripts/logs/task-<number>-*.jsonl` để debug), và thứ tự merge. `stopped`/`interrupted` → nói rõ task nào chặn lại (field `failed_task` trong `pipeline_status.json` cho case `stopped`) và cần sửa trước khi chạy lại. Không được im lặng dừng giữa epic mà không nói rõ task nào chặn lại.
 
 ---
 

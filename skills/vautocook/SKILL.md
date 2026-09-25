@@ -7,7 +7,7 @@ disable-model-invocation: true
 when_to_use: "Invoke after an epic + sub-issues already exist (e.g. created by vtickets) and you want them implemented unattended, one by one, without babysitting each /vcook run."
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 Auto-implement every sub-issue under a GitHub epic, sequentially, unattended. Each sub-issue runs as its own isolated `/vcook` session in headless mode (`claude -p --dangerously-skip-permissions`) — its own branch, its own PR, no back-and-forth with anyone mid-task. Built on 2 bundled scripts in this skill's `scripts/` folder; this file is the instructions for *when and how* to run them, not a script itself.
@@ -67,14 +67,30 @@ Only after the user confirms. This step runs for potentially hours, unattended, 
   ```
 
   ```bash
+  rm -f ~/.claude/skills/vautocook/scripts/pipeline_status.json
   open 'warp://tab_config/vautocook'
   ```
 
   Tell the user a new Warp tab just opened running the pipeline — this session
-  does not run it and cannot see its output; watch/interrupt it directly in
-  that tab. Warp's tab-config launcher only supports opening by name (no CLI
-  args), which is why the config is a file this session writes each time
-  rather than a single inline command.
+  does not run it and cannot see its live output; watch/interrupt it directly
+  in that tab. Warp's tab-config launcher only supports opening by name (no
+  CLI args), which is why the config is a file this session writes each time
+  rather than a single inline command. There is no way to send further input
+  into that tab afterward — Warp's tab-config launch is one-shot, so this
+  session can only watch for completion, never steer the run mid-flight.
+
+  Removing the sentinel first, then a single Bash `run_in_background: true`
+  call to wait on it, is how this session finds out the run finished without
+  asking the user — `run_tasks.py` (over)writes it once at start (`"running"`)
+  and once more at the very end, however it ends:
+
+  ```bash
+  until [ -f ~/.claude/skills/vautocook/scripts/pipeline_status.json ] && grep -qE '"state": "(completed|stopped|interrupted)"' ~/.claude/skills/vautocook/scripts/pipeline_status.json; do sleep 30; done
+  ```
+
+  This blocks until the pipeline reaches a terminal state; the harness notifies
+  this session automatically when the command exits (same pattern as any other
+  `run_in_background` wait — no manual polling in this conversation).
 - **Anything else** (not macOS, or Warp not installed): fall back to running
   it directly, same as before:
 
@@ -94,7 +110,7 @@ Only after the user confirms. This step runs for potentially hours, unattended, 
 
 ## Step 4 — Report
 
-Ran in a Warp tab → ask the user to confirm it's finished, then read `scripts/tasks.json` fresh (this session never saw that run, don't rely on anything printed earlier in this conversation). Ran directly in this session's own Bash tool → summarize from what you observed, same as before. Either way: tasks completed this run and their PR URLs, any task left `pending`/`failed` (point at its `scripts/logs/task-<number>-*.jsonl` for debugging), and the merge order. Do not silently stop mid-epic without saying which task blocked it.
+Ran in a Warp tab → the `run_in_background` wait above already resolved once `pipeline_status.json` reached a terminal state, so read that file's `state` first (`completed` / `stopped` / `interrupted`), then read `scripts/tasks.json` fresh — this session never saw that run, don't rely on anything printed earlier in this conversation. Ran directly in this session's own Bash tool → summarize from what you observed, same as before. Either way: tasks completed this run and their PR URLs, any task left `pending`/`failed` (point at its `scripts/logs/task-<number>-*.jsonl` for debugging), and the merge order. `stopped`/`interrupted` → say which task blocked it (`pipeline_status.json`'s `failed_task` for `stopped`) and that it needs fixing before a re-run. Do not silently stop mid-epic without saying which task blocked it.
 
 ---
 
