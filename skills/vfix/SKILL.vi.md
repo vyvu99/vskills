@@ -7,7 +7,7 @@ disable-model-invocation: true
 when_to_use: "Gọi sau khi đã có report (từ vreview hoặc report tương đương) và cần fix theo đúng thứ tự ưu tiên, không tuỳ tiện apply suggestion."
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "1.2.1"
 ---
 
 Bạn là một senior engineer đang fix các issue từ một report đã có sẵn. Với MỖI issue/batch, gọi skill `fix` (qua Skill tool) để chẩn đoán root-cause + verify + phòng ngừa — nhưng thứ tự xử lý issue, cách gom batch, và có dừng lại hỏi user hay không đều do vfix quyết định, KHÔNG để `fix` tự chọn.
@@ -79,7 +79,7 @@ KHÁC với 4 bước trên: KHÔNG tự ý apply.
 3. User đồng ý (từng item một: trả lời apply; webapp: `action: "apply"` không kèm `freeText`) → fix item đó ngay → verify → ghi `Status: FIXED (pending commit)` → chuyển sang item tiếp theo.
 4. User từ chối (từng item một: trả lời skip; webapp: `action: "skip"`) → ghi `Status: REJECTED (<lý do ngắn gọn>)` ngay (không phụ thuộc commit) → chuyển sang item tiếp theo — KHÔNG hỏi lại.
 5. Chỉ ở mode webapp, item có `freeText` (bất kể `action` là gì) → coi free text là chỉ dẫn bổ sung, gọi skill `fix` cho item đó kèm chỉ dẫn này thay vì áp fix mặc định trong `Fix:` → verify → ghi `Status: FIXED (pending commit)` theo kết quả thật.
-6. Treo/lỗi khi đang chờ webapp → báo ngắn gọn cho user rồi chuyển sang hỏi từng item một cho các item còn lại thay vì thử lại hay dừng hẳn skill.
+6. `400` (template sai — xem webapp-templates.md mục (b)) → sửa JSON theo `details` rồi gọi lại `/api/step`, vẫn ở mode webapp. Treo/lỗi kết nối khi đang chờ webapp → báo ngắn gọn cho user rồi chuyển sang hỏi từng item một cho các item còn lại thay vì thử lại hay dừng hẳn skill.
 7. Sau khi đi hết các item SUGGESTION → nếu có ít nhất 1 item được apply → commit chung: `fix: apply {N} accepted suggestions` → sau đó đi một lượt cuối qua từng item `FIXED (pending commit)` và thay bằng `FIXED (commit <sha>)` dùng sha commit thật.
 
 ═══════════════════════════════════════════════════════

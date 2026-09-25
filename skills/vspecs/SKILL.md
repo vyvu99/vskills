@@ -6,7 +6,7 @@ when_to_use: "Invoke when you want to create new specs or add to existing specs 
 argument-hint: "Feature: [feature name]\nCompare: [product name] (optional)"
 metadata:
   author: vyvu
-  version: "1.3.0"
+  version: "1.3.1"
 ---
 
 # Specs Loop
@@ -76,7 +76,7 @@ Once the user confirms, start the loop. Each round:
 
 After each round of 5 cases:
 - **Chat mode** — stop and wait for the user to decide on each case.
-- **Webapp mode** — build 1 JSON template per `~/.claude/skills/_vskills-shared/webapp-templates.md` §(a): 1 `select` field per case (options at minimum "Chấp nhận đề xuất" / "Từ chối / Out of Scope" / "Sửa lại", each option's `description` carrying that case's full Situation/Impact/Gap/Proposal verbatim — never trimmed, so the user isn't choosing blind) plus 1 paired `text` field per case for a free-form alternative decision. Health-check + start the webapp per §(b) if not already running, `POST /api/step` (Bash `run_in_background: true`), then apply the returned decisions the same way the chat flow would. Timeout/error while waiting → tell the user briefly and fall back to chat (ask about each case individually) for the rest of this round instead of retrying or aborting.
+- **Webapp mode** — build 1 JSON template per `~/.claude/skills/_vskills-shared/webapp-templates.md` §(a): 1 `select` field per case (options at minimum "Chấp nhận đề xuất" / "Từ chối / Out of Scope" / "Sửa lại", each option's `description` carrying that case's full Situation/Impact/Gap/Proposal verbatim — never trimmed, so the user isn't choosing blind) plus 1 paired `text` field per case for a free-form alternative decision. Health-check + start the webapp per §(b) if not already running, `POST /api/step` (Bash `run_in_background: true`), then apply the returned decisions the same way the chat flow would. `400` (invalid template — see webapp-templates.md §(b)) → fix the JSON per `details` and retry `/api/step`, still in webapp mode. Timeout/connection error while waiting → tell the user briefly and fall back to chat (ask about each case individually) for the rest of this round instead of retrying or aborting.
 - Update the specs file directly (Decisions, Edge Cases, Out of Scope for deferred/rejected cases) — only the fields listed above persist per case; no recap, no explanation
 - Run Step 5's self-check item 5 (no code identifiers, no implementation-status marker) against what was just written, this round — don't wait for Step 5 to catch it after several rounds have accumulated
 - Any P1/P2 Open Question already in the file and still unresolved this round → bump its carry-over counter (`_(carried over N×)_`, starts at 2× on the first carry-over)
@@ -104,7 +104,7 @@ Only do this after the user confirms there are no more edge cases to cover. Add 
 
 Before the checks below: scan Open Questions for any P1/P2 item whose counter reads `_(carried over 3×)_` or higher.
 - **Chat mode** — for each, stop and use `AskUserQuestion` with 3 options: (a) **Resolve now** — turn it into a Decision with Acceptance right there; (b) **Won't Fix / Out of Scope** — move into `## Out of Scope`, marked closed, never re-asked; (c) **Still open** — reaffirm it's genuinely open, reset the counter.
-- **Webapp mode** (same choice made at the top of Step 3) — build 1 JSON template with 1 `select` field per qualifying Open Question (same 3 options, each `description` carrying that question's full context), health-check + start the webapp per `~/.claude/skills/_vskills-shared/webapp-templates.md` §(b) if not already running, `POST /api/step` (Bash `run_in_background: true`), then apply each answer the same way. Timeout/error while waiting → fall back to `AskUserQuestion` per question instead of retrying or aborting.
+- **Webapp mode** (same choice made at the top of Step 3) — build 1 JSON template with 1 `select` field per qualifying Open Question (same 3 options, each `description` carrying that question's full context), health-check + start the webapp per `~/.claude/skills/_vskills-shared/webapp-templates.md` §(b) if not already running, `POST /api/step` (Bash `run_in_background: true`), then apply each answer the same way. `400` (invalid template — see webapp-templates.md §(b)) → fix the JSON per `details` and retry `/api/step`, still in webapp mode. Timeout/connection error while waiting → fall back to `AskUserQuestion` per question instead of retrying or aborting.
 
 P0 Open Questions are unaffected — rule 3 below already hard-blocks them.
 

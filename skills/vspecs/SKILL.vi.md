@@ -6,7 +6,7 @@ when_to_use: "Dùng khi muốn viết specs mới hoặc bổ sung specs hiện 
 argument-hint: "Feature: [tên feature]\nCompare: [tên sản phẩm] (tuỳ chọn)"
 metadata:
   author: vyvu
-  version: "1.3.0"
+  version: "1.3.1"
 ---
 
 # Specs Loop
@@ -76,7 +76,7 @@ Sau khi user xác nhận, bắt đầu vòng lặp. Mỗi vòng:
 
 Sau mỗi vòng 5 case:
 - **Mode chat** — dừng lại và chờ user quyết định từng case.
-- **Mode webapp** — build 1 JSON template theo `~/.claude/skills/_vskills-shared/webapp-templates.md` mục (a): 1 field `select` cho mỗi case (option tối thiểu "Chấp nhận đề xuất" / "Từ chối / Out of Scope" / "Sửa lại", `description` của mỗi option mang nguyên văn Situation/Impact/Gap/Proposal của case đó — không rút gọn, tránh user chọn mù) cộng 1 field `text` đi kèm mỗi case để user viết quyết định khác đề xuất. Health-check + start webapp theo mục (b) nếu chưa chạy, `POST /api/step` (Bash `run_in_background: true`), rồi áp dụng quyết định trả về y hệt như khi hỏi qua chat. Treo/lỗi khi đang chờ → báo ngắn gọn cho user rồi chuyển sang hỏi qua chat (từng case một) cho phần còn lại của vòng này thay vì thử lại hay dừng hẳn.
+- **Mode webapp** — build 1 JSON template theo `~/.claude/skills/_vskills-shared/webapp-templates.md` mục (a): 1 field `select` cho mỗi case (option tối thiểu "Chấp nhận đề xuất" / "Từ chối / Out of Scope" / "Sửa lại", `description` của mỗi option mang nguyên văn Situation/Impact/Gap/Proposal của case đó — không rút gọn, tránh user chọn mù) cộng 1 field `text` đi kèm mỗi case để user viết quyết định khác đề xuất. Health-check + start webapp theo mục (b) nếu chưa chạy, `POST /api/step` (Bash `run_in_background: true`), rồi áp dụng quyết định trả về y hệt như khi hỏi qua chat. `400` (template sai — xem webapp-templates.md mục (b)) → sửa JSON theo `details` rồi gọi lại `/api/step`, vẫn ở mode webapp. Treo/lỗi kết nối khi đang chờ → báo ngắn gọn cho user rồi chuyển sang hỏi qua chat (từng case một) cho phần còn lại của vòng này thay vì thử lại hay dừng hẳn.
 - Cập nhật trực tiếp vào file specs (Decisions, Edge Cases, Out of Scope cho case bị deferred/rejected) — chỉ các field liệt kê ở trên mới được persist cho mỗi case; không recap, không giải thích thay đổi
 - Chạy mục 5 của self-check ở Bước 5 (không code identifier, không marker trạng thái triển khai) trên nội dung vừa ghi, ngay trong vòng này — không đợi đến Bước 5 mới bắt sau khi đã tích luỹ qua nhiều vòng
 - Case Open Question P1/P2 nào đã có sẵn trong file mà vòng này vẫn chưa resolve → tăng bộ đếm tồn đọng (`_(tồn đọng N lần)_`, lần tồn đọng đầu tiên bắt đầu từ 2 lần)
@@ -104,7 +104,7 @@ Chỉ làm bước này sau khi user xác nhận không còn edge case nào cầ
 
 Trước các check bên dưới: quét Open Questions tìm case P1/P2 nào có counter `_(tồn đọng 3 lần)_` trở lên.
 - **Mode chat** — với mỗi case đó, dừng lại và dùng `AskUserQuestion` với 3 lựa chọn: (a) **Resolve now** — chuyển thành Decision kèm Acceptance ngay tại đây; (b) **Won't Fix / Out of Scope** — chuyển vào `## Out of Scope`, đánh dấu đã đóng, không hỏi lại nữa; (c) **Still open** — xác nhận vẫn thực sự còn mở, reset counter.
-- **Mode webapp** (đúng lựa chọn đã chọn ở đầu Bước 3) — build 1 JSON template với 1 field `select` cho mỗi Open Question đang ở ngưỡng này (cùng 3 lựa chọn, `description` mang đủ ngữ cảnh câu hỏi đó), health-check + start webapp theo `~/.claude/skills/_vskills-shared/webapp-templates.md` mục (b) nếu chưa chạy, `POST /api/step` (Bash `run_in_background: true`), rồi áp dụng từng câu trả lời y hệt. Treo/lỗi khi đang chờ → chuyển sang hỏi qua `AskUserQuestion` từng câu thay vì thử lại hay dừng hẳn.
+- **Mode webapp** (đúng lựa chọn đã chọn ở đầu Bước 3) — build 1 JSON template với 1 field `select` cho mỗi Open Question đang ở ngưỡng này (cùng 3 lựa chọn, `description` mang đủ ngữ cảnh câu hỏi đó), health-check + start webapp theo `~/.claude/skills/_vskills-shared/webapp-templates.md` mục (b) nếu chưa chạy, `POST /api/step` (Bash `run_in_background: true`), rồi áp dụng từng câu trả lời y hệt. `400` (template sai — xem webapp-templates.md mục (b)) → sửa JSON theo `details` rồi gọi lại `/api/step`, vẫn ở mode webapp. Treo/lỗi kết nối khi đang chờ → chuyển sang hỏi qua `AskUserQuestion` từng câu thay vì thử lại hay dừng hẳn.
 
 Case P0 không bị ảnh hưởng — rule 3 bên dưới đã hard-block chúng rồi.
 

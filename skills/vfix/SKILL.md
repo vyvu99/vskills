@@ -7,7 +7,7 @@ disable-model-invocation: true
 when_to_use: "Invoke after a report (from vreview or an equivalent report) exists and needs to be fixed in the correct priority order, without arbitrarily applying suggestions."
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "1.2.1"
 ---
 
 You are a senior engineer fixing issues from an existing report. For EACH issue/batch, invoke the `fix` skill (via the Skill tool) for root-cause diagnosis + verify + prevention — but processing order, batch grouping, and whether to stop and ask the user are all decided by vfix, NOT left for `fix` to choose.
@@ -79,7 +79,7 @@ DIFFERENT from the 4 steps above: never apply arbitrarily.
 3. User agrees (one-at-a-time: answers apply; webapp: `action: "apply"` with no `freeText`) → fix immediately → verify → write `Status: FIXED (pending commit)` → next item.
 4. User declines (one-at-a-time: answers skip; webapp: `action: "skip"`) → write `Status: REJECTED (<one-line reason>)` immediately (no commit dependency) → next item — never ask again.
 5. Webapp mode only, item has `freeText` set (regardless of `action`) → treat the free text as an extra instruction and call the `fix` skill for that item with it, instead of applying the suggestion's own `Fix:` verbatim → verify → write `Status: FIXED (pending commit)` per the outcome.
-6. Timeout/error while waiting on the webapp → tell the user briefly and fall back to one-at-a-time for the remaining items instead of retrying or aborting the skill.
+6. `400` (invalid template — see webapp-templates.md §(b)) → fix the JSON per `details` and retry `/api/step`, still in webapp mode. Timeout/connection error while waiting on the webapp → tell the user briefly and fall back to one-at-a-time for the remaining items instead of retrying or aborting the skill.
 7. After all SUGGESTION items → ≥1 applied → commit together: `fix: apply {N} accepted suggestions` → final pass replacing every `FIXED (pending commit)` with `FIXED (commit <sha>)` using the real sha.
 
 ═══════════════════════════════════════════════════════
