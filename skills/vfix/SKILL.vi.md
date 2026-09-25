@@ -7,7 +7,7 @@ disable-model-invocation: true
 when_to_use: "Gọi sau khi đã có report (từ vreview hoặc report tương đương) và cần fix theo đúng thứ tự ưu tiên, không tuỳ tiện apply suggestion."
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 Bạn là một senior engineer đang fix các issue từ một report đã có sẵn. Với MỖI issue/batch, gọi skill `fix` (qua Skill tool) để chẩn đoán root-cause + verify + phòng ngừa — nhưng thứ tự xử lý issue, cách gom batch, và có dừng lại hỏi user hay không đều do vfix quyết định, KHÔNG để `fix` tự chọn.
@@ -73,10 +73,14 @@ BƯỚC 5 — Issue SUGGESTION (REPORT.md)
 KHÁC với 4 bước trên: KHÔNG tự ý apply.
 
 1. Đọc phần SUGGESTION.
-2. Với MỖI suggestion (từng item một, không gom nhóm): dùng `AskUserQuestion` để trình bày issue + fix đề xuất, và hỏi user có apply hay skip.
-3. User đồng ý → fix item đó ngay → verify → ghi `Status: FIXED (pending commit)` → chuyển sang item tiếp theo.
-4. User từ chối → ghi `Status: REJECTED (<lý do ngắn gọn>)` ngay (không phụ thuộc commit) → chuyển sang item tiếp theo — KHÔNG hỏi lại.
-5. Sau khi đi hết các item SUGGESTION → nếu có ít nhất 1 item được apply → commit chung: `fix: apply {N} accepted suggestions` → sau đó đi một lượt cuối qua từng item `FIXED (pending commit)` và thay bằng `FIXED (commit <sha>)` dùng sha commit thật.
+2. Hỏi đúng 1 `AskUserQuestion` để chọn chế độ duyệt (nội dung theo `~/.claude/skills/_vskills-shared/webapp-templates.md` mục (c)): **webapp** hay **từng item một** (cách cũ).
+   - **Từng item một (cách cũ)** — với MỖI suggestion (từng item một, không gom nhóm): dùng `AskUserQuestion` để trình bày issue + fix đề xuất, và hỏi user có apply hay skip.
+   - **Webapp** — build 1 field `diff-review-list` chứa hết toàn bộ item SUGGESTION theo `~/.claude/skills/_vskills-shared/webapp-templates.md` mục (a): `id` = `SUGGESTION-{n}` (`n` = số thứ tự item trong phần SUGGESTIONS), `before` = text `Issue:` cộng với code hiện tại đọc lại từ `File:line` (REPORT.md không có sẵn khối "code hiện tại" như `Fix:` — phải đọc file), `after` = text/code trong `Fix:`, `actions: ["apply","skip"]`, `allowFreeText: true`. Health-check + start webapp theo mục (b) nếu chưa chạy, `POST /api/step` (Bash `run_in_background: true`), rồi lặp qua mảng quyết định trả về theo đúng thứ tự.
+3. User đồng ý (từng item một: trả lời apply; webapp: `action: "apply"` không kèm `freeText`) → fix item đó ngay → verify → ghi `Status: FIXED (pending commit)` → chuyển sang item tiếp theo.
+4. User từ chối (từng item một: trả lời skip; webapp: `action: "skip"`) → ghi `Status: REJECTED (<lý do ngắn gọn>)` ngay (không phụ thuộc commit) → chuyển sang item tiếp theo — KHÔNG hỏi lại.
+5. Chỉ ở mode webapp, item có `freeText` (bất kể `action` là gì) → coi free text là chỉ dẫn bổ sung, gọi skill `fix` cho item đó kèm chỉ dẫn này thay vì áp fix mặc định trong `Fix:` → verify → ghi `Status: FIXED (pending commit)` theo kết quả thật.
+6. Treo/lỗi khi đang chờ webapp → báo ngắn gọn cho user rồi chuyển sang hỏi từng item một cho các item còn lại thay vì thử lại hay dừng hẳn skill.
+7. Sau khi đi hết các item SUGGESTION → nếu có ít nhất 1 item được apply → commit chung: `fix: apply {N} accepted suggestions` → sau đó đi một lượt cuối qua từng item `FIXED (pending commit)` và thay bằng `FIXED (commit <sha>)` dùng sha commit thật.
 
 ═══════════════════════════════════════════════════════
 STOP-GATE — DỪNG LẠI VÀ HỎI USER (áp dụng cho bước 2-4, KHÔNG tự quyết định)
@@ -113,7 +117,7 @@ QUY TẮC CỨNG
 ═══════════════════════════════════════════════════════
 
 - KHÔNG được bỏ qua thứ tự ưu tiên SCRIPT_SCAN → CRITICAL → WARNING → CROSS-GROUP → SUGGESTION — kể cả khi một bước rỗng, vẫn phải báo "skip — no issues" trước khi chuyển sang bước tiếp theo; không bao giờ nhảy cóc.
-- KHÔNG được tự ý apply item SUGGESTION mà không hỏi từng item qua `AskUserQuestion`.
+- KHÔNG được tự ý apply item SUGGESTION mà không có quyết định tường minh từng item từ user — qua `AskUserQuestion` (mode từng item một) hoặc `diff-review-list` của webapp (mode webapp); không bao giờ bulk-apply mà thiếu cả 2.
 - KHÔNG được refactor code ngoài phạm vi của issue đang fix — root-cause đúng issue đó, không tranh thủ "tiện thể" chèn thêm thay đổi khác.
 - KHÔNG được commit từng issue riêng lẻ trong một batch có tính phụ thuộc lẫn nhau — commit theo batch.
 - LUÔN dùng `AskUserQuestion` khi khớp điều kiện STOP-GATE (a/b/c/d) — không bao giờ tự quyết định thay user.

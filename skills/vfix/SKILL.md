@@ -7,7 +7,7 @@ disable-model-invocation: true
 when_to_use: "Invoke after a report (from vreview or an equivalent report) exists and needs to be fixed in the correct priority order, without arbitrarily applying suggestions."
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 You are a senior engineer fixing issues from an existing report. For EACH issue/batch, invoke the `fix` skill (via the Skill tool) for root-cause diagnosis + verify + prevention — but processing order, batch grouping, and whether to stop and ask the user are all decided by vfix, NOT left for `fix` to choose.
@@ -73,10 +73,14 @@ STEP 5 — SUGGESTION issues (REPORT.md)
 DIFFERENT from the 4 steps above: never apply arbitrarily.
 
 1. Read the SUGGESTION section.
-2. For EACH suggestion (one item at a time, no grouping): use `AskUserQuestion` to present the issue + proposed fix, ask whether to apply or skip.
-3. User agrees → fix immediately → verify → write `Status: FIXED (pending commit)` → next item.
-4. User declines → write `Status: REJECTED (<one-line reason>)` immediately (no commit dependency) → next item — never ask again.
-5. After all SUGGESTION items → ≥1 applied → commit together: `fix: apply {N} accepted suggestions` → final pass replacing every `FIXED (pending commit)` with `FIXED (commit <sha>)` using the real sha.
+2. Ask 1 `AskUserQuestion` to pick the review mode (wording per `~/.claude/skills/_vskills-shared/webapp-templates.md` §(c)): **webapp** or **one at a time** (the existing flow).
+   - **One at a time (existing flow)** — for EACH suggestion (one item at a time, no grouping): use `AskUserQuestion` to present the issue + proposed fix, ask whether to apply or skip.
+   - **Webapp** — build 1 `diff-review-list` field with every SUGGESTION item at once per `~/.claude/skills/_vskills-shared/webapp-templates.md` §(a): `id` = `SUGGESTION-{n}` (`n` = the item's number in the SUGGESTIONS section), `before` = the `Issue:` text plus the actual current code read fresh from `File:line` (REPORT.md doesn't inline a "current code" block the way it does for `Fix:` — read the file), `after` = the `Fix:` text/code, `actions: ["apply","skip"]`, `allowFreeText: true`. Health-check + start the webapp per §(b) if not already running, `POST /api/step` (Bash `run_in_background: true`), then walk the returned decisions array in order.
+3. User agrees (one-at-a-time: answers apply; webapp: `action: "apply"` with no `freeText`) → fix immediately → verify → write `Status: FIXED (pending commit)` → next item.
+4. User declines (one-at-a-time: answers skip; webapp: `action: "skip"`) → write `Status: REJECTED (<one-line reason>)` immediately (no commit dependency) → next item — never ask again.
+5. Webapp mode only, item has `freeText` set (regardless of `action`) → treat the free text as an extra instruction and call the `fix` skill for that item with it, instead of applying the suggestion's own `Fix:` verbatim → verify → write `Status: FIXED (pending commit)` per the outcome.
+6. Timeout/error while waiting on the webapp → tell the user briefly and fall back to one-at-a-time for the remaining items instead of retrying or aborting the skill.
+7. After all SUGGESTION items → ≥1 applied → commit together: `fix: apply {N} accepted suggestions` → final pass replacing every `FIXED (pending commit)` with `FIXED (commit <sha>)` using the real sha.
 
 ═══════════════════════════════════════════════════════
 STOP-GATE — STOP AND ASK THE USER (applies to steps 2-4, do NOT decide on your own)
@@ -113,7 +117,7 @@ HARD RULES
 ═══════════════════════════════════════════════════════
 
 - Do NOT skip the priority order SCRIPT_SCAN → CRITICAL → WARNING → CROSS-GROUP → SUGGESTION — even an empty step reports "skip — no issues" before moving on; never jump ahead.
-- Do NOT apply SUGGESTION items without asking about each one via `AskUserQuestion`.
+- Do NOT apply SUGGESTION items without an explicit per-item decision from the user — via `AskUserQuestion` (one-at-a-time mode) or the webapp's `diff-review-list` (webapp mode); never bulk-apply without either.
 - Do NOT refactor outside the scope of the issue being fixed — root-cause that exact issue, don't sneak in extra changes "while you're at it".
 - Do NOT commit interdependent issues within a batch individually — commit per batch.
 - ALWAYS use `AskUserQuestion` when a STOP-GATE condition (a/b/c/d) matches — never decide on the user's behalf.
