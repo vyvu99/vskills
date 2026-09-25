@@ -16,15 +16,15 @@ Nguồn của danh sách này: v0 (Vercel), Galileo AI, Framer AI, Material Desi
 ## Vòng 1 — Nền Tảng Thị Giác
 
 1. **Typography** — hướng typeface chính và giọng điệu kích cỡ.
-   - *Minimal/Professional* (IBM Plex, Source Sans 3) — trung tính, technical
-   - *Bold/Editorial* (Playfair Display, Fraunces, Clash Display) — đặc trưng, có bản sắc
-   - *Code/Technical* (JetBrains Mono, Fira Code, Space Grotesk) — dev-tool, sáng tạo
-   - *Startup/Modern* (Satoshi, Cabinet Grotesk, Inter Tight) — hiện đại, thân thiện
+   - *Minimal/Professional* (IBM Plex, Source Sans 3) — trung tính, technical — giá trị `font-sample` cho webapp: `"IBM Plex Sans, sans-serif"`
+   - *Bold/Editorial* (Playfair Display, Fraunces, Clash Display) — đặc trưng, có bản sắc — giá trị `font-sample` cho webapp: `"Playfair Display, serif"`
+   - *Code/Technical* (JetBrains Mono, Fira Code, Space Grotesk) — dev-tool, sáng tạo — giá trị `font-sample` cho webapp: `"JetBrains Mono, monospace"`
+   - *Startup/Modern* (Satoshi, Cabinet Grotesk, Inter Tight) — hiện đại, thân thiện — giá trị `font-sample` cho webapp: `"Inter Tight, sans-serif"`
 2. **Triết lý bảng màu** — cách xây bảng màu.
-   - *Giữ token hiện có* — nhất quán hoàn toàn với codebase hiện tại. Khoá: không đổi được màu brand nào suốt run này.
-   - *Chỉ thêm accent* — giữ primary, thêm 1 accent brand mới. Mở: đúng 1 màu accent mới; token primary/base giữ nguyên.
-   - *Redesign toàn bộ bảng màu* — bảng màu mới từ brand color, xây lại từ đầu. Mở: thay toàn bộ bảng màu — mọi color token trong phạm vi đều được đổi.
-   - *Dynamic/tự sinh* — bảng màu do tool sinh, có sẵn accessibility (kiểu Material Theme Builder). Mở: thay toàn bộ bảng màu như "Redesign toàn bộ", chỉ khác là do tool sinh thay vì chọn tay.
+   - *Giữ token hiện có* — nhất quán hoàn toàn với codebase hiện tại. Khoá: không đổi được màu brand nào suốt run này. — giá trị `swatch` cho webapp: `"#94A3B8"` (xám trung tính, thể hiện "không đổi màu")
+   - *Chỉ thêm accent* — giữ primary, thêm 1 accent brand mới. Mở: đúng 1 màu accent mới; token primary/base giữ nguyên. — giá trị `swatch` cho webapp: `"#2563EB"`
+   - *Redesign toàn bộ bảng màu* — bảng màu mới từ brand color, xây lại từ đầu. Mở: thay toàn bộ bảng màu — mọi color token trong phạm vi đều được đổi. — giá trị `swatch` cho webapp: `"#7C3AED"`
+   - *Dynamic/tự sinh* — bảng màu do tool sinh, có sẵn accessibility (kiểu Material Theme Builder). Mở: thay toàn bộ bảng màu như "Redesign toàn bộ", chỉ khác là do tool sinh thay vì chọn tay. — không có màu cố định để làm swatch (do tool sinh lúc build): dùng `renderHint` `"plain"` riêng cho option này, thêm tiền tố "🎲 " vào label
 3. **Triết lý motion/animation** — UI mang bao nhiêu chuyển động.
    - *Minimal* — chỉ transition 150-300ms, không micro-interaction
    - *Balanced* — transition + vài micro-interaction chính (hover, page transition)
