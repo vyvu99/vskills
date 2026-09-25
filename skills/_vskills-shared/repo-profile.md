@@ -118,3 +118,13 @@ When no base/target branch is given explicitly:
 1. `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||'`
 2. Empty → try `git rev-parse --verify main 2>/dev/null` → use `main`
 3. `main` doesn't exist → use `master`
+
+## §10 — Subagent concurrency limit
+
+A phase whose subagent count scales with input (1 per diff group, 1 per research aspect, 1 per independent file) can exceed how many subagents the platform will actually run concurrently from one message — the spawn call itself fails or is throttled once the count is too high.
+
+Rule: split the full list into batches sized to what one message can spawn reliably (default ceiling: 8, matching the cap vdesign's Phase 2 already uses) and spawn batch by batch — wait for a batch to finish before spawning the next. This keeps parallelism within each batch while staying under the ceiling; it isn't a fallback to sequential-only.
+
+Note in the phase's own output/CONTEXT file how many batches ran (same checkpointing requirement as §6), so a later phase reading that state sees N batches, not a single spawn round.
+
+This section states the rule only. A skill whose phase can exceed 8 subagents in one round should point to it rather than restate it: "See `_vskills-shared/repo-profile.md` §10 for the batching rule."

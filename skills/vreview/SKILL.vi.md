@@ -450,6 +450,7 @@ QUY TẮC CHUNG
    - Ghi kết quả vào .code-review/{GROUP_NAME}.txt với header: [REVIEWED BY: MAIN AGENT — subagent failed]
    - Ghi vào phần CONFIDENCE NOTES của REPORT.md: "Group X reviewed by main agent — lower confidence than subagent review"
 7. Phase 5 (Lint Harvest) KHÔNG block merge — chạy sau Phase 4.5, việc nó fail không ảnh hưởng đến kết quả review chính.
+7b. Số subagent ở Phase 2 = số group từ 1.4, tỉ lệ theo kích thước diff nên có thể vượt số subagent platform cho phép chạy song song trong 1 message. Xem `_vskills-shared/repo-profile.md` §10 để biết rule batch (spawn theo lô, đợi lô này xong mới spawn lô sau) — ghi số lô đã chạy vào CONTEXT.txt.
 8. Diff rỗng-sau-khi-filter hoặc toàn comment-only (1.3c) → early exit, không spawn subagent nào.
 9. Incremental mode (1.0) chỉ áp dụng cho Mode 3 diff review; `--path`/`--since` luôn chạy full.
 10. Phase 4.5 spot-check chạy inline trong main agent — không bao giờ spawn subagent cho nó.

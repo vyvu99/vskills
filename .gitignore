@@ -7,3 +7,8 @@ plans/
 .code-review-history.jsonl
 .vdesign/
 node_modules/
+__pycache__/
+*.pyc
+skills/vautocook/scripts/tasks.json
+skills/vautocook/scripts/logs/
+skills/vautocook/scripts/pipeline_status.json
