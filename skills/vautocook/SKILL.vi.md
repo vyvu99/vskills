@@ -7,7 +7,7 @@ disable-model-invocation: true
 when_to_use: "Dùng khi đã có sẵn epic + sub-issues (ví dụ do vtickets tạo) và muốn triển khai tự động, lần lượt từng cái, không cần ngồi canh từng lượt /vcook."
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 Tự động triển khai từng sub-issue của 1 GitHub epic, tuần tự, không cần người canh. Mỗi sub-issue chạy như 1 phiên `/vcook` cô lập ở chế độ headless (`claude -p --dangerously-skip-permissions`) — có branch riêng, PR riêng, không hỏi lại ai giữa chừng. Dựa trên 2 script đi kèm trong thư mục `scripts/` của skill này; file này chỉ là hướng dẫn *khi nào và chạy sao*, bản thân nó không phải script.
@@ -50,13 +50,43 @@ Bước này không sửa code và không mở gì cả — chạy thoải mái 
 
 ## Bước 3 — Chạy pipeline
 
-Chỉ sau khi user xác nhận:
+Chỉ sau khi user xác nhận. Bước này có thể chạy hàng giờ, không người canh, với `--dangerously-skip-permissions` — ưu tiên cho user 1 terminal thật họ tự kiểm soát (scrollback thật, `Ctrl+C` hoạt động thật) thay vì chạy âm thầm trong Bash tool của chính phiên này, mỗi khi có thể:
 
-```bash
-python3 ~/.claude/skills/vautocook/scripts/run_tasks.py
-```
+- **macOS có cài Warp** (`/Applications/Warp.app` tồn tại): ghi 1 Warp
+  [Tab Config](https://docs.warp.dev/terminal/windows/tab-configs/) chạy
+  pipeline trong tab riêng, rồi mở nó lên:
 
-- Với mỗi task pending, theo thứ tự: checkout branch của nó (từ default branch, hoặc từ branch của task phụ thuộc nếu task đó chưa merge — chuỗi PR chồng lên nhau), điền `scripts/prompt.md` với ngữ cảnh của task, rồi chạy `claude -p <prompt> --dangerously-skip-permissions --output-format stream-json --verbose`. Phiên bên trong đó chạy `/vcook` trên issue ở chế độ headless (không dừng lại hỏi; tự xử lý ambiguity theo root-cause/KISS/DRY, ghi quyết định vào PR body) và được kỳ vọng tự tạo commit + PR qua Step 9 của chính `/vcook`.
+  ```toml
+  # ~/.warp/tab_configs/vautocook.toml
+  name = "vautocook"
+  [[panes]]
+  id = "main"
+  type = "terminal"
+  directory = "<đường dẫn tuyệt đối tới repo đích — git rev-parse --show-toplevel>"
+  commands = ["python3 ~/.claude/skills/vautocook/scripts/run_tasks.py"]
+  ```
+
+  ```bash
+  open 'warp://tab_config/vautocook'
+  ```
+
+  Báo cho user biết 1 tab Warp mới vừa mở chạy pipeline — phiên này không tự
+  chạy và không thấy được output của nó; theo dõi/interrupt trực tiếp ở tab
+  đó. Warp's tab-config launcher chỉ hỗ trợ mở theo tên (không nhận tham số
+  qua CLI), đó là lý do config phải là 1 file phiên này ghi lại mỗi lần thay
+  vì 1 lệnh inline duy nhất.
+- **Trường hợp khác** (không phải macOS, hoặc chưa cài Warp): fallback về
+  chạy trực tiếp như cũ:
+
+  ```bash
+  python3 ~/.claude/skills/vautocook/scripts/run_tasks.py
+  ```
+
+  Bản tóm tắt live của chính phiên này bị lọc/cắt bớt, nhưng transcript đầy
+  đủ không lọc luôn nằm ở `scripts/logs/task-<number>-*.jsonl` (xem bên dưới)
+  — đọc file đó cho bất kỳ phần nào bản tóm tắt live không hiện.
+
+- Với mỗi task pending, theo thứ tự: checkout branch của nó (từ default branch, hoặc từ branch của task phụ thuộc nếu task đó chưa merge — chuỗi PR chồng lên nhau), điền `scripts/prompt.md` với ngữ cảnh của task, rồi chạy `claude -p <prompt> --dangerously-skip-permissions --output-format stream-json --verbose`. Phiên bên trong đó chạy `/vcook` trên issue ở chế độ headless (không dừng lại hỏi; tự xử lý ambiguity theo root-cause/KISS/DRY, ghi quyết định vào PR body) và được kỳ vọng tự tạo commit + PR qua Step 9 của chính `/vcook`. Nó cũng ghi lại transcript stream-json đầy đủ, không lọc, của từng task vào `scripts/logs/task-<number>-<timestamp>.jsonl` — terminal (tab Warp hoặc terminal của user) hiện bản tóm tắt live dễ đọc, file log là bản ghi đầy đủ để grep lại sau.
 - Sau khi phiên bên trong kết thúc, kiểm tra branch đã có PR chưa; `/vcook` chưa mở được PR → fallback: tự push branch và mở 1 PR tối giản (không gọi thêm AI cho fallback này).
 - **Resume:** Ctrl+C hoặc crash giữa chừng để lại task ở `status: "running"` trong `tasks.json` — chạy lại `run_tasks.py` sẽ tự reset về `pending` và tiếp tục từ đó.
 - **Fail-fast:** task kết thúc mà không có PR sẽ dừng cả lượt chạy; sửa nó (hoặc sửa `tasks.json`) rồi chạy lại để tiếp tục.
@@ -64,13 +94,13 @@ python3 ~/.claude/skills/vautocook/scripts/run_tasks.py
 
 ## Bước 4 — Báo cáo
 
-Tóm tắt những gì đã chạy: task nào xong trong lượt này kèm URL PR, task nào còn `pending`/`failed`, và thứ tự merge từ output Bước 3. Không được im lặng dừng giữa epic mà không nói rõ task nào chặn lại.
+Chạy trong tab Warp → hỏi user xác nhận đã chạy xong chưa, rồi đọc lại `scripts/tasks.json` từ đầu (phiên này không hề thấy lượt chạy đó, đừng dựa vào bất kỳ gì đã in ra trước đó trong hội thoại này). Chạy trực tiếp trong Bash tool của chính phiên này → tóm tắt từ những gì đã quan sát được, như trước giờ. Dù theo cách nào: task nào xong trong lượt này kèm URL PR, task nào còn `pending`/`failed` (trỏ tới `scripts/logs/task-<number>-*.jsonl` để debug), và thứ tự merge. Không được im lặng dừng giữa epic mà không nói rõ task nào chặn lại.
 
 ---
 
 ## Hard rules
 
-- **Không bao giờ** chạy Bước 3 mà chưa có user xác nhận rõ ràng danh sách task ở Bước 2 — `--dangerously-skip-permissions` cho từng task nghĩa là không còn ai canh sau khi bắt đầu.
+- **Không bao giờ** kích hoạt Bước 3 (mở tab Warp, hoặc tự chạy trực tiếp) mà chưa có user xác nhận rõ ràng danh sách task ở Bước 2 — `--dangerously-skip-permissions` cho từng task nghĩa là không còn ai canh sau khi bắt đầu.
 - **Không bao giờ** tự sửa tay field `status` trong `tasks.json` để ép 1 task thành done/skip — task nào cần bỏ qua thì báo user tự sửa file; việc bỏ task nào là quyết định của họ, không phải của skill này.
 - Mỗi phiên `/vcook` bên trong là **phiên mới, cô lập hoàn toàn** — không thấy được cuộc hội thoại này. Input duy nhất của nó là template `prompt.md` đã điền (URL issue, URL epic, branch, parent branch, số issue) — không gì khác từ cuộc hội thoại này truyền sang.
 - Pipeline chỉ hoạt động trên GitHub (GraphQL sub-issues, `gh pr create`) — không có chế độ degraded/non-GitHub; STOP của §2 áp dụng ở Bước 0, không phải giữa chừng.

@@ -7,7 +7,7 @@ disable-model-invocation: true
 when_to_use: "Invoke after an epic + sub-issues already exist (e.g. created by vtickets) and you want them implemented unattended, one by one, without babysitting each /vcook run."
 metadata:
   author: vyvu
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 Auto-implement every sub-issue under a GitHub epic, sequentially, unattended. Each sub-issue runs as its own isolated `/vcook` session in headless mode (`claude -p --dangerously-skip-permissions`) — its own branch, its own PR, no back-and-forth with anyone mid-task. Built on 2 bundled scripts in this skill's `scripts/` folder; this file is the instructions for *when and how* to run them, not a script itself.
@@ -50,13 +50,43 @@ Read the generated `tasks.json`, print the ordered task list (number, title, bra
 
 ## Step 3 — Run the pipeline
 
-Only after the user confirms:
+Only after the user confirms. This step runs for potentially hours, unattended, with `--dangerously-skip-permissions` — prefer giving the user a real terminal they personally control (native scrollback, `Ctrl+C` that actually works) over running it silently inside this session's own Bash tool, whenever that's available:
 
-```bash
-python3 ~/.claude/skills/vautocook/scripts/run_tasks.py
-```
+- **macOS with Warp installed** (`/Applications/Warp.app` exists): write a Warp
+  [Tab Config](https://docs.warp.dev/terminal/windows/tab-configs/) that runs
+  the pipeline in its own tab, then open it:
 
-- For each pending task, in order: checks out its branch (from the default branch, or from its dependency's branch if that dependency isn't merged yet — a stacked-PR chain), fills `scripts/prompt.md` with the task's context, and runs `claude -p <prompt> --dangerously-skip-permissions --output-format stream-json --verbose`. That inner session runs `/vcook` on the issue in headless mode (never stops to ask; resolves ambiguity itself per root-cause/KISS/DRY, documents the decision in the PR body) and is expected to create its own commit + PR via `/vcook`'s own Step 9.
+  ```toml
+  # ~/.warp/tab_configs/vautocook.toml
+  name = "vautocook"
+  [[panes]]
+  id = "main"
+  type = "terminal"
+  directory = "<absolute path to the target repo — git rev-parse --show-toplevel>"
+  commands = ["python3 ~/.claude/skills/vautocook/scripts/run_tasks.py"]
+  ```
+
+  ```bash
+  open 'warp://tab_config/vautocook'
+  ```
+
+  Tell the user a new Warp tab just opened running the pipeline — this session
+  does not run it and cannot see its output; watch/interrupt it directly in
+  that tab. Warp's tab-config launcher only supports opening by name (no CLI
+  args), which is why the config is a file this session writes each time
+  rather than a single inline command.
+- **Anything else** (not macOS, or Warp not installed): fall back to running
+  it directly, same as before:
+
+  ```bash
+  python3 ~/.claude/skills/vautocook/scripts/run_tasks.py
+  ```
+
+  This session's own summary is filtered/truncated live, but the full,
+  unfiltered transcript is always in `scripts/logs/task-<number>-*.jsonl`
+  (see below) — read that file for anything the live summary didn't show.
+
+- For each pending task, in order: checks out its branch (from the default branch, or from its dependency's branch if that dependency isn't merged yet — a stacked-PR chain), fills `scripts/prompt.md` with the task's context, and runs `claude -p <prompt> --dangerously-skip-permissions --output-format stream-json --verbose`. That inner session runs `/vcook` on the issue in headless mode (never stops to ask; resolves ambiguity itself per root-cause/KISS/DRY, documents the decision in the PR body) and is expected to create its own commit + PR via `/vcook`'s own Step 9. It also writes the full, unfiltered stream-json transcript for each task to `scripts/logs/task-<number>-<timestamp>.jsonl` — the terminal (Warp tab or the user's own) shows a readable live summary, the log file is the complete record to grep afterward.
 - After the inner session exits, verifies a PR now exists for the branch; `/vcook` didn't manage to open one → falls back to pushing the branch and opening a minimal PR itself (no extra AI call for that fallback).
 - **Resume:** Ctrl+C or a crash mid-run leaves that task `status: "running"` in `tasks.json` — re-running `run_tasks.py` resets it to `pending` and continues from there.
 - **Fail-fast:** a task ending without a PR stops the whole run; fix it (or edit `tasks.json`) and re-run to continue.
@@ -64,13 +94,13 @@ python3 ~/.claude/skills/vautocook/scripts/run_tasks.py
 
 ## Step 4 — Report
 
-Summarize what ran: tasks completed this run and their PR URLs, any task left `pending`/`failed`, and the merge order from Step 3's output. Do not silently stop mid-epic without saying which task blocked it.
+Ran in a Warp tab → ask the user to confirm it's finished, then read `scripts/tasks.json` fresh (this session never saw that run, don't rely on anything printed earlier in this conversation). Ran directly in this session's own Bash tool → summarize from what you observed, same as before. Either way: tasks completed this run and their PR URLs, any task left `pending`/`failed` (point at its `scripts/logs/task-<number>-*.jsonl` for debugging), and the merge order. Do not silently stop mid-epic without saying which task blocked it.
 
 ---
 
 ## Hard rules
 
-- **Never** run Step 3 without the user explicitly confirming the Step 2 task list first — `--dangerously-skip-permissions` per task means zero human-in-the-loop once it starts.
+- **Never** trigger Step 3 (open the Warp tab, or run it directly) without the user explicitly confirming the Step 2 task list first — `--dangerously-skip-permissions` per task means zero human-in-the-loop once it starts.
 - **Never** hand-edit `tasks.json`'s `status` field yourself to force a task as done/skipped — if a task needs skipping, tell the user to edit the file themselves; which task is safe to skip is their call, not this skill's.
 - Each inner `/vcook` run is a **fresh, isolated session** — it does not see this conversation. Its only inputs are `prompt.md`'s filled template (issue URL, epic URL, branch, parent branch, issue number) — nothing else from this conversation transfers.
 - The pipeline is GitHub-only (GraphQL sub-issues, `gh pr create`) — no degraded/non-GitHub mode; the §2 STOP applies at Step 0, not mid-run.

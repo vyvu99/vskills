@@ -105,6 +105,7 @@ def _print_stream_event(event: dict) -> bool:
 SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
 PROMPT_FILE = SCRIPT_DIR / "prompt.md"
+LOGS_DIR = SCRIPT_DIR / "logs"
 
 
 def load_tasks() -> dict:
@@ -245,6 +246,11 @@ def run_task(task: dict, config: dict) -> bool:
     task['started_at'] = datetime.now().isoformat()
     save_tasks(config)
 
+    LOGS_DIR.mkdir(exist_ok=True)
+    log_path = LOGS_DIR / f"task-{task['number']}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.jsonl"
+    task['log_file'] = str(log_path)
+    print(f"  Full raw transcript (every bash command + full output, unfiltered): {log_path}", flush=True)
+
     print("  Running Claude CLI...", flush=True)
     master, slave = pty.openpty()
     proc = subprocess.Popen(
@@ -259,34 +265,37 @@ def run_task(task: dict, config: dict) -> bool:
 
     buf = ''
     interrupted = False
-    try:
-        while True:
-            try:
-                chunk = os.read(master, 4096).decode('utf-8', errors='ignore')
-                buf += _ANSI_RE.sub('', chunk)
-                while '\n' in buf:
-                    line, buf = buf.split('\n', 1)
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        if _print_stream_event(json.loads(line)):
-                            raise StopIteration  # result event → exit the loop
-                    except json.JSONDecodeError:
-                        print(f"  {line}", flush=True)
-            except OSError:
-                break  # PTY closed when the process exits
-    except StopIteration:
-        pass
-    except KeyboardInterrupt:
-        interrupted = True
-        proc.kill()  # SIGKILL → returns immediately, doesn't block
-    finally:
+    with open(log_path, 'a', encoding='utf-8') as log_file:
         try:
-            os.close(master)
-        except OSError:
+            while True:
+                try:
+                    chunk = os.read(master, 4096).decode('utf-8', errors='ignore')
+                    buf += _ANSI_RE.sub('', chunk)
+                    while '\n' in buf:
+                        line, buf = buf.split('\n', 1)
+                        line = line.strip()
+                        if not line:
+                            continue
+                        log_file.write(line + '\n')
+                        log_file.flush()
+                        try:
+                            if _print_stream_event(json.loads(line)):
+                                raise StopIteration  # result event → exit the loop
+                        except json.JSONDecodeError:
+                            print(f"  {line}", flush=True)
+                except OSError:
+                    break  # PTY closed when the process exits
+        except StopIteration:
             pass
-        proc.wait()
+        except KeyboardInterrupt:
+            interrupted = True
+            proc.kill()  # SIGKILL → returns immediately, doesn't block
+        finally:
+            try:
+                os.close(master)
+            except OSError:
+                pass
+            proc.wait()
 
     if interrupted:
         raise KeyboardInterrupt
@@ -309,6 +318,7 @@ def run_task(task: dict, config: dict) -> bool:
         task['status'] = 'failed'
         task['completed_at'] = datetime.now().isoformat()
         print(f"  ✗ Task #{task['number']} FAILED (exit code: {proc.returncode})")
+        print(f"  Full transcript for debugging: {log_path}")
         save_tasks(config)
 
     return task['status'] == 'done' and task.get('open_pr_url') is not None

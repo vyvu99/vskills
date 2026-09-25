@@ -9,3 +9,5 @@ plans/
 node_modules/
 __pycache__/
 *.pyc
+skills/vautocook/scripts/tasks.json
+skills/vautocook/scripts/logs/
