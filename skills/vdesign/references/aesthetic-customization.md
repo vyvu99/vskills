@@ -16,15 +16,15 @@ Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 
 ## Round 1 — Visual Foundation
 
 1. **Typography** — primary typeface direction and sizing voice.
-   - *Minimal/Professional* (IBM Plex, Source Sans 3) — neutral, technical
-   - *Bold/Editorial* (Playfair Display, Fraunces, Clash Display) — distinctive, branded
-   - *Code/Technical* (JetBrains Mono, Fira Code, Space Grotesk) — dev-tool, creative
-   - *Startup/Modern* (Satoshi, Cabinet Grotesk, Inter Tight) — contemporary, friendly
+   - *Minimal/Professional* (IBM Plex, Source Sans 3) — neutral, technical — webapp `font-sample` value: `"IBM Plex Sans, sans-serif"`
+   - *Bold/Editorial* (Playfair Display, Fraunces, Clash Display) — distinctive, branded — webapp `font-sample` value: `"Playfair Display, serif"`
+   - *Code/Technical* (JetBrains Mono, Fira Code, Space Grotesk) — dev-tool, creative — webapp `font-sample` value: `"JetBrains Mono, monospace"`
+   - *Startup/Modern* (Satoshi, Cabinet Grotesk, Inter Tight) — contemporary, friendly — webapp `font-sample` value: `"Inter Tight, sans-serif"`
 2. **Color palette philosophy** — how the palette gets built.
-   - *Keep existing tokens* — full consistency with the current codebase. Locks: no brand color changes anywhere in this run.
-   - *Accent colors only* — keep primary, add a new brand accent. Unlocks: exactly one new accent color; base/primary tokens stay untouched.
-   - *Full palette redesign* — new palette from brand colors, built from scratch. Unlocks: full palette replacement — every color token in scope may change.
-   - *Dynamic/auto-generated* — tool-generated palette with accessibility built in (Material Theme Builder style). Unlocks: full palette replacement, same freedom as Full palette redesign, generated rather than hand-picked.
+   - *Keep existing tokens* — full consistency with the current codebase. Locks: no brand color changes anywhere in this run. — webapp `swatch` value: `"#94A3B8"` (neutral slate, signals "no new color")
+   - *Accent colors only* — keep primary, add a new brand accent. Unlocks: exactly one new accent color; base/primary tokens stay untouched. — webapp `swatch` value: `"#2563EB"`
+   - *Full palette redesign* — new palette from brand colors, built from scratch. Unlocks: full palette replacement — every color token in scope may change. — webapp `swatch` value: `"#7C3AED"`
+   - *Dynamic/auto-generated* — tool-generated palette with accessibility built in (Material Theme Builder style). Unlocks: full palette replacement, same freedom as Full palette redesign, generated rather than hand-picked. — no fixed color to swatch (it's tool-generated at build time): webapp renderHint `"plain"` for this option only, prefix label with "🎲 " instead
 3. **Motion/animation philosophy** — how much movement the UI carries.
    - *Minimal* — 150-300ms transitions only, no micro-interactions
    - *Balanced* — transitions + a few key micro-interactions (hover, page transition)
