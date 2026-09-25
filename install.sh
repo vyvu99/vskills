@@ -61,6 +61,9 @@ if [[ -d "$SKILLS_SRC" ]]; then
     # it isn't subject to --lang per-file selection, so any skill with a
     # references/ dir gets it (generic, not hardcoded to a specific skill).
     [[ -d "${skill_dir}references" ]] && link "${skill_dir}references" "$dst_dir/references"
+    # scripts/ (if the skill has one) is symlinked whole, same as references/ —
+    # e.g. vautocook's bundled plan_tasks.py/run_tasks.py it shells out to.
+    [[ -d "${skill_dir}scripts" ]] && link "${skill_dir}scripts" "$dst_dir/scripts"
   done
 fi
 

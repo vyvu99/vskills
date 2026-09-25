@@ -450,6 +450,7 @@ GENERAL RULES
    - Writes the result into .code-review/{GROUP_NAME}.txt with header: [REVIEWED BY: MAIN AGENT — subagent failed]
    - Writes into REPORT.md's CONFIDENCE NOTES section: "Group X reviewed by main agent — lower confidence than subagent review"
 7. Phase 5 (Lint Harvest) does NOT block merge — runs after Phase 4.5, its failure doesn't affect the main review result.
+7b. Phase 2's subagent count = number of groups from 1.4, which scales with diff size and can exceed what the platform can spawn concurrently in one message. See `_vskills-shared/repo-profile.md` §10 for the batching rule (spawn in batches, wait for each batch before the next) — note the batch count in CONTEXT.txt.
 8. Empty-after-filter or all-comment-only diffs (1.3c) → early exit, no subagent spawned.
 9. Incremental mode (1.0) applies only to Mode 3 diff review; `--path`/`--since` always run full.
 10. Phase 4.5 spot-check runs inline in the main agent — never spawn a subagent for it.
