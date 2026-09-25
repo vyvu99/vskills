@@ -18,7 +18,34 @@ Template gửi qua `POST /api/step`:
 Kết quả trả về khi `/api/step` resolve (Claude nhận) là 1 object
 `{ [field.id]: value }` — 1 key cho mỗi field, gộp cả 3 loại cùng lúc.
 
+**`/api/step` validate template ngay lập tức, trước khi hiện lên web** (title/fields
+rỗng, field thiếu `id`/`label`/`type`, `type` lạ, `id` trùng, `select` thiếu
+`options` hoặc option thiếu `label`/`value`, `renderHint` sai enum, `renderHint:
+"swatch"` nhưng `value` không phải màu CSS thật, `diff-review-list` thiếu `items`
+hoặc item thiếu field bắt buộc). Sai → trả `400` ngay (không mở web, không set
+pending): `{ "error": "invalid template", "details": ["fields[0].label phải là
+string không rỗng", ...] }`. Đọc `details`, tự sửa lại JSON, gọi lại `/api/step`
+— đừng để user mở tab thấy trang hỏng/rỗng mới biết JSON sai.
+
 ### `select`
+
+| Key | Type | Required | Ghi chú |
+|---|---|---|---|
+| `id` | string | ✅ | Key trong object kết quả |
+| `type` | `"select"` | ✅ | |
+| `label` | string | ✅ | Tiêu đề field |
+| `description` | string | — | Render **ngay trên** danh sách option (không phải tooltip ẩn) — dùng khi option cần đủ ngữ cảnh mới quyết định được |
+| `options` | array | ✅ | Xem bảng option bên dưới |
+
+**Option** (mỗi phần tử của `options`):
+
+| Key | Type | Required | Ghi chú |
+|---|---|---|---|
+| `label` | string | ✅ | Text hiển thị |
+| `value` | string | ✅ | Giá trị trả về khi chọn — PHẢI là màu hex thật nếu `renderHint: "swatch"`, CSS `font-family` thật nếu `renderHint: "font-sample"`. Không gửi label suông rồi để `renderHint` không có gì để hiện |
+| `renderHint` | `"plain"` \| `"swatch"` \| `"font-sample"` | — | Mặc định `"plain"` (radio/list thường). `"swatch"` = hiện 1 ô màu dùng `value` làm CSS color. `"font-sample"` = label render bằng chính font trong `value` |
+
+Value trả về = `option.value` của option được chọn.
 
 ```json
 {
@@ -33,28 +60,44 @@ Kết quả trả về khi `/api/step` resolve (Claude nhận) là 1 object
 }
 ```
 
-- `renderHint`: `"plain"` (mặc định, list/radio thường) | `"swatch"` (option hiện 1 ô
-  màu dùng `option.value` làm CSS color — `value` PHẢI là màu thật, vd `"#1E63B8"`,
-  không phải tên khái niệm) | `"font-sample"` (label render bằng chính font trong
-  `option.value` — `value` PHẢI là 1 CSS `font-family` hợp lệ, vd font thật kèm
-  fallback).
-- `description` (optional): render **ngay trên** danh sách option, không phải
-  tooltip ẩn — dùng khi option cần đủ ngữ cảnh mới quyết định được (case dài).
-- Value trả về = `option.value` của option được chọn (string).
-- **Bắt buộc:** nếu dùng `swatch`/`font-sample`, mỗi option phải có 1 giá trị
-  đại diện THẬT (màu hex/font family thật) — không gửi label suông rồi để
-  `renderHint` không có gì để hiện.
-
 ### `text`
+
+| Key | Type | Required | Ghi chú |
+|---|---|---|---|
+| `id` | string | ✅ | Key trong object kết quả |
+| `type` | `"text"` | ✅ | |
+| `label` | string | ✅ | |
+| `description` | string | — | Cùng quy tắc hiển thị như `select` |
+| `placeholder` | string | — | |
+
+Input tự do (textarea), dùng cho "Other"/proposal/quyết định mở. Value trả về
+= string đã nhập (rỗng nếu bỏ trống).
 
 ```json
 { "id": "catchall", "type": "text", "label": "Điều gì khác bạn muốn chỉnh?", "placeholder": "Optional" }
 ```
 
-Input tự do (textarea), dùng cho "Other"/proposal/quyết định mở. Value trả về
-= string đã nhập (rỗng nếu bỏ trống).
-
 ### `diff-review-list`
+
+| Key | Type | Required | Ghi chú |
+|---|---|---|---|
+| `id` | string | ✅ | Key trong object kết quả |
+| `type` | `"diff-review-list"` | ✅ | |
+| `label` | string | ✅ | |
+| `items` | array | ✅ | Xem bảng item bên dưới |
+
+**Item** (mỗi phần tử của `items`):
+
+| Key | Type | Required | Ghi chú |
+|---|---|---|---|
+| `id` | string | ✅ | ID ổn định trong lần chạy này (vd `SUGGESTION-1`) — dùng để map ngược quyết định, không dựa vào thứ tự index |
+| `before` | string | ✅ | Render riêng 1 khối, tự scroll (item dài không đẩy item khác ra khỏi màn hình) |
+| `after` | string | ✅ | Cùng quy tắc render như `before` |
+| `actions` | string[] | ✅ | Thường `["apply", "skip"]` |
+| `allowFreeText` | boolean | — | Mặc định `false`. `true` → thêm ô nhập tuỳ chọn, dùng làm chỉ dẫn bổ sung thay vì chỉ apply/skip thô |
+| `default` | string | — | Action chọn sẵn khi trang mở — mặc định `"apply"` nếu bỏ trống |
+
+Value trả về = mảng `{ id, action, freeText? }` theo **đúng thứ tự** `items` gốc.
 
 ```json
 {
@@ -73,15 +116,6 @@ Input tự do (textarea), dùng cho "Other"/proposal/quyết định mở. Value
   ]
 }
 ```
-
-- Mỗi item render 1 khối riêng: `before`/`after` cạnh nhau, tự scroll riêng
-  (item dài không đẩy các item khác ra khỏi màn hình).
-- `default` (optional): action được chọn sẵn khi trang mở (mặc định `"apply"`
-  nếu bỏ trống).
-- `allowFreeText: true` → thêm ô nhập tuỳ chọn, dùng làm chỉ dẫn bổ sung thay
-  vì chỉ apply/skip thô.
-- Value trả về = mảng `{ id, action, freeText? }` theo **đúng thứ tự** `items`
-  gốc — map ngược lại bằng `id`, không dựa vào thứ tự index.
 
 ## (b) 1 port cố định + health-check + start nền + mở browser
 
@@ -113,13 +147,19 @@ node web/server.mjs &     # Bash run_in_background: true
   tương tác bằng 1 lệnh Bash `run_in_background: true` duy nhất, đọc body từ file:
 
 ```bash
-curl -s -X POST localhost:4270/api/step -H 'content-type: application/json' -d @/path/to/step-template.json
+curl -s -w '\n%{http_code}' -X POST localhost:4270/api/step -H 'content-type: application/json' -d @/path/to/step-template.json
 ```
 
   Lệnh này **tự treo** tới khi user submit trên trang web — harness tự động
-  notify Claude khi lệnh nền hoàn tất (không tự polling/sleep-loop). Response
-  stdout của lệnh chính là object kết quả `{ [field.id]: value }` — parse JSON
-  đó để lấy quyết định của user.
+  notify Claude khi lệnh nền hoàn tất (không tự polling/sleep-loop). Dòng cuối
+  của stdout là HTTP status code (nhờ `-w`), phần còn lại là JSON body — luôn
+  kiểm tra status trước khi dùng body:
+  - `400` → template sai (xem mục (a)), trả về NGAY LẬP TỨC, không phải sau khi
+    user submit — đọc `details`, sửa JSON, gọi lại, KHÔNG hỏi/mở tab cho user
+  - `504` → hết timeout, không có answer — coi như user không chọn webapp,
+    fallback theo hướng dẫn bên dưới
+  - `200` → body chính là object kết quả `{ [field.id]: value }` — parse JSON
+    đó để lấy quyết định của user
 - User đóng tab không submit → lệnh trên tự trả lỗi timeout sau 30 phút mặc
   định (`VSKILLS_WEBAPP_STEP_TIMEOUT_MS` để đổi) — skill nên nói rõ cho user
   biết sẽ chờ tối đa bao lâu trước khi gọi.
