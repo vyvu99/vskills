@@ -42,6 +42,12 @@ STEP 2: DETERMINE THE BRANCH
    - `git checkout <default_branch>` → `git pull` → `git checkout -b <descriptive-branch-name>`
    - Branch name: kebab-case, English, accurately describing the scope of change (no tool/agent-based prefix unless the repo enforces its own convention).
 
+**Determine the PR base branch now, in either path above, before Step 5 adds any commits** (merge-base heuristics below get unreliable once new commits land) — this is what Step 9 uses for `gh pr create --base`, never `gh`'s own default:
+- Path 2 (just branched off `<default_branch>`) → base is `<default_branch>`.
+- Path 1 (already on an existing branch, e.g. a caller — human or a script like an automated multi-task pipeline — already checked it out from somewhere) → do NOT assume `<default_branch>`.
+  - **The caller already told you where this branch came from** (e.g. an instruction like "you are already on branch X, checked out from Y") → trust that directly as the base. It was computed once, deterministically, by whatever set this branch up — re-deriving it from git history is redundant and, in a multi-branch stacked setup, strictly less reliable than the answer you were already given.
+  - **Nobody told you** (plain standalone use — you or the user manually checked out this branch, no orchestrating caller) → detect it yourself: for every other local/remote branch `b` (excluding this one), check `git merge-base --is-ancestor b HEAD`; among the ones that pass, the branch needing the fewest commits to reach HEAD (`git rev-list --count b..HEAD`) is the true parent. If that closest ancestor resolves to `<default_branch>` (or its `origin/` mirror), base = `<default_branch>`. If it's some OTHER, still-unmerged branch, THAT branch is the PR base — this is a stacked-PR situation (this branch's real predecessor hasn't merged yet), and basing the PR on `<default_branch>` instead would make the diff wrongly include every commit from that unmerged predecessor too.
+
 ═══════════════════════════════════════════════════════
 STEP 3: IDENTIFY THE INPUT MODE
 ═══════════════════════════════════════════════════════
@@ -118,7 +124,7 @@ Resolve the VCS profile first: read `~/.claude/skills/_vskills-shared/repo-profi
 - Read the project's `.github/pull_request_template.md` (if it exists) → PR body MUST follow it exactly. Absent → sensible default format (Summary / Changes / Test plan).
 - Title: English, concise.
 - Description: in the project's communication language — `## Ngôn ngữ`/`## Language` section in the project's `CLAUDE.md`, then `~/.claude/CLAUDE.md`, else English (same resolution `repo-profile.md` §4 documents, doesn't require the file itself to be present) — non-technical, for readers who aren't engineers, focused on user/business impact, no code jargon.
-- Full gh mode (per §2) → create the PR with `gh` as usual. Degraded/local-only → push the branch, print the §2 vcook message plus the fully composed title and body so the user pastes it into their host's UI — compose the body in both modes, never skip it.
+- Full gh mode (per §2) → create the PR with `gh pr create --base <resolved base branch from Step 2>` — never omit `--base` and rely on `gh`'s own default, which always targets the repo's default branch even when this branch's real parent is a different, still-unmerged branch (see Step 2's base-branch determination). Degraded/local-only → push the branch, print the §2 vcook message plus the fully composed title and body so the user pastes it into their host's UI — compose the body in both modes, never skip it.
 - Related GitHub issue (from the plan or an issue number the user gave):
   - Add `Closes #<issue>` at the TOP of the PR body (plain text, works in both modes)
   - Full gh mode → `gh issue edit <issue>` to append a link to the PR at the END of the issue body. Degraded mode → print "add a link to the PR in issue #N manually" and continue.

@@ -177,6 +177,14 @@ def ensure_pr(task: dict, parent_branch: str) -> str | None:
 
     existing = _find_open_pr_by_branch(owner, repo, branch)
     if existing:
+        if existing.get('baseRefName') != base:
+            print(_c('yellow', f"  ⚠ PR #{existing['number']} base is '{existing['baseRefName']}', should be '{base}' (stacked dependency) — fixing"), flush=True)
+            fix = subprocess.run(
+                ['gh', 'pr', 'edit', str(existing['number']), '--repo', f'{owner}/{repo}', '--base', base],
+                capture_output=True, text=True
+            )
+            if fix.returncode != 0:
+                print(_c('red', f"  ✗ Could not fix PR base: {fix.stderr.strip()}"), flush=True)
         print(_c('green', f"  ✓ PR already open (created by /vcook): {existing['url']}"), flush=True)
         return existing['url']
 
@@ -208,10 +216,17 @@ def checkout_branch(branch_name: str, parent_branch: str) -> None:
     subprocess.run(['git', 'fetch', 'origin'], check=True)
 
     check = subprocess.run(['git', 'rev-parse', '--verify', branch_name], capture_output=True)
+    remote_check = subprocess.run(['git', 'rev-parse', '--verify', f'origin/{branch_name}'], capture_output=True)
 
     if check.returncode == 0:
         subprocess.run(['git', 'checkout', branch_name], check=True)
         print(f"  Resumed on existing branch: {branch_name}")
+    elif remote_check.returncode == 0:
+        # Exists on origin but not locally (e.g. resumed from a fresh clone, or the
+        # local branch was deleted after pushing) — track it instead of recreating
+        # from parent_branch, which would diverge from the already-pushed history.
+        subprocess.run(['git', 'checkout', '-b', branch_name, '--track', f'origin/{branch_name}'], check=True)
+        print(f"  Resumed on remote branch: origin/{branch_name}")
     else:
         resolved_parent = parent_branch
         verify = subprocess.run(['git', 'rev-parse', '--verify', parent_branch], capture_output=True)
