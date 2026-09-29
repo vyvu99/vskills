@@ -459,4 +459,4 @@ GENERAL RULES
 NEXT STEPS
 ═══════════════════════════════════════════════════════
 
-Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly. (see the shared convention in `_vskills-shared/repo-profile.md` §7)
+Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly. (see the shared convention in `_vskills-shared/repo-profile.md` §7)

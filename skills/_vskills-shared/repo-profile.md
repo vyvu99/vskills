@@ -63,7 +63,6 @@ Degraded-mode contract:
 Per-skill degraded messages:
 - **vcook** (PR creation): `⚠️ gh unavailable / non-GitHub remote — commits are pushed, open the PR manually on your host. Suggested title: <title>. Body below.` then print the body.
 - **vtickets** (sub-issue linking): `⚠️ Sub-issue linking uses GitHub's addSubIssue GraphQL mutation, which has no equivalent on other hosts — create the epic + sub-issues manually and link them by hand.` then print the ready-to-paste issue bodies.
-- **vlearn** (PR-comment fetch): `⚠️ Can't fetch review comments without gh — paste the bot's review comments and I'll continue from Step 3.`
 - **vdesign / vreview** (PR diff / PR-ref resolution): `⚠️ Can't resolve PR refs without gh — pass a branch name instead; branch/diff modes work without gh.`
 
 ## §3 — Primary language + framework
@@ -104,7 +103,7 @@ This section states the rule only. Each skill names its own specific file path/f
 
 Every skill in this pack ends with the same "Next steps" instruction. Reference it instead of inlining:
 
-> Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+> Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
 
 A skill's own `## Next steps` section should read: "Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7." — updating the skill-name list (add/rename/remove a skill) then only requires editing this one paragraph, not 10 files. A skill whose footer body is intentionally customized (e.g. vreview/vfix's ASCII-banner-style footer with skill-specific wording) keeps its own body and appends a short pointer sentence instead — "(see the shared convention in `_vskills-shared/repo-profile.md` §7)" — rather than being forced into the standard paragraph.
 

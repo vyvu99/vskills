@@ -459,4 +459,4 @@ QUY TẮC CHUNG
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vlearn, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn. (xem convention chung ở `_vskills-shared/repo-profile.md` §7)
+Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn. (xem convention chung ở `_vskills-shared/repo-profile.md` §7)
