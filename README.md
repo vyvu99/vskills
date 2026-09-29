@@ -77,16 +77,16 @@ flowchart LR
 ## Which skill do I need?
 
 ```
-├─ Write specs for a new feature        → /vspecs
-├─ Turn specs into a plan               → /vplan
-├─ Implement a plan or a quick task     → /vcook
-├─ Review a branch or PR                → /vreview
-├─ Fix a review report                  → /vfix
-├─ Typecheck/build before a commit      → /vci
-├─ Track a plan on GitHub               → /vtickets
-├─ Implement a GitHub epic unattended   → /vautocook
-├─ Redesign a page's UI                 → /vdesign
-└─ Roll back a local migration          → /vrollback
+├─ "No specs yet for this feature"                 → /vspecs
+├─ "Specs are ready, need an implementation plan"  → /vplan
+├─ "Have a plan (or just a quick task), need code" → /vcook
+├─ "Need to review a branch or PR"                 → /vreview
+├─ "Have a review report, need to fix it"          → /vfix
+├─ "Want a typecheck/build sanity check"           → /vci
+├─ "Need to track a plan on GitHub"                → /vtickets
+├─ "Have a GitHub epic, want it built unattended"  → /vautocook
+├─ "Need to redesign a page's UI"                  → /vdesign
+└─ "Ran the wrong migration locally"               → /vrollback
 ```
 
 ---

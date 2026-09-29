@@ -77,16 +77,16 @@ flowchart LR
 ## Cần skill nào?
 
 ```
-├─ Viết specs cho feature mới           → /vspecs
-├─ Biến specs thành plan                → /vplan
-├─ Implement 1 plan hoặc task nhanh     → /vcook
-├─ Review 1 branch/PR                   → /vreview
-├─ Fix 1 report review                  → /vfix
-├─ Typecheck/build trước khi commit     → /vci
-├─ Track 1 plan trên GitHub             → /vtickets
-├─ Implement 1 epic GitHub không cần canh → /vautocook
-├─ Redesign UI 1 trang                  → /vdesign
-└─ Rollback 1 migration ở local         → /vrollback
+├─ "Feature này chưa có specs"                    → /vspecs
+├─ "Đã có specs, cần lập plan implementation"     → /vplan
+├─ "Đã có plan (hoặc chỉ 1 task nhanh), cần code" → /vcook
+├─ "Cần review 1 branch/PR"                       → /vreview
+├─ "Có report review, cần fix"                    → /vfix
+├─ "Cần check nhanh typecheck/build"              → /vci
+├─ "Cần track 1 plan trên GitHub"                 → /vtickets
+├─ "Có 1 epic GitHub, muốn build không cần canh"  → /vautocook
+├─ "Cần redesign UI 1 trang"                      → /vdesign
+└─ "Lỡ chạy nhầm migration ở local"                → /vrollback
 ```
 
 ---
