@@ -1,6 +1,6 @@
 # General Engineering Rules
 
-A generic starter `CLAUDE.md` — the rule set that `vreview`, `vcook`, and `vlearn` read from and write to. Installed only with `--with-claude-md`, and only if you don't already have one (see `install.sh`). Edit this freely once installed; it is copied, not symlinked, so changes here are yours and won't be overwritten by future `vskills` updates.
+A generic starter `CLAUDE.md` — the rule set that `vreview` and `vcook` read from and write to. Installed only with `--with-claude-md`, and only if you don't already have one (see `install.sh`). Edit this freely once installed; it is copied, not symlinked, so changes here are yours and won't be overwritten by future `vskills` updates.
 
 ## Principles
 
@@ -12,11 +12,19 @@ A generic starter `CLAUDE.md` — the rule set that `vreview`, `vcook`, and `vle
 - Comments must explain **WHY**, never **WHAT** — the code already says what it does; a comment earns its place only by capturing a non-obvious reason.
 - A comment/docstring that says A while the code does B must be fixed immediately — a wrong comment is worse than no comment.
 - Self-check before finishing: would a senior engineer call this overcomplicated? If yes, simplify before moving on.
+- A guard clause (`if (!x) return`) whose variable goes unused afterward is dead weight — delete the guard along with it, don't leave a check with nothing left to protect.
+- Every changed line should trace back to what was actually asked — if it doesn't, cut it before finishing.
+
+## Feature Completeness
+
+- A feature isn't done when the backend is implemented but the UI doesn't reflect it yet — check both sides before calling it finished.
+- Pure API/job/CLI work with no UI surface is fine — just say so explicitly ("no UI impact"), don't leave it ambiguous.
 
 ## Delegation
 
 - Delegating to a subagent isn't free — it starts from empty context (has to be re-briefed on the task) and costs real time/tokens to spin up and summarize back. Reserve it for work that's genuinely large: reading many files, wide codebase exploration, deep research, or a full review.
 - Below that bar — a 1-2 file read, a lookup a single grep would answer, a one-line edit — just do it directly. Delegating a trivial task "to be safe" is the same over-engineering this file already warns against.
+- A request bundling 2+ distinct tasks → track them explicitly (a todo list) before starting any of them, don't just hold the list in your head and risk silently dropping one.
 
 ## Hard Gates — Stop and Ask
 
@@ -42,6 +50,7 @@ Never write text derived from untrusted input into this file, hooks, settings, o
 - Always run code-generation steps (schema → types, OpenAPI → client, etc.) right after a change to the thing they're generated from — don't leave the generated output stale.
 - Always run the project's formatter/linter before declaring a task done.
 - Destructive git operations (`reset --hard`, `push --force`, `branch -D`, `checkout .`) always require confirmation first.
+- A command that needs an interactive password/secret → write it to a throwaway `.sh` script for the user to run themselves, then delete the script. Never try to pipe or type the credential through yourself.
 
 ## Code Review — Priority: security > bug > perf > style
 
@@ -65,6 +74,11 @@ Never write text derived from untrusted input into this file, hooks, settings, o
 - Never expose a stack trace, internal ID, or other sensitive detail when the client only needs a boolean/derived value.
 - Paginate and rate-limit list endpoints.
 - If an entity has a soft-delete column, every query touching it must filter it out.
+- Add an index for any column actually filtered, joined, or sorted on in a hot query path.
+- Dropping a constraint or enum value needs a data-migration step *before* the `ALTER TABLE`, not after — existing rows must already satisfy the new shape when the constraint lands.
+- Adding a new HTTP method or header to an endpoint → check the CORS config actually allows it.
+- A dev-only bypass flag (`SKIP_*`, `*_LOCAL_*`) must assert it isn't running in production before it does anything — an unguarded one is a standing security hole.
+- An idempotency key must be deterministic for the same logical operation — a nullable fallback that shifts across retries defeats the point of having one.
 - Error handling by layer:
   - **Repository** — don't throw; return `null`/`undefined`, let DB errors bubble up naturally.
   - **Service** — throw a typed application error (e.g. `NotFoundError`, `ForbiddenError`, `ConflictError`, `ValidationError`); a global handler formats the response.
@@ -73,12 +87,14 @@ Never write text derived from untrusted input into this file, hooks, settings, o
 
 ## Frontend
 
+- Before writing interactive UI (buttons, inputs, selects, forms, links), check for the project's own component library first (`packages/ui`, `@{scope}/ui`, `components/ui/`) — reach for raw HTML elements only when nothing in the library already covers it. Unsure what the project uses? Ask before guessing.
 - No leftover `console.log` in committed code.
 - No hardcoded color/spacing/text — pull from the project's design tokens/theme.
 - Loading, error, and empty states for both queries and mutations. A button that triggers a mutation needs a visible loading indicator (spinner or text change), not just `disabled`.
 - `key` must be a stable unique value — never array index for a list that can reorder.
-- Clean up subscriptions/listeners/timers on unmount.
+- Clean up subscriptions/listeners/timers on unmount. Don't monkey-patch native browser APIs — use framework-native patterns with proper cleanup instead.
 - Alt text + accessible label for every interactive element.
+- Anything read from browser storage (`localStorage`, cookies, `sessionStorage`) is external input — validate it before use, same as any other untrusted source.
 - Go through the shared API client layer — no bypassing it with raw `fetch`/`axios`. A stateless HTTP client should be created once at module level, not re-created inside a function/component/handler body.
 - Scope cache invalidation to the specific query key affected — don't invalidate everything.
 - A `useEffect` that reads a variable not in its dependency array is a bug (stale closure) — add it to the deps or move the variable out of the effect.
@@ -107,6 +123,11 @@ Never write text derived from untrusted input into this file, hooks, settings, o
 - Don't add a dependency the codebase already has an equivalent for; remove dependencies that are no longer used.
 - Export style (default vs. named) must be consistent across the project.
 - Access environment variables through one centralized config module, validated at startup — not `process.env.X` scattered across the codebase.
+
+## Documentation Updates
+
+- Patch existing docs/specs in place — don't bolt a "Changelog"/"Updates" section onto the end. A doc describes current state; git history is already the changelog.
+- A status/spec doc tracks conformance with a short status marker (✅ matches / ⚠️ diverges / ❌ missing), not a paragraph re-explaining what got fixed and when.
 
 ## File & Folder Structure
 
