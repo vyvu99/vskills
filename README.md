@@ -2,7 +2,7 @@
 
 🌐 English | [Tiếng Việt](README.vi.md)
 
-Personal Claude Code skills covering the full lifecycle of a coding task: spec, plan, implement, review, fix, and ship — plus GitHub tracking, UI redesign, and local migration rollback.
+Personal Claude Code skills covering the full lifecycle of a coding task: spec, plan, implement, review, fix, and ship — plus GitHub tracking, UI redesign, unattended audit sweeps, and local migration rollback.
 
 Plain `SKILL.md` files, symlinked from this repo into `~/.claude/skills`. No plugin layer, no config file. Each skill ships in English (`SKILL.md`) and Vietnamese (`SKILL.vi.md`).
 
@@ -41,7 +41,7 @@ Skills are symlinked, not copied — edit either copy, it's the same file. Re-ru
 | Skill | Description | Example |
 |---|---|---|
 | `vtickets`* | Creates or syncs a GitHub epic and sub-issues from a plan directory. Idempotent. | `/vtickets plans/appointment-rebooking` |
-| `vautocook`* | Implements every sub-issue of a GitHub epic unattended, one at a time, each as its own PR. Requires confirmation before it starts; no fallback if `gh`/`claude` isn't available. | `/vautocook <epic-url>` |
+| `vautocook`* | Implements every sub-issue of a GitHub epic unattended, one at a time, each in a fresh session, all landing in a single epic PR. Requires confirmation before it starts; no fallback if `gh`/`claude` isn't available. | `/vautocook <epic-url>` |
 
 ### Support
 
@@ -49,6 +49,7 @@ Skills are symlinked, not copied — edit either copy, it's the same file. Re-ru
 |---|---|---|
 | `vci` | Typecheck, build, and lint in parallel across a JS/TS repo; format and optional tests after. Auto-detects the package manager and workspace. | `/vci --changed` |
 | `vdesign` | Redesigns a page or component's UI through a structured scan → audit → fix → verify process. Always starts by asking 18 style questions. | `/vdesign /clients/[id]` |
+| `vsweep` | Runs an unattended, time-boxed bug/security sweep: one subagent at a time, fixes clear-cut issues with tests + live verification, logs ambiguous ones as pending decisions. Resumes later to implement those decisions with the same rigor. | `/vsweep --until 06:00` |
 | `vrollback`* | Rolls back one applied migration on a confirmed-local database and removes its tracking record. Refuses non-local targets. | `/vrollback 0007_add_status` |
 
 Full behavior, flags, and edge cases: `skills/<name>/SKILL.md`.
@@ -70,9 +71,11 @@ flowchart LR
     auto -. drives .-> cook
     cook -. before opening PR .-> ci["/vci"]
     cook -. UI work .-> design["/vdesign"]
+
+    sweep["/vsweep"] -. findings needing a decision .-> idea
 ```
 
-`/vrollback` runs independently — not part of this pipeline.
+`/vrollback` and `/vsweep` run independently — not part of this pipeline.
 
 ## Which skill do I need?
 
@@ -86,6 +89,7 @@ flowchart LR
 ├─ "Need to track a plan on GitHub"                → /vtickets
 ├─ "Have a GitHub epic, want it built unattended"  → /vautocook
 ├─ "Need to redesign a page's UI"                  → /vdesign
+├─ "Audit everything, unattended, until a deadline" → /vsweep
 └─ "Ran the wrong migration locally"               → /vrollback
 ```
 
