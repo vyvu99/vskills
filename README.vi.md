@@ -2,7 +2,7 @@
 
 🌐 [English](README.md) | Tiếng Việt
 
-Bộ skill Claude Code cá nhân, bao trọn vòng đời 1 task code: viết specs, lập plan, implement, review, fix, ship — cộng thêm track trên GitHub, redesign UI, rà soát không cần canh, và rollback migration ở local.
+Bộ skill Claude Code cá nhân, bao trọn vòng đời 1 task code: viết specs, lập plan, implement, review, fix, ship — cộng thêm track trên GitHub, redesign UI, rà backlog không cần canh, và rollback migration ở local.
 
 File `SKILL.md` thuần, symlink từ repo này vào `~/.claude/skills`. Không qua plugin, không có config. Mỗi skill có 2 bản: English (`SKILL.md`) và tiếng Việt (`SKILL.vi.md`).
 
@@ -49,7 +49,7 @@ Skill được symlink chứ không copy — sửa ở đâu cũng là cùng 1 f
 |---|---|---|
 | `vci` | Typecheck, build, lint song song cho cả repo JS/TS; format và test tùy chọn chạy sau. Tự phát hiện package manager/workspace. | `/vci --changed` |
 | `vdesign` | Redesign UI 1 page/component qua quy trình scan → audit → fix → verify. Luôn mở đầu bằng 18 câu hỏi style. | `/vdesign /clients/[id]` |
-| `vsweep` | Chạy 1 đợt rà soát bug/bảo mật không cần canh, có giới hạn thời gian: 1 subagent mỗi lần, tự sửa lỗi rõ ràng kèm test + verify sống, ghi nhận cái mơ hồ thành quyết định đang chờ. Resume lại sau để triển khai các quyết định đó với cùng mức kỹ lưỡng. | `/vsweep --until 06:00` |
+| `vsweep` | Chạy 1 đợt rà backlog mở (bug, bảo mật, feature, test, doc, refactor) không cần canh, có giới hạn thời gian: 1 subagent mỗi lần, tự làm xong việc rõ ràng kèm test + verify sống, ghi nhận cái mơ hồ thành quyết định đang chờ. Resume lại sau để triển khai các quyết định đó với cùng mức kỹ lưỡng. | `/vsweep --until 06:00` |
 | `vrollback`* | Rollback 1 migration đã chạy trên DB xác nhận là local + xóa tracking record. Từ chối target không rõ local. | `/vrollback 0007_add_status` |
 
 Chi tiết đầy đủ, flag, edge case: `skills/<name>/SKILL.vi.md`.
@@ -89,7 +89,7 @@ flowchart LR
 ├─ "Cần track 1 plan trên GitHub"                 → /vtickets
 ├─ "Có 1 epic GitHub, muốn build không cần canh"  → /vautocook
 ├─ "Cần redesign UI 1 trang"                      → /vdesign
-├─ "Audit toàn bộ, không cần canh, tới 1 deadline" → /vsweep
+├─ "Rà 1 backlog, không cần canh, tới 1 deadline"  → /vsweep
 └─ "Lỡ chạy nhầm migration ở local"                → /vrollback
 ```
 
