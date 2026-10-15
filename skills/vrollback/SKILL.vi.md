@@ -1,6 +1,6 @@
 ---
 name: vrollback
-description: "Rollback một migration cụ thể trên database LOCAL và xóa tracking record của nó, như thể migration đó chưa từng chạy. Tự động detect framework (Drizzle/Prisma/Knex/TypeORM/raw SQL) + DB (Postgres/MySQL/SQLite) + Docker container. Generic cho mọi project JS/TS (Drizzle/Prisma/Knex/TypeORM/raw SQL)."
+description: "Rollback một migration cụ thể trên database LOCAL và xóa tracking record của nó, như thể migration đó chưa từng chạy. Tự động detect framework (Drizzle/Prisma/Knex/TypeORM/raw SQL) + DB (Postgres/MySQL/SQLite) + Docker container."
 argument-hint: "<migration-name-or-version>"
 user-invocable: true
 disable-model-invocation: true
@@ -38,7 +38,7 @@ Nếu `$ARGUMENTS` rỗng — hỏi user tên hoặc version của migration c�
 
 1. Tìm migration trong thư mục migrations của project (đường dẫn tùy framework: `drizzle/migrations/`, `prisma/migrations/`, `migrations/`, v.v.)
 2. Query tracking table tương ứng để xác nhận migration đã được apply:
-   - Drizzle: `__drizzle_migrations`
+   - Drizzle: `drizzle.__drizzle_migrations` (Postgres đặt bảng này trong schema `drizzle`, không phải `public`)
    - Prisma: `_prisma_migrations`
    - Knex: `knex_migrations`
    - TypeORM: `migrations`
@@ -63,8 +63,8 @@ Trình bày trước khi chạy bất kỳ command nào:
 - **Framework có sẵn built-in down/rollback command** → dùng nó:
   - Prisma: không có down tự động sẵn — phải tự generate: `prisma migrate diff --from-schema prisma/schema.prisma --to-migrations prisma/migrations --script > down.sql`, hiển thị `down.sql` cho user, sau đó `prisma db execute --file ./down.sql`. KHÔNG dùng `prisma migrate resolve --rolled-back` — flag này chỉ hợp lệ cho migration đang ở trạng thái FAILED, dùng trên migration đã apply thành công sẽ throw lỗi P3012.
     <!-- Design tradeoff (đã verify với docs chính thức của Prisma ngày 2026-09-09): Đường dẫn Prisma khuyến nghị chính thức cho một migration đã apply thành công lại khác — revert `schema.prisma` về trạng thái trước đó rồi chạy `migrate dev` để sinh ra một migration forward mới undo lại thay đổi đó, giữ nguyên history. Cách đó CỐ Ý không được dùng ở đây vì nó mâu thuẫn với hợp đồng của skill này ("như thể migration chưa từng chạy" — Bước 5 xóa tracking row). Bản thân `migrate diff` không phụ thuộc vào trạng thái migration (nó chỉ diff schema/migration state), nên dùng nó để sinh down.sql + db execute + xóa thủ công tracking row (Bước 5) là combination duy nhất khớp với đúng lời hứa của skill này. KHÔNG "fix" lại về cách revert schema.prisma. -->
-  - Knex: `knex migrate:rollback`
-  - TypeORM: `typeorm migration:revert`
+  - Knex: `knex migrate:down <name>` — KHÔNG dùng `migrate:rollback`, lệnh đó revert cả batch cuối (có thể gồm nhiều migration)
+  - TypeORM: `typeorm migration:revert` — chỉ revert migration chạy GẦN NHẤT; migration cần rollback không phải cái cuối → dùng nhánh SQL thủ công bên dưới
 - **Framework không có down tự động** (ví dụ Drizzle không tự sinh down migration) → đọc file up migration, suy ra thao tác nghịch đảo (DROP TABLE thay vì CREATE TABLE, DROP COLUMN thay vì ADD COLUMN, v.v.), viết rollback SQL, hiển thị cho user trước khi chạy
 - **Ưu tiên dùng inverse do tool tự sinh hơn là suy luận thủ công.** Với Drizzle: nếu `schema.ts` trước migration còn recover được từ git history, checkout nó ra một temp path rồi chạy `drizzle-kit generate` với schema đó để tool tự sinh down SQL. Chỉ fallback sang suy luận thủ công inverse khi không recover được schema state trước đó.
 - Bọc rollback SQL trong transaction (`BEGIN; ... COMMIT;`) với Postgres/SQLite để tránh trường hợp fail giữa chừng làm schema bị half-migrated. DDL của MySQL không transactional — phải nói rõ điều này và backup trước (theo Bước 3).
@@ -72,7 +72,7 @@ Trình bày trước khi chạy bất kỳ command nào:
 
 ## Bước 5 — Xóa tracking record
 
-Sau khi rollback schema thành công, xóa tracking row tương ứng với framework đang dùng. **Luôn SELECT row đó trước, hiển thị cho user, rồi mới DELETE — không bao giờ blind-delete:**
+Sau khi rollback schema thành công, xóa tracking row tương ứng với framework đang dùng. **Luôn SELECT row đó trước, hiển thị cho user, rồi mới DELETE — không bao giờ blind-delete. Knex `migrate:down` tự xóa row của nó — SELECT không thấy gì → bỏ qua DELETE:**
 - Drizzle (Postgres): schema là `drizzle`, không phải `public` — `DELETE FROM drizzle."__drizzle_migrations" WHERE hash = '<hash>'` (pre-v1: không có cột `name`, match theo `hash` hoặc `created_at` lấy từ entry tương ứng trong `meta/_journal.json` của migration; v1 có thêm cột `name`)
 - Prisma: `DELETE FROM "_prisma_migrations" WHERE migration_name = '<name>'`
 - Knex/TypeORM/raw SQL: `DELETE FROM <tracking_table> WHERE <name-or-version-column> = '<value>'` (table/column đã xác định ở Bước 2)

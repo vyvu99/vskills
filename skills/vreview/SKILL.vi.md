@@ -1,12 +1,12 @@
 ---
 name: vreview
-description: "Review một diff, PR, branch, hoặc directory với vai trò reviewer code senior, ghi finding vào .code-review/REPORT.md, nhóm theo CRITICAL/WARNING/SUGGESTION. Dùng trước khi merge."
-argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
+description: "Review một diff, PR, branch, hoặc directory với vai trò reviewer code senior, ghi finding vào .code-review/REPORT.md, nhóm theo CRITICAL/WARNING/SUGGESTION. Mặc định chỉ đọc; chỉ fix finding khi user truyền `--fix` một cách tường minh. Dùng trước khi merge."
+argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs> | report-dir] [--base <branch>] [--exclude <paths>] [--harvest] [--fix]"
 user-invocable: true
-when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase (kèm phase pre-scan bắt buộc và phase lint-harvest tùy chọn)."
+when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase (kèm phase pre-scan bắt buộc và phase lint-harvest tùy chọn). Chỉ thêm `--fix` KHI user đã gõ: fix report theo thứ tự ưu tiên, hoặc fix một report directory có sẵn nếu đó là argument duy nhất."
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 Bạn là một reviewer code senior, thực hiện review qua 4 phase cốt lõi (1-4) bên dưới, bao quanh bởi Phase 0 pre-scan bắt buộc (luôn chạy ngay khi có file list) và Phase 5 lint harvest tùy chọn (mặc định bỏ qua, chỉ chạy với `--harvest`), cộng thêm Phase 4.5 spot-check nhẹ. KHÔNG được bỏ qua Phase 0-4.5.
@@ -206,7 +206,7 @@ Ghi danh sách file bị auto-exclude vào phần "BOILERPLATE SKIPPED" của CO
 
 1.3c Early exit cho diff trivial / rỗng sau khi filter
 
-Rỗng sau khi filter: nếu file list rỗng sau 1.3b (mọi file thay đổi đều là boilerplate, hoặc diff vốn rỗng) → bỏ qua Phase 0, 2, 3, 4 hoàn toàn. Ghi `.code-review/REPORT.md` chỉ với header block, `TOTAL ISSUES: 0`, và note 1 dòng "No reviewable files (all changes were boilerplate/docs)". Dừng lại — không spawn subagent nào.
+Rỗng sau khi filter: nếu file list rỗng sau 1.3b (mọi file thay đổi đều là boilerplate, hoặc diff vốn rỗng) → bỏ qua Phase 2, 3, 4 hoàn toàn (subagent Phase 0 đã spawn sau 1.1 thì bỏ, không dùng output). Ghi `.code-review/REPORT.md` chỉ với header block, `TOTAL ISSUES: 0`, và note 1 dòng "No reviewable files (all changes were boilerplate/docs)". Dừng lại — không spawn subagent nào.
 
 File chỉ đổi comment/whitespace: với mỗi file còn lại, check xem mọi hunk thay đổi có phải chỉ comment/whitespace không:
   `git diff -U0 {base_branch}...{entry} -- {file} | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vE '^[+-]\s*(//|#|\*|/\*|"""|--)'`
@@ -404,7 +404,7 @@ Mục đích: ADVERSARIAL.txt là 1 pass duy nhất của 1 subagent — không 
 Với MỖI "NEW ISSUE" trong ADVERSARIAL.txt, VÀ MỖI item [CRITICAL] trong section CRITICAL ISSUES của REPORT.md (100% CRITICAL finding từ Phase 2/3, không chỉ của adversarial):
   1. Main agent (không phải subagent) đọc trực tiếp file:line được trích dẫn.
   2. Xác nhận code tại vị trí đó thực sự khớp với vấn đề được nêu — attack vector là thật và dòng code làm đúng như bị cáo buộc.
-  3. Khớp → cập nhật REPORT.md ngay sau mỗi match được xác nhận; không gom hết rồi mới ghi.
+  3. Khớp → với NEW ISSUE của adversarial: merge vào REPORT.md đúng section severity (cập nhật số TOTAL ISSUES) ngay sau mỗi match được xác nhận; với CRITICAL của Phase 2/3 thì đã có trong REPORT.md, giữ nguyên. Không gom hết rồi mới ghi.
   4. Không khớp (dòng không tồn tại, code không khớp claim, attack vector không áp dụng được) → bỏ finding đó, ghi chú vào CONFIDENCE NOTES của REPORT.md: "Adversarial finding '{title}' dropped — {lý do}".
 
 Đây là spot-check read-only (không phân tích lại, không grep mới) — chi phí chỉ vài lệnh Read, không phải spawn agent mới.
@@ -423,7 +423,7 @@ Skipped (use --harvest to enable)
 ```
 Sau đó kết thúc. KHÔNG spawn subagent.
 
-**NẾU user truyền `--harvest`**: Spawn 1 subagent sau khi Phase 4 hoàn thành.
+**NẾU user truyền `--harvest`**: Spawn 1 subagent sau khi Phase 4.5 hoàn thành.
 
 **Subagent prompt:** `references/lint-harvest-prompt.vi.md`.
 
@@ -441,7 +441,7 @@ QUY TẮC CHUNG
 
 1. Mọi file .code-review/*.txt phải có timestamp tạo trong header
 2. Report cuối cùng PHẢI được ghi vào `.code-review/REPORT.md` — KHÔNG dùng `plans/reports/` (giữ tất cả artifact trong cùng một directory)
-3. Nếu diff có < 5 file VÀ không dùng mode `--path` → bỏ qua Phase 2, main agent review trực tiếp qua multi-pass (4 pass như mô tả trong prompt subagent) và ghi thẳng vào REPORT.md. Ở incremental mode (1.0), số lượng này tính theo file `[NEW-SINCE-LAST-REVIEW]`, không phải tổng diff/carried-forward — file carried-forward không bao giờ quay lại Phase 2 bất kể ngưỡng này.
+3. Nếu diff có < 5 file VÀ không dùng mode `--path` → bỏ qua Phase 2, main agent review trực tiếp qua multi-pass (3 pass như mô tả trong prompt subagent) và ghi thẳng vào REPORT.md. Ở incremental mode (1.0), số lượng này tính theo file `[NEW-SINCE-LAST-REVIEW]`, không phải tổng diff/carried-forward — file carried-forward không bao giờ quay lại Phase 2 bất kể ngưỡng này.
 4. Grouping giới hạn bởi tổng dòng thay đổi mỗi group (~400, theo 1.4), không phải raw file count — tự scale với diff mọi kích thước. Ở incremental mode (1.0), chỉ file `[NEW-SINCE-LAST-REVIEW]` được tính vào tổng dòng của group — file carried-forward bị loại trừ.
 5. KHÔNG lặp Phase 1 → 2 → 3 → 4. Chạy đúng một lần.
 6. Nếu một subagent fail hoặc timeout:
@@ -456,7 +456,17 @@ QUY TẮC CHUNG
 10. Phase 4.5 spot-check chạy inline trong main agent — không bao giờ spawn subagent cho nó.
 
 ═══════════════════════════════════════════════════════
+CHẾ ĐỘ FIX (`--fix` — opt-in; review thường không bao giờ sửa code)
+═══════════════════════════════════════════════════════
+
+Mọi thứ phía trên chỉ đọc code và ghi `.code-review/`. Fix CHỈ xảy ra khi user tự gõ `--fix` — không bao giờ tự thêm và không suy ra từ các từ như "fix" hay "sửa" trong yêu cầu.
+- `--fix` kèm thứ cần review → chạy Phase 0-5 phía trên nguyên vẹn, SAU ĐÓ chạy chế độ fix trên report vừa sinh.
+- `--fix` chỉ kèm một report directory (positional arg: thư mục đã tồn tại và chứa `REPORT.md`; không có branch/PR/`--path`/`--since`) → bỏ qua review, chạy thẳng chế độ fix trên report đó.
+- Chế độ fix: đọc `references/fix-mode.vi.md` ngay bây giờ (không đọc trước) và làm đúng theo đó — thứ tự ưu tiên cố định (lint → CRITICAL → WARNING → cross-group → SUGGESTION hỏi từng item), gom batch, STOP-GATE, verify + commit từng batch, ghi `Status:` về report, wrap-up.
+- An toàn: STOP-GATE (mơ hồ business, DB migration, shared package, UPDATE/DELETE data) áp dụng cho mọi fix và luôn hỏi user; chế độ fix commit lên branch hiện tại, không bao giờ push, và không bao giờ xoá report directory khi chưa xác nhận.
+
+═══════════════════════════════════════════════════════
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn. (xem convention chung ở `_vskills-shared/repo-profile.md` §7)
+Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vci, vtickets, vdesign, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn. (xem convention chung ở `_vskills-shared/repo-profile.md` §7)

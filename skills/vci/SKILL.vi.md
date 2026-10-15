@@ -1,6 +1,6 @@
 ---
 name: vci
-description: "Chạy typecheck + build + format (+ test tùy chọn) song song cho toàn bộ hoặc một phần package trong repo JS/TS (monorepo hoặc single package). Tự động phát hiện package trong workspace và package manager, không hardcode tên package."
+description: "Chạy typecheck + build + lint + format (+ test tùy chọn) song song cho toàn bộ hoặc một phần package trong repo JS/TS (monorepo hoặc single package). Tự động phát hiện package trong workspace và package manager, không hardcode tên package."
 argument-hint: "[package-names...] [--test] [--changed]"
 user-invocable: true
 when_to_use: "Dùng khi cần typecheck/build (và test) nhanh cho toàn bộ repo hoặc một nhóm package trong monorepo JS/TS (hoặc single package) trước khi commit/PR."
@@ -12,7 +12,7 @@ metadata:
 
 # vci
 
-Chạy typecheck + build (+ test tùy chọn) song song cho các package trong repo JS/TS (monorepo hoặc single package), dùng background command + `wait`. Generic — không hardcode tên package hay package manager.
+Chạy typecheck + build + lint (+ test tùy chọn) song song cho các package trong repo JS/TS (monorepo hoặc single package), dùng background command + `wait`. Generic — không hardcode tên package hay package manager.
 
 Đọc input từ user:
 

@@ -57,7 +57,7 @@ Input is one of 2 forms — auto-detect from `$ARGUMENTS`:
 **Mode A — Has a plan path** (e.g.: `plans/<slug>/`, `plan.md`, `phase-XX-*.md`):
 1. Read the entire plan + related phase files.
 2. Read the codebase areas the plan references carefully (parallel subagents per step 1).
-3. Cross-check: does the current codebase match the plan's assumptions (files still exist at the right path, patterns/APIs still match what the plan describes, dependencies haven't changed)?
+3. Cross-check: does the current codebase match the plan's assumptions (files still exist at the right path, patterns/APIs still match what the plan describes, dependencies haven't changed)? `plan.md`'s `Generated against commit` stamp differs from current HEAD → re-verify the PASS cases' file:line references before trusting them.
 4. MISMATCH → STOP, present the specific mismatch + a proposed adjustment BEFORE coding. Do NOT deviate from the plan without asking.
 5. Matches → proceed to step 4.
 
@@ -124,6 +124,7 @@ Resolve the VCS profile first: read `~/.claude/skills/_vskills-shared/repo-profi
 - Read the project's `.github/pull_request_template.md` (if it exists) → PR body MUST follow it exactly. Absent → sensible default format (Summary / Changes / Test plan).
 - Title: English, concise.
 - Description: in the project's communication language — `## Ngôn ngữ`/`## Language` section in the project's `CLAUDE.md`, then `~/.claude/CLAUDE.md`, else English (same resolution `repo-profile.md` §4 documents, doesn't require the file itself to be present) — non-technical, for readers who aren't engineers, focused on user/business impact, no code jargon.
+- **Caller said "commit only, no PR"** (e.g. an automated pipeline that opens one PR for many tasks) → commit, then stop: no push, no PR, no issue edit. Skip the rest of this section.
 - Full gh mode (per §2) → create the PR with `gh pr create --base <resolved base branch from Step 2>` — never omit `--base` and rely on `gh`'s own default, which always targets the repo's default branch even when this branch's real parent is a different, still-unmerged branch (see Step 2's base-branch determination). Degraded/local-only → push the branch, print the §2 vcook message plus the fully composed title and body so the user pastes it into their host's UI — compose the body in both modes, never skip it.
 - Related GitHub issue (from the plan or an issue number the user gave):
   - Add `Closes #<issue>` at the TOP of the PR body (plain text, works in both modes)

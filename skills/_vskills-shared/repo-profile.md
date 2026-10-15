@@ -103,9 +103,9 @@ This section states the rule only. Each skill names its own specific file path/f
 
 Every skill in this pack ends with the same "Next steps" instruction. Reference it instead of inlining:
 
-> Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+> Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
 
-A skill's own `## Next steps` section should read: "Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7." — updating the skill-name list (add/rename/remove a skill) then only requires editing this one paragraph, not 10 files. A skill whose footer body is intentionally customized (e.g. vreview/vfix's ASCII-banner-style footer with skill-specific wording) keeps its own body and appends a short pointer sentence instead — "(see the shared convention in `_vskills-shared/repo-profile.md` §7)" — rather than being forced into the standard paragraph.
+A skill's own `## Next steps` section should read: "Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7." — updating the skill-name list (add/rename/remove a skill) then only requires editing this one paragraph, not 10 files. A skill whose footer body is intentionally customized (e.g. vreview's ASCII-banner-style footer with skill-specific wording) keeps its own body and appends a short pointer sentence instead — "(see the shared convention in `_vskills-shared/repo-profile.md` §7)" — rather than being forced into the standard paragraph.
 
 ## §8 — Verification honesty rule
 

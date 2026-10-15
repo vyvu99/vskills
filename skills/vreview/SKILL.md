@@ -1,12 +1,12 @@
 ---
 name: vreview
-description: "Reviews a diff, PR, branch, or directory as a senior code reviewer and writes findings to .code-review/REPORT.md, grouped by CRITICAL/WARNING/SUGGESTION. Use before merging changes."
-argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
+description: "Reviews a diff, PR, branch, or directory as a senior code reviewer and writes findings to .code-review/REPORT.md, grouped by CRITICAL/WARNING/SUGGESTION. Read-only by default; fixes findings only when the user explicitly passes `--fix`. Use before merging changes."
+argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs> | report-dir] [--base <branch>] [--exclude <paths>] [--harvest] [--fix]"
 user-invocable: true
-when_to_use: "Invoke to review current branch diff or specific branches/paths with a 4-phase subagent review (plus a mandatory pre-scan and an opt-in lint-harvest phase)."
+when_to_use: "Invoke to review current branch diff or specific branches/paths with a 4-phase subagent review (plus a mandatory pre-scan and an opt-in lint-harvest phase). Add `--fix` ONLY when the user typed it: fixes the report in priority order, or fixes an existing report directory given as the only argument."
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 You are a senior code reviewer, executing the review through 4 core phases (1-4) below, bracketed by a mandatory Phase 0 pre-scan (runs every time once the file list is ready) and an opt-in Phase 5 lint harvest (skipped by default, runs only with `--harvest`), plus a lightweight Phase 4.5 spot-check. Do NOT skip Phase 0-4.5.
@@ -206,7 +206,7 @@ Write auto-excluded files into CONTEXT.txt's "BOILERPLATE SKIPPED" section (for 
 
 1.3c Trivial-diff / empty-after-filter early exit
 
-Empty-after-filter: file list empty after 1.3b (every changed file was boilerplate, or the diff itself is empty) → skip Phase 0, 2, 3, 4 entirely. Write `.code-review/REPORT.md` with just the header block, `TOTAL ISSUES: 0`, and a one-line note "No reviewable files (all changes were boilerplate/docs)". Stop — spawn no subagent.
+Empty-after-filter: file list empty after 1.3b (every changed file was boilerplate, or the diff itself is empty) → skip Phase 2, 3, 4 entirely (a Phase 0 subagent already spawned after 1.1 is discarded, its output unused). Write `.code-review/REPORT.md` with just the header block, `TOTAL ISSUES: 0`, and a one-line note "No reviewable files (all changes were boilerplate/docs)". Stop — spawn no subagent.
 
 Comment/whitespace-only files: for each remaining file, check whether every changed hunk is comment or whitespace only:
   `git diff -U0 {base_branch}...{entry} -- {file} | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' | grep -vE '^[+-]\s*(//|#|\*|/\*|"""|--)'`
@@ -404,7 +404,7 @@ Purpose: ADVERSARIAL.txt is a single subagent's single pass — nothing verifies
 For EACH "NEW ISSUE" in ADVERSARIAL.txt, AND EACH [CRITICAL] item in REPORT.md's CRITICAL ISSUES section (100% of Phase 2/3's CRITICAL findings, not just adversarial's):
   1. Main agent (not a subagent) reads the cited file:line directly.
   2. Confirm the code at that location actually matches the claimed issue — the attack vector is real and the line does what's claimed.
-  3. Match confirmed → update REPORT.md immediately after each confirmed match; don't accumulate matches before writing.
+  3. Match confirmed → for an adversarial NEW ISSUE, merge it into REPORT.md under its severity section (updating TOTAL ISSUES counts) immediately after each confirmed match; for a Phase 2/3 CRITICAL it is already in REPORT.md, leave it as is. Never accumulate matches before writing.
   4. Match fails (line doesn't exist, code doesn't match the claim, attack vector doesn't apply) → drop the finding, note it in REPORT.md's CONFIDENCE NOTES: "Adversarial finding '{title}' dropped — {reason}".
 
 Read-only spot-check (no re-analysis, no new grep) — cost is a handful of Read calls, not a new agent spawn.
@@ -423,7 +423,7 @@ Skipped (use --harvest to enable)
 ```
 Then finish. Do NOT spawn a subagent.
 
-**IF the user passes `--harvest`**: Spawn 1 subagent after Phase 4 completes.
+**IF the user passes `--harvest`**: Spawn 1 subagent after Phase 4.5 completes.
 
 **Subagent prompt:** `references/lint-harvest-prompt.md`.
 
@@ -441,7 +441,7 @@ GENERAL RULES
 
 1. Every .code-review/*.txt file must have a creation timestamp in its header
 2. The final report MUST be written to `.code-review/REPORT.md` — never `plans/reports/` (keep all artifacts in the same directory)
-3. Diff has < 5 files AND `--path` mode is not used → skip Phase 2, main agent reviews it directly via multi-pass (4 passes as described in the subagent prompt), writes straight into REPORT.md. Incremental mode (1.0): this count is the `[NEW-SINCE-LAST-REVIEW]` file count, not the total diff/carried-forward count — carried-forward files never re-enter Phase 2 regardless of this threshold.
+3. Diff has < 5 files AND `--path` mode is not used → skip Phase 2, main agent reviews it directly via multi-pass (3 passes as described in the subagent prompt), writes straight into REPORT.md. Incremental mode (1.0): this count is the `[NEW-SINCE-LAST-REVIEW]` file count, not the total diff/carried-forward count — carried-forward files never re-enter Phase 2 regardless of this threshold.
 4. Grouping is capped by total changed lines per group (~400, per 1.4), not raw file count — scales automatically for diffs of any size. Incremental mode (1.0): only `[NEW-SINCE-LAST-REVIEW]` files count toward a group's line total — carried-forward files excluded.
 5. Do NOT loop Phase 1 → 2 → 3 → 4. Run exactly once.
 6. Subagent fails or times out:
@@ -456,7 +456,17 @@ GENERAL RULES
 10. Phase 4.5 spot-check runs inline in the main agent — never spawn a subagent for it.
 
 ═══════════════════════════════════════════════════════
+FIX MODE (`--fix` — opt-in; a normal review never edits code)
+═══════════════════════════════════════════════════════
+
+Everything above only reads code and writes `.code-review/`. Fixing happens ONLY when the user typed `--fix` themselves — never add it on your own and never infer it from words like "fix" or "resolve" in the request.
+- `--fix` with something to review → run Phase 0-5 above unchanged, THEN fix mode on the fresh report.
+- `--fix` with only a report directory (positional arg: an existing directory containing `REPORT.md`; no branch/PR/`--path`/`--since`) → skip the review, run fix mode directly on that report.
+- Fix mode: read `references/fix-mode.md` now (not before) and follow it exactly — fixed priority order (lint → CRITICAL → WARNING → cross-group → SUGGESTION asked per item), batching, STOP-GATE, verify + commit per batch, `Status:` write-back, wrap-up.
+- Safety: STOP-GATE (business ambiguity, DB migration, shared package, data UPDATE/DELETE) applies to every fix and always asks the user; fix mode commits to the current branch, never pushes, and never deletes the report directory unconfirmed.
+
+═══════════════════════════════════════════════════════
 NEXT STEPS
 ═══════════════════════════════════════════════════════
 
-Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly. (see the shared convention in `_vskills-shared/repo-profile.md` §7)
+Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly. (see the shared convention in `_vskills-shared/repo-profile.md` §7)

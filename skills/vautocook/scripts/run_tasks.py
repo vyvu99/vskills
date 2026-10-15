@@ -6,10 +6,11 @@ Executes tasks from tasks.json in order. Supports resume across interrupts.
 - A task left "running" (interrupted mid-run) is reset to "pending" and retried.
 - Fail-fast: the pipeline stops as soon as one task fails.
 
-Each task shells out to `claude -p <prompt> --dangerously-skip-permissions`, which
-runs /vcook on the task's issue in headless mode. /vcook is expected to create its
-own commit + PR (its own Step 9); this script only verifies a PR exists afterwards
-and falls back to opening a minimal one itself if /vcook didn't manage to.
+All tasks share ONE epic branch. Each task shells out to a fresh
+`claude -p <prompt> --dangerously-skip-permissions` (a new session, so context is
+cleared between tasks) that runs /vcook on the task's issue in headless mode and
+commits — /vcook does not open a PR. After every task this script pushes the branch;
+once all tasks are done it opens the single PR for the whole epic.
 """
 
 import json
@@ -105,6 +106,7 @@ def _print_stream_event(event: dict) -> bool:
 SCRIPT_DIR = Path(__file__).parent
 TASKS_FILE = SCRIPT_DIR / "tasks.json"
 PROMPT_FILE = SCRIPT_DIR / "prompt.md"
+PR_PROMPT_FILE = SCRIPT_DIR / "pr-prompt.md"
 LOGS_DIR = SCRIPT_DIR / "logs"
 PIPELINE_STATUS_FILE = SCRIPT_DIR / "pipeline_status.json"
 
@@ -131,27 +133,12 @@ def find_task(config: dict, number: int) -> dict | None:
     return next((t for t in config['tasks'] if t['number'] == number), None)
 
 
-def _parse_owner_repo(task_url: str) -> tuple[str, str]:
-    """Split owner/repo out of a task's issue URL."""
-    match = re.search(r'github\.com/([^/]+)/([^/]+)/issues/\d+', task_url)
+def _parse_owner_repo(issue_url: str) -> tuple[str, str]:
+    """Split owner/repo out of a GitHub issue URL."""
+    match = re.search(r'github\.com/([^/]+)/([^/]+)/issues/\d+', issue_url)
     if not match:
-        raise ValueError(f"Invalid GitHub issue URL: {task_url}")
+        raise ValueError(f"Invalid GitHub issue URL: {issue_url}")
     return match.group(1), match.group(2)
-
-
-def get_parent_branch(config: dict, task: dict) -> str:
-    """Branch to check out from: the default branch, or the dependency task's branch."""
-    default_branch = config.get('default_branch', 'main')
-    if not task['depends_on']:
-        return f'origin/{default_branch}'
-    dep_number = task['depends_on'][-1]
-    dep_task = find_task(config, dep_number)
-    if dep_task is None:
-        raise ValueError(f"Dependency task #{dep_number} not found in tasks.json")
-    # Dep already merged (pr_url set by plan_tasks.py) → base off the default branch
-    if dep_task.get('pr_url'):
-        return f'origin/{default_branch}'
-    return f"origin/{dep_task['branch_name']}"
 
 
 def _find_open_pr_by_branch(owner: str, repo: str, branch: str) -> dict | None:
@@ -160,7 +147,7 @@ def _find_open_pr_by_branch(owner: str, repo: str, branch: str) -> dict | None:
          '--repo', f'{owner}/{repo}',
          '--head', branch,
          '--state', 'open',
-         '--json', 'number,title,url,headRefName,baseRefName'],
+         '--json', 'number,url'],
         capture_output=True, text=True
     )
     if result.returncode != 0:
@@ -169,112 +156,43 @@ def _find_open_pr_by_branch(owner: str, repo: str, branch: str) -> dict | None:
     return prs[0] if prs else None
 
 
-def ensure_pr(task: dict, parent_branch: str) -> str | None:
-    """Verify /vcook opened a PR for this branch; if not, open a minimal fallback one."""
-    branch = task['branch_name']
-    owner, repo = _parse_owner_repo(task['task_url'])
-    base = parent_branch.removeprefix('origin/')
-
-    existing = _find_open_pr_by_branch(owner, repo, branch)
-    if existing:
-        if existing.get('baseRefName') != base:
-            print(_c('yellow', f"  ⚠ PR #{existing['number']} base is '{existing['baseRefName']}', should be '{base}' (stacked dependency) — fixing"), flush=True)
-            fix = subprocess.run(
-                ['gh', 'pr', 'edit', str(existing['number']), '--repo', f'{owner}/{repo}', '--base', base],
-                capture_output=True, text=True
-            )
-            if fix.returncode != 0:
-                print(_c('red', f"  ✗ Could not fix PR base: {fix.stderr.strip()}"), flush=True)
-        print(_c('green', f"  ✓ PR already open (created by /vcook): {existing['url']}"), flush=True)
-        return existing['url']
-
-    print(_c('yellow', "  /vcook did not open a PR — pushing branch and opening a fallback one"), flush=True)
-    push_result = subprocess.run(['git', 'push', '-u', 'origin', branch], capture_output=True, text=True)
-    if push_result.returncode != 0:
-        print(_c('red', f"  ✗ Push failed: {push_result.stderr.strip()}"), flush=True)
-        return None
-
-    result = subprocess.run(
-        ['gh', 'pr', 'create',
-         '--repo', f'{owner}/{repo}',
-         '--base', base,
-         '--head', branch,
-         '--title', task['title'],
-         '--body', f"Closes #{task['number']}"],
-        capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        print(_c('red', f"  ✗ Fallback PR creation failed: {result.stderr.strip()}"), flush=True)
-        return None
-
-    pr_url = result.stdout.strip()
-    print(_c('green', f"  ✓ Fallback PR created: {pr_url}"), flush=True)
-    return pr_url
-
-
-def checkout_branch(branch_name: str, parent_branch: str) -> None:
+def checkout_epic_branch(config: dict) -> None:
+    branch = config['epic_branch']
+    default_branch = config.get('default_branch', 'main')
     subprocess.run(['git', 'fetch', 'origin'], check=True)
 
-    check = subprocess.run(['git', 'rev-parse', '--verify', branch_name], capture_output=True)
-    remote_check = subprocess.run(['git', 'rev-parse', '--verify', f'origin/{branch_name}'], capture_output=True)
-
-    if check.returncode == 0:
-        subprocess.run(['git', 'checkout', branch_name], check=True)
-        print(f"  Resumed on existing branch: {branch_name}")
-    elif remote_check.returncode == 0:
-        # Exists on origin but not locally (e.g. resumed from a fresh clone, or the
-        # local branch was deleted after pushing) — track it instead of recreating
-        # from parent_branch, which would diverge from the already-pushed history.
-        subprocess.run(['git', 'checkout', '-b', branch_name, '--track', f'origin/{branch_name}'], check=True)
-        print(f"  Resumed on remote branch: origin/{branch_name}")
+    if subprocess.run(['git', 'rev-parse', '--verify', branch], capture_output=True).returncode == 0:
+        subprocess.run(['git', 'checkout', branch], check=True)
+        print(f"Resumed on existing branch: {branch}")
+    elif subprocess.run(['git', 'rev-parse', '--verify', f'origin/{branch}'], capture_output=True).returncode == 0:
+        # Pushed earlier but no local copy (fresh clone / deleted) — track it rather than
+        # recreating from the default branch, which would diverge from the pushed history.
+        subprocess.run(['git', 'checkout', '-b', branch, '--track', f'origin/{branch}'], check=True)
+        print(f"Resumed on remote branch: origin/{branch}")
     else:
-        resolved_parent = parent_branch
-        verify = subprocess.run(['git', 'rev-parse', '--verify', parent_branch], capture_output=True)
-        if verify.returncode != 0 and parent_branch.startswith('origin/'):
-            local_fallback = parent_branch.removeprefix('origin/')
-            print(f"  Warning: {parent_branch} not on remote, using local {local_fallback}")
-            resolved_parent = local_fallback
-
-        subprocess.run(['git', 'checkout', '-b', branch_name, resolved_parent], check=True)
-        print(f"  Created branch: {branch_name} (from {resolved_parent})")
+        subprocess.run(['git', 'checkout', '-b', branch, f'origin/{default_branch}'], check=True)
+        print(f"Created branch: {branch} (from origin/{default_branch})")
 
 
-def fill_prompt(task: dict, config: dict, parent_branch: str) -> str:
+def head_sha() -> str:
+    return subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True, check=True).stdout.strip()
+
+
+def fill_prompt(task: dict, config: dict) -> str:
     template = PROMPT_FILE.read_text(encoding='utf-8')
     return (
         template
         .replace('{{TASK_URL}}', task['task_url'])
         .replace('{{EPIC_URL}}', config['epic_url'])
-        .replace('{{BRANCH_NAME}}', task['branch_name'])
-        .replace('{{PARENT_BRANCH}}', parent_branch)
+        .replace('{{BRANCH_NAME}}', config['epic_branch'])
         .replace('{{ISSUE_NUMBER}}', str(task['number']))
     )
 
 
-def run_task(task: dict, config: dict) -> bool:
-    print(f"\n{'=' * 60}")
-    print(f"Task #{task['number']}: {task['title']}")
-
-    for dep_number in task['depends_on']:
-        dep_task = find_task(config, dep_number)
-        if dep_task is None or dep_task['status'] != 'done':
-            print(f"ERROR: Dependency #{dep_number} is not done yet!")
-            return False
-
-    parent_branch = get_parent_branch(config, task)
-    checkout_branch(task['branch_name'], parent_branch)
-
-    prompt = fill_prompt(task, config, parent_branch)
-
-    task['status'] = 'running'
-    task['started_at'] = datetime.now().isoformat()
-    save_tasks(config)
-
-    LOGS_DIR.mkdir(exist_ok=True)
-    log_path = LOGS_DIR / f"task-{task['number']}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.jsonl"
-    task['log_file'] = str(log_path)
+def run_claude(prompt: str, log_path: Path) -> int:
+    """Run one headless claude session, streaming a readable summary and the raw
+    transcript to log_path. Returns the exit code; re-raises KeyboardInterrupt."""
     print(f"  Full raw transcript (every bash command + full output, unfiltered): {log_path}", flush=True)
-
     print("  Running Claude CLI...", flush=True)
     master, slave = pty.openpty()
     proc = subprocess.Popen(
@@ -323,64 +241,92 @@ def run_task(task: dict, config: dict) -> bool:
 
     if interrupted:
         raise KeyboardInterrupt
+    return proc.returncode
 
-    if proc.returncode == 0:
-        task['status'] = 'done'
-        task['completed_at'] = datetime.now().isoformat()
-        print(f"  ✓ Task #{task['number']} completed")
-        save_tasks(config)
-        pr_url = ensure_pr(task, parent_branch)
-        if pr_url is None:
-            task['status'] = 'failed'
-            task['completed_at'] = datetime.now().isoformat()
-            print(f"  ✗ Task #{task['number']} FAILED — no PR could be opened")
-            save_tasks(config)
-        else:
-            task['open_pr_url'] = pr_url
-            save_tasks(config)
-    else:
+
+def new_log_path(name: str) -> Path:
+    LOGS_DIR.mkdir(exist_ok=True)
+    return LOGS_DIR / f"{name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.jsonl"
+
+
+def run_task(task: dict, config: dict) -> bool:
+    print(f"\n{'=' * 60}")
+    print(f"Task #{task['number']}: {task['title']}")
+
+    for dep_number in task['depends_on']:
+        dep_task = find_task(config, dep_number)
+        if dep_task is None or dep_task['status'] != 'done':
+            print(f"ERROR: Dependency #{dep_number} is not done yet!")
+            return False
+
+    task['status'] = 'running'
+    task['started_at'] = datetime.now().isoformat()
+    log_path = new_log_path(f"task-{task['number']}")
+    task['log_file'] = str(log_path)
+    save_tasks(config)
+
+    sha_before = head_sha()
+    returncode = run_claude(fill_prompt(task, config), log_path)
+    task['completed_at'] = datetime.now().isoformat()
+
+    if returncode != 0:
         task['status'] = 'failed'
-        task['completed_at'] = datetime.now().isoformat()
-        print(f"  ✗ Task #{task['number']} FAILED (exit code: {proc.returncode})")
+        print(f"  ✗ Task #{task['number']} FAILED (exit code: {returncode})")
         print(f"  Full transcript for debugging: {log_path}")
-        save_tasks(config)
+    elif head_sha() == sha_before:
+        task['status'] = 'failed'
+        print(f"  ✗ Task #{task['number']} FAILED — session exited cleanly but made no commit")
+        print(f"  Full transcript for debugging: {log_path}")
+    elif subprocess.run(['git', 'push', '-u', 'origin', config['epic_branch']]).returncode != 0:
+        task['status'] = 'failed'
+        print(f"  ✗ Task #{task['number']} FAILED — could not push {config['epic_branch']}")
+    else:
+        task['status'] = 'done'
+        print(f"  ✓ Task #{task['number']} completed and pushed")
 
-    return task['status'] == 'done' and task.get('open_pr_url') is not None
+    save_tasks(config)
+    return task['status'] == 'done'
 
 
-def _print_merge_order(config: dict) -> None:
-    """Print the order stacked PRs should be merged into the default branch."""
-    tasks = config['tasks']
-
-    open_pr_tasks = [t for t in tasks if t.get('open_pr_url') and not t.get('pr_url')]
-    if not open_pr_tasks:
-        return
-
-    remaining = {t['number']: t for t in open_pr_tasks}
-    merged_set: set[int] = {t['number'] for t in tasks if t.get('pr_url')}
-    levels: list[list[dict]] = []
-
-    while remaining:
-        ready = [t for t in remaining.values() if all(d in merged_set for d in t.get('depends_on', []))]
-        if not ready:
-            levels.append(list(remaining.values()))  # circular or missing — dump the rest as-is
-            break
-        levels.append(ready)
-        for t in ready:
-            merged_set.add(t['number'])
-            del remaining[t['number']]
-
+def ensure_epic_pr(config: dict) -> str | None:
+    """One PR for the whole epic: let a headless session write it (language/template rules
+    live in its prompt), then fall back to a minimal PR if it didn't open one."""
+    branch = config['epic_branch']
     default_branch = config.get('default_branch', 'main')
-    print(_c('bold', f"\n{'=' * 60}"))
-    print(_c('bold', f"MERGE ORDER — merge into {default_branch} top to bottom:"))
-    print(_c('dim', "(after merging a level, rebase the next level's PRs before merging them)"))
-    for i, level in enumerate(levels, 1):
-        label = f"→ {default_branch} directly" if i == 1 else f"→ {default_branch} (after level {i - 1})"
-        print(f"\n  Level {i} {_c('dim', label)}:")
-        for t in level:
-            pr = t.get('open_pr_url', '(no PR)')
-            print(f"    {_c('cyan', pr)}  #{t['number']} {t['title']}")
-    print()
+    owner, repo = _parse_owner_repo(config['epic_url'])
+
+    existing = _find_open_pr_by_branch(owner, repo, branch)
+    if existing:
+        print(_c('green', f"  ✓ Epic PR already open: {existing['url']}"), flush=True)
+        return existing['url']
+
+    print(_c('bold', f"\n{'=' * 60}\nOpening the single PR for {branch} → {default_branch}"), flush=True)
+    closes = '\n'.join(f"- Closes #{t['number']}: {t['title']}" for t in config['tasks'] if t['status'] == 'done')
+    prompt = (
+        PR_PROMPT_FILE.read_text(encoding='utf-8')
+        .replace('{{EPIC_URL}}', config['epic_url'])
+        .replace('{{BRANCH_NAME}}', branch)
+        .replace('{{BASE_BRANCH}}', default_branch)
+        .replace('{{CLOSES}}', closes)
+    )
+    run_claude(prompt, new_log_path('epic-pr'))
+
+    existing = _find_open_pr_by_branch(owner, repo, branch)
+    if existing:
+        print(_c('green', f"  ✓ Epic PR opened: {existing['url']}"), flush=True)
+        return existing['url']
+
+    print(_c('yellow', "  Session did not open a PR — opening a minimal fallback one"), flush=True)
+    result = subprocess.run(
+        ['gh', 'pr', 'create', '--repo', f'{owner}/{repo}', '--base', default_branch, '--head', branch,
+         '--title', f"Epic {config['epic_url'].rsplit('/', 1)[-1]}", '--body', closes],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print(_c('red', f"  ✗ Fallback PR creation failed: {result.stderr.strip()}"), flush=True)
+        return None
+    print(_c('green', f"  ✓ Fallback PR created: {result.stdout.strip()}"), flush=True)
+    return result.stdout.strip()
 
 
 def main():
@@ -388,8 +334,8 @@ def main():
         print("tasks.json not found. Run plan_tasks.py first.")
         sys.exit(1)
 
-    if not PROMPT_FILE.exists():
-        print("prompt.md not found.")
+    if not PROMPT_FILE.exists() or not PR_PROMPT_FILE.exists():
+        print("prompt.md / pr-prompt.md not found.")
         sys.exit(1)
 
     write_pipeline_status('running')
@@ -406,42 +352,29 @@ def main():
     if to_reset:
         save_tasks(config)
 
-    done_count = sum(1 for t in tasks if t['status'] == 'done')
     pending = [t for t in tasks if t['status'] == 'pending']
+    print(f"Progress: {len(tasks) - len(pending)}/{len(tasks)} done, {len(pending)} pending")
 
-    print(f"Progress: {done_count}/{len(tasks)} done, {len(pending)} pending")
-
-    missing_pr = [
-        t for t in tasks
-        if t['status'] == 'done' and not t.get('open_pr_url') and not t.get('pr_url')
-    ]
-    if missing_pr:
-        print(f"\nOpening missing PRs for {len(missing_pr)} done task(s)...")
-        for task in missing_pr:
-            parent_branch = get_parent_branch(config, task)
-            pr_url = ensure_pr(task, parent_branch)
-            if pr_url:
-                task['open_pr_url'] = pr_url
-                save_tasks(config)
-            else:
-                print(_c('yellow', f"  ⚠ Could not open a PR for #{task['number']} — create it manually"))
-
-    if not pending:
-        print("All tasks are done!")
-        _print_merge_order(config)
-        write_pipeline_status('completed')
-        return
+    if pending:
+        checkout_epic_branch(config)
 
     for task in pending:
-        success = run_task(task, config)
-        if not success:
+        if not run_task(task, config):
             print(f"\nPipeline stopped. Fix task #{task['number']} and re-run.")
             write_pipeline_status('stopped', failed_task=task['number'])
             sys.exit(1)
 
+    if any(t['status'] == 'done' for t in tasks):
+        pr_url = ensure_epic_pr(config)
+        if pr_url is None:
+            print("\nAll tasks done but the epic PR could not be opened — open it manually.")
+            write_pipeline_status('stopped', failed_task=None)
+            sys.exit(1)
+        config['epic_pr_url'] = pr_url
+        save_tasks(config)
+
     print(f"\n{'=' * 60}")
     print(f"All {len(tasks)} tasks completed!")
-    _print_merge_order(config)
     write_pipeline_status('completed')
 
 

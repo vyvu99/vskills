@@ -1,6 +1,6 @@
 ---
 name: vci
-description: "Run typecheck + build + format (+ optional test) in parallel for all or part of the packages in a JS/TS repo (monorepo or single package). Auto-detects workspace packages and package manager, no hardcoded package names."
+description: "Run typecheck + build + lint + format (+ optional test) in parallel for all or part of the packages in a JS/TS repo (monorepo or single package). Auto-detects workspace packages and package manager, no hardcoded package names."
 argument-hint: "[package-names...] [--test] [--changed]"
 user-invocable: true
 when_to_use: "Invoke when you need a fast typecheck/build (and test) of the whole repo or a group of packages in a JS/TS monorepo (or single package) before commit/PR."
@@ -12,7 +12,7 @@ metadata:
 
 # vci
 
-Runs typecheck + build (+ optional test) in parallel for packages in a JS/TS repo (monorepo or single package), using background commands + `wait`. No hardcoded package names or package manager.
+Runs typecheck + build + lint (+ optional test) in parallel for packages in a JS/TS repo (monorepo or single package), using background commands + `wait`. No hardcoded package names or package manager.
 
 Read input from the user:
 

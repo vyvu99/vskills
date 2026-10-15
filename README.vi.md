@@ -20,7 +20,7 @@ cd vskills
 ./install.sh --dry-run             # chỉ xem trước
 ```
 
-Skill được symlink chứ không copy — sửa ở đâu cũng là cùng 1 file. Chạy lại `install.sh` sẽ dọn skill nào đã bị xóa khỏi repo từ lần cài trước.
+Skill được symlink chứ không copy — sửa ở đâu cũng là cùng 1 file. Chạy lại `install.sh` sẽ dọn skill nào đã bị xóa khỏi repo từ lần cài trước. File/thư mục thật (không phải symlink) đang nằm ở đích sẽ được đổi tên thành `<path>.bak.<timestamp>`, không bị xóa.
 
 ## Skills
 
@@ -33,8 +33,7 @@ Skill được symlink chứ không copy — sửa ở đâu cũng là cùng 1 f
 | `vspecs` | Viết/cập nhật specs: research codebase + cách người dùng thật đang làm, rồi cùng bạn đi qua từng edge case. Output chỉ ngôn ngữ thường — không code, không file:line. | `/vspecs Feature: đặt lịch tái khám` |
 | `vplan` | Biến 1 file specs thành plan theo từng phase, verify từng case với code thật (PASS/FAIL/MISSING). | `/vplan plans/specs/dat-lich-tai-kham.md` |
 | `vcook`* | Implement 1 plan hoặc task từ đầu tới cuối: branch, viết test trước, code, chỉ dùng generated SDK, review theo CLAUDE.md, mở PR. Dừng lại nếu working tree dơ hoặc plan lệch code. | `/vcook plans/dat-lich-tai-kham` |
-| `vreview` | Review 1 diff/PR/branch/thư mục: pre-scan lint, review song song theo file, tổng hợp, và 1 lượt adversarial. Ghi `.code-review/REPORT.md`. | `/vreview #482` |
-| `vfix`* | Fix report của `vreview` theo thứ tự ưu tiên — lint, Critical, Warning, cross-group, Suggestion. Dừng lại hỏi trước bất kỳ thứ gì rủi ro. | `/vfix` |
+| `vreview` | Review 1 diff/PR/branch/thư mục: pre-scan lint, review song song theo file, tổng hợp, và 1 lượt adversarial. Ghi `.code-review/REPORT.md`. Mặc định chỉ đọc; thêm `--fix` để fix report theo thứ tự ưu tiên (lint, Critical, Warning, cross-group, Suggestion), dừng lại hỏi trước bất kỳ thứ gì rủi ro — hoặc truyền một report directory có sẵn để fix thẳng. | `/vreview #482` · `/vreview --fix` |
 
 ### Track trên GitHub
 
@@ -48,8 +47,8 @@ Skill được symlink chứ không copy — sửa ở đâu cũng là cùng 1 f
 | Skill | Làm gì | Ví dụ |
 |---|---|---|
 | `vci` | Typecheck, build, lint song song cho cả repo JS/TS; format và test tùy chọn chạy sau. Tự phát hiện package manager/workspace. | `/vci --changed` |
-| `vdesign` | Redesign UI 1 page/component qua quy trình scan → audit → fix → verify. Luôn mở đầu bằng 18 câu hỏi style. | `/vdesign /clients/[id]` |
-| `vsweep` | Chạy 1 đợt rà backlog mở (bug, bảo mật, feature, test, doc, refactor) không cần canh, có giới hạn thời gian: 1 subagent mỗi lần, tự làm xong việc rõ ràng kèm test + verify sống, ghi nhận cái mơ hồ thành quyết định đang chờ. Resume lại sau để triển khai các quyết định đó với cùng mức kỹ lưỡng. | `/vsweep --until 06:00` |
+| `vdesign` | Redesign UI 1 page/component qua quy trình scan → audit → fix → verify. Mỗi lần chạy tự quyết cả 18 tiêu chí style/cấu trúc dựa trên research thiết kế trực tiếp và việc đọc người dùng/task thật — không hỏi trước. | `/vdesign /clients/[id]` |
+| `vsweep` | Chạy 1 đợt rà khối việc mở thuộc bất kỳ loại nào (code, nghiên cứu, viết lách, dữ liệu, vận hành, brainstorm) không cần canh, có giới hạn thời gian: dispatch subagent (mặc định 1 cái mỗi lần), tự làm xong việc rõ ràng kèm verify phù hợp loại việc, ghi nhận cái mơ hồ thành quyết định đang chờ, lưu tiến độ trong state file. Hook stop-guard tuỳ chọn (bật thủ công — xem comment đầu `skills/vsweep/stop-guard.sh`) giữ nó chạy tới deadline. Resume lại sau để triển khai các quyết định đó với cùng mức kỹ lưỡng. | `/vsweep --until 06:00` |
 | `vrollback`* | Rollback 1 migration đã chạy trên DB xác nhận là local + xóa tracking record. Từ chối target không rõ local. | `/vrollback 0007_add_status` |
 
 Chi tiết đầy đủ, flag, edge case: `skills/<name>/SKILL.vi.md`.
@@ -62,7 +61,7 @@ flowchart LR
     specs --> plan["/vplan"]
     plan --> cook["/vcook"]
     cook --> review["/vreview"]
-    review --> fix["/vfix"]
+    review --> fix["/vreview --fix"]
     fix -. còn phát hiện thêm vấn đề .-> review
     fix --> ship(["ship"])
 
@@ -84,7 +83,7 @@ flowchart LR
 ├─ "Đã có specs, cần lập plan implementation"     → /vplan
 ├─ "Đã có plan (hoặc chỉ 1 task nhanh), cần code" → /vcook
 ├─ "Cần review 1 branch/PR"                       → /vreview
-├─ "Có report review, cần fix"                    → /vfix
+├─ "Có report review, cần fix"                    → /vreview --fix
 ├─ "Cần check nhanh typecheck/build"              → /vci
 ├─ "Cần track 1 plan trên GitHub"                 → /vtickets
 ├─ "Có 1 epic GitHub, muốn build không cần canh"  → /vautocook
@@ -107,7 +106,11 @@ vskills/
 ├── skills/<name>/SKILL.vi.md     # bản tiếng Việt, cùng số dòng (kiểm bởi scripts/check-skills.js)
 ├── skills/<name>/scripts/        # tùy chọn, cài cùng skill
 ├── skills/<name>/references/     # tùy chọn, cài cùng skill
+├── skills/<name>/*.sh            # tuỳ chọn, script phụ ở gốc skill (vd vsweep/stop-guard.sh), symlink từng file
 ├── skills/_vskills-shared/       # reference dùng chung, luôn symlink
+├── claude-md/CLAUDE.md           # CLAUDE.md starter, được copy khi dùng --with-claude-md
+├── evals/                        # eval trigger + behavior (chạy bằng scripts/run-evals.sh; gọi `claude -p`, tốn phí)
+├── web/                          # webapp local cho vspecs/vreview --fix ở các bước cần UI (node web/server.mjs)
 └── scripts/<name>/               # vd lint-rules — opt-in, khác với skills/<name>/scripts/
 ```
 

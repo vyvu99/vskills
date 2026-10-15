@@ -1,8 +1,8 @@
 # Phase 2 Audit Checklist
 
-Read this file in full at Phase 2 and go through each category — only flag issues that **actually affect visual/UX quality**. Split out from `SKILL.md` to keep the main skill body lean; every category here is still part of the mandatory Scan → **Audit** → Fix → Verify workflow.
+Read this file in full at Phase 2 and go through each category — only flag issues that **actually affect visual/UX quality**.
 
-**Framework-conditional syntax note:** checklist items below are written in Tailwind/React shorthand (`grid-cols-*`, `sm:`, `group-hover:`, `next/image`, etc.) as the most common stack in this pack's projects — treat it as illustrative of the underlying CSS/UX concept, not a literal requirement. For a different stack (CSS Modules, Chakra, styled-components, Vue/Svelte, plain CSS), translate each item to its equivalent mechanism (e.g. `sm:` → the project's own breakpoint mixin/media query; `grid-cols-1 sm:grid-cols-2` → any responsive column-collapse approach; `next/image` → the project's own sized-image component, same conditionality already applied to image components via §3 of `repo-profile.md`).
+**Framework-conditional syntax note:** items use Tailwind/React shorthand (`grid-cols-*`, `sm:`, `next/image`, etc.) as illustrative shorthand for the underlying CSS/UX concept, not a literal requirement — translate to the project's equivalent mechanism for other stacks (CSS Modules, Chakra, Vue/Svelte, plain CSS), e.g. `sm:` → breakpoint mixin/media query, `next/image` → the project's sized-image component (§3 of `repo-profile.md`).
 
 ---
 
@@ -15,7 +15,7 @@ Read this file in full at Phase 2 and go through each category — only flag iss
 #### Color & Surfaces
 - [ ] Using CSS vars/Tailwind tokens — no hardcoded hex?
 - [ ] Background/border/shadow consistent with same-type components elsewhere in the project?
-- [ ] **Contrast — measure, don't guess**: resolve the actual foreground/background color values for each text/background pair in the file(s) under audit (CSS custom properties, Tailwind theme config, or literal hex/rgb in the component). For each pair, compute WCAG relative luminance per channel (`L = 0.2126*R + 0.7152*G + 0.0722*B` on linearized sRGB) and the contrast ratio `(L1+0.05)/(L2+0.05)`. Report PASS/FAIL with the actual ratio against 4.5:1 (normal text), 3:1 (large text ≥18pt/14pt-bold, and non-text UI like borders/icons per SC 1.4.11). If the colors can't be resolved statically (computed at runtime, or from an external design system with no visible token values) → report **"NOT MEASURED — verify manually"**, never silently assume PASS.
+- [ ] **Contrast — measure, don't guess**: resolve actual fg/bg color values (CSS vars, Tailwind config, or literal hex/rgb), compute WCAG relative luminance (`L = 0.2126*R + 0.7152*G + 0.0722*B`, linearized sRGB) and contrast ratio `(L1+0.05)/(L2+0.05)`. Report PASS/FAIL vs 4.5:1 (normal text) / 3:1 (large text ≥18pt/14pt-bold, non-text UI per SC 1.4.11). Can't resolve statically (runtime-computed, external design system) → **"NOT MEASURED — verify manually"**, never assume PASS.
 - [ ] Do active/selected/highlighted states have a distinguishing color?
 - [ ] **NOT using the component's default color** (e.g. shadcn's default blue) — must use the system's primary color (`primary`, `accent` tokens)?
 
@@ -33,7 +33,6 @@ Read this file in full at Phase 2 and go through each category — only flag iss
 - [ ] Responsive is solid: mobile-first, no horizontal scroll?
 - [ ] Correct layout container pattern: `container → header fixed → content overflow-y-auto → footer/input fixed`?
 - [ ] Not using `h-screen` — using `min-h-[100dvh]`?
-- [ ] Max-width container placed correctly?
 - [ ] Consistent alignment (no mixing left/center arbitrarily)?
 
 #### Components
@@ -52,13 +51,13 @@ Read this file in full at Phase 2 and go through each category — only flag iss
 - [ ] Icon size proportional to adjacent text — icon height ≈ line-height of the text beside it?
 - [ ] Same-variant components (all primary buttons, all inputs) share identical height/padding — no silent drift between instances? Verify via the actual shared class/style, not a per-instance visual pass.
 - [ ] Vertical rhythm: gaps between stacked elements are multiples of the base line-height, not arbitrary?
-- [ ] Icon optical alignment: an icon's visual glyph (not its container box, which often has built-in padding) is centered against the cap-height/x-height of the text beside it — a container centered on itself can still look visually off-center next to text?
+- [ ] Icon optical alignment: the icon's visual glyph (not its container box, which often has built-in padding) is centered against the text's cap-height/x-height — a self-centered container can still look off against text?
 - [ ] Every spacing/radius value in the diff resolves to an actual declared token (Tailwind scale, CSS var) — no near-token approximation (`p-[15px]` "close enough" to `p-4`) that silently breaks the grid?
 
 #### Third-party Self-styled Components
 Applies when encountering a component with `import 'lib/styles.css'` or that injects its own CSS: rich text editor (CKEditor, TipTap, Quill), code editor (Monaco, CodeMirror), date/color picker, react-select, map component, etc.
 
-- [ ] **Double border check**: does the wrapper div add its own `border`/`shadow`? If the wrapper adds a border AND the component also has its own border → double border. Only one side should own the visual boundary.
+- [ ] **Double border check**: wrapper div AND the library component both drawing a border/shadow → double border; only one side should own the visual boundary.
 - [ ] **Clear ownership**: wrapper div owns border/focus ring/error state → must null out all borders inside the component. Or the reverse: component self-styles → wrapper adds nothing.
 - [ ] **Focus state**: focus ring managed in exactly one place — wrapper (via JS state `onFocus`/`onBlur`) or component CSS (`:focus-within`), not both.
 - [ ] **Disabled state**: disabled must reflect on the wrapper's visuals too (opacity/pointer-events), not just pass the `disabled` prop into the component.
@@ -87,17 +86,17 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Feedback for any action appears within 400ms (Doherty Threshold) — optimistic UI update or a loading indicator, never a silent wait?
 - [ ] Dropdown/select with >10 options has a search/filter input, not a bare scroll list?
 
-**Scope carve-out (UX Efficiency + Content Design & Error Prevention categories only):** fixes in these two categories (multi-select/bulk action, inline-edit, remembered client-side state, optimistic UI, validation-timing changes, input masking) may touch **frontend interaction state only** (React state/hooks, localStorage) — still DO NOT call new backend endpoints, change data models, or modify server logic. If a fix genuinely requires a new API (e.g. a true bulk-delete endpoint), flag it in the final report as a backend dependency instead of implementing a client-side workaround that fakes it.
+**Scope note (UX Efficiency + Content Design & Error Prevention):** fixes here commonly only need frontend interaction state (React state/hooks, localStorage) — when a fix genuinely needs a new/changed API endpoint (e.g. a true bulk-delete endpoint), implement it directly (API/service layer is in scope, see `SKILL.md`'s hard rules) rather than faking it client-side; DB schema/migration changes stay out of scope regardless.
 
 #### Information Architecture & Scannability
-- [ ] **View-type fit**: does the chosen view type (table, card grid, list, detail panel, form, kanban board, timeline, masonry/bento grid, split master-detail, calendar/heatmap, comparison matrix, tree/outline, carousel/feed — and more, pick by what the data structure and task actually call for) actually match the data shape and task named in Phase 1's Data & Purpose step — or is it forcing an awkward fit (a relational/nested dataset crammed into a flat table, a single-record task buried inside a list view)?
-- [ ] **Generic-repetition check**: are sections/cards that hold meaningfully different content or serve different purposes rendered as identical generic boxes anyway, purely for visual sameness? That genericness is itself a finding here, not a safe default — flag it, and restructure so each section's layout fits what it actually contains, don't preserve the repeated shape out of caution.
-- [ ] A field Phase 1's task actually needs is missing from the view because it was never fetched at all (not just fetched-but-unrendered — see Sparse/under-filled below)? Flag as a backend dependency in the final report, never invent it client-side.
+- [ ] **View-type fit**: does the chosen view type (table, card grid, kanban, timeline, master-detail, calendar, tree, etc. — picked for what the data/task calls for) match the data shape and task named in Phase 1's Real User & Purpose step, or force an awkward fit (e.g. nested data crammed into a flat table)?
+- [ ] **Generic-repetition check**: sections/cards with meaningfully different content/purpose rendered as identical generic boxes just for visual sameness — flag the genericness itself (not a safe default) and restructure each section's layout to fit its actual content.
+- [ ] A field Phase 1's task actually needs is missing from the view because it was never fetched at all (not just fetched-but-unrendered — see Sparse/under-filled below)? Trace whether it already exists upstream (DB column, service-layer data) — if so, wire it through the API/service layer (never invent it client-side) and surface it, subject to Phase 4's content-exposure confirmation; if it doesn't exist upstream either, flag it as a product/backend dependency instead.
 - [ ] Above-the-fold content on a dense page/dashboard prioritizes the highest-value info top-left (F-pattern) — critical KPI/action isn't buried below the fold?
 - [ ] Dense data table row height matches the actual user: comfortable default (~48-52px, fewer rows/viewport) for mixed/occasional users, compact option (~28-32px) for power-user/analyst contexts — not picked arbitrarily?
 - [ ] A list/table with many items provides a way to scan key info without opening each row individually (column choice, summary badges) — not forcing per-row drill-down for basic comparison?
 - [ ] Progressive disclosure used for dense dashboards: overview first, drill-down for detail, not everything rendered at once?
-- [ ] **Sparse/under-filled check**: does the view read as empty/thin relative to its whitespace when the underlying data/props/API response already carries fields that aren't currently rendered? Flag as a content-density opportunity — never invent data to fill space, and never auto-add it (see Phase 3/4 of `SKILL.md`: content-density proposals require explicit user approval, always).
+- [ ] **Sparse/under-filled check**: does the view read as empty/thin relative to its whitespace when the underlying data/props/API response already carries fields that aren't currently rendered, or when the backing DB schema carries a field never even fetched? Compile these as content-exposure candidates — never invent data to fill space — for Phase 4's single batched confirmation before wiring them into the API/service layer and the UI (see `SKILL.md` Hard rules).
 
 #### Accessibility (WCAG 2.2)
 - [ ] **2.4.11 Focus Not Obscured**: is a focused element ever fully hidden behind a sticky header/cookie banner/other overlay?
@@ -117,10 +116,10 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Has a `prefers-reduced-motion` guard if using CSS animation
 
 #### Media & Images (banner, hero character, background art, video)
-- [ ] If an image needs to be full-bleed (spanning the full container width) using `object-contain` → the container MUST set `aspect-ratio` (or `style={{ aspectRatio: 'W/H' }}`) matching the image file's actual width/height ratio (read via PIL/`sips -g pixelWidth -g pixelHeight`, don't guess) — if the container and image aspect ratios mismatch, `object-contain` will letterbox on both sides even if width is declared full
+- [ ] Full-bleed image with `object-contain` → container MUST set `aspect-ratio` matching the image's actual W/H (measure via PIL/`sips -g pixelWidth -g pixelHeight`, don't guess) — a mismatched ratio letterboxes the image even at full width
 - [ ] For full-bleed with acceptable minor cropping instead of computing aspect-ratio → use `object-cover` with `mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)` to fade the edges and hide the hard crop marks
-- [ ] If an illustration needs to "grow" without taking up sibling (text/button) layout space → set `position: absolute` (not a normal flex/grid item); but still must reserve room for the adjacent text via `max-width: calc(100% - Npx)` or matching padding for the image size, to avoid overlapping text
-- [ ] `float` + `shape-outside` (the technique where text automatically wraps around an image's contour) ONLY works when the element is a direct child of a **block container** — **it has no effect inside `flex`/`grid`** (the browser silently ignores `float`, no warning/error). If the parent must be flex, use `absolute` + `max-width` reservation instead of float
+- [ ] Illustration must "grow" without taking sibling (text/button) layout space → `position: absolute`, but still reserve room for adjacent text via `max-width: calc(100% - Npx)` or matching padding, to avoid overlap
+- [ ] `float` + `shape-outside` (text wraps around an image's contour) only works as a direct child of a **block container** — no effect inside `flex`/`grid` (browser silently ignores it, no warning). If the parent must be flex, use `absolute` + `max-width` reservation instead
 - [ ] Multiple cards in the same row with illustrations that need to align on the top or bottom edge → anchor the container with `top-0`/`bottom-0` (not both) AND set matching `object-position` on the same side (`object-top`/`object-bottom`) — do not rely on the images' natural aspect ratios happening to align, since each source image usually has a different content margin/bbox
 - [ ] Equal-height cards in a `grid` (grid auto-stretches items equally) but the inner visual frame (border/bg/shadow) only auto-sizes to content → must set `h-full` on BOTH the outer wrapper (grid item) AND the inner visual frame, otherwise cards still end up mismatched in height even though the grid item stretched correctly
 - [ ] A dynamic overlay (shine border, border beam, glow, floating badge) without an explicit `z-index` → a sibling with `position: relative` that appears LATER in the DOM will cover the overlay, because `z-index: auto` among positioned elements stacks by DOM order, not by "which one is intended to be on top"; always assign an explicit `z-index` to animation/decoration overlays
@@ -144,7 +143,7 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Empty-state and success-message copy gives context + a clear next action, not just a status statement?
 - [ ] Destructive/high-stakes action labels are specific about consequence (e.g. "Delete 12 records" not just "Delete")?
 
-**Scope:** validation-timing and input-masking items follow the same frontend-only scope carve-out as UX Efficiency above.
+**Scope:** validation-timing and input-masking items follow the same scope note as UX Efficiency above.
 
 #### Table/List Specific
 - [ ] Table header: typography clearly distinguished from data rows
@@ -171,7 +170,6 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 **Typography scaling:**
 - [ ] Heading scales with viewport: `text-xl sm:text-2xl lg:text-3xl` — not a single fixed size for all
 - [ ] Body text does not need to change size across viewports (text-sm/text-base is already fine)
-- [ ] Input/textarea font-size ≥ 16px on mobile to avoid iOS auto-zoom
 
 **Touch & Interaction:**
 - [ ] Touch targets ≥ 44×44px for every interactive element (button, link, checkbox, toggle)
@@ -197,7 +195,6 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 **Safe areas (iOS/Android):**
 - [ ] Fixed bottom elements: `pb-safe` or `padding-bottom: env(safe-area-inset-bottom)` on iOS
 - [ ] Fixed top: `pt-safe` if the notch needs to be respected
-- [ ] Not using `h-screen` — using `min-h-[100dvh]` to avoid mobile browser chrome issues
 
 **Responsive spacing:**
 - [ ] Section padding: `py-6 sm:py-8 lg:py-12` — mobile usually needs less whitespace than desktop

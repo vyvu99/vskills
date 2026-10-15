@@ -128,7 +128,7 @@ Plain, non-technical language — no file names, function names, DB table names,
 <brief — what's in, what's out>
 ```
 
-(The epic's body additionally starts with the hidden `<!-- vplan: <plan-slug> -->` marker from Step 2.5 — sub-issue bodies don't carry it.)
+(The epic's body additionally starts with the hidden `<!-- vplan: <plan-slug> -->` marker from Step 2 point 5 — sub-issue bodies don't carry it.)
 
 ## Step 5 — Migration constraint
 

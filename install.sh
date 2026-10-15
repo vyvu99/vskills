@@ -2,7 +2,7 @@
 # Symlink skills (+ optionally scripts, CLAUDE.md starter) into ~/.claude,
 # and remove any previously-installed skill symlinks whose source was since
 # deleted from this repo.
-# Usage: ./install.sh [--dry-run] [--with-scripts] [--with-claude-md] [--lang=en|vi]
+# Usage: ./install.sh [--dry-run] [--with-scripts] [--with-claude-md] [--lang=en|vi] [--help]
 
 set -euo pipefail
 
@@ -17,20 +17,30 @@ for arg in "$@"; do
     --with-scripts) WITH_SCRIPTS=true ;;
     --with-claude-md) WITH_CLAUDE_MD=true ;;
     --lang=*) LANG_CHOICE="${arg#--lang=}" ;;
+    -h|--help) sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "[install] unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
+
+case "$LANG_CHOICE" in
+  en|vi) ;;
+  *) echo "[install] unsupported --lang=$LANG_CHOICE (use en or vi)" >&2; exit 2 ;;
+esac
 
 log() { echo "[install] $*"; }
 run() { $DRY_RUN && echo "[dry-run] $*" || eval "$*"; }
 
-# link <src> <dst> — symlinks dst → src, replacing whatever was there
+# link <src> <dst> — symlinks dst → src. An existing symlink is replaced; an existing real
+# file/dir (e.g. your own ~/.claude/scripts/lint-rules with personal rules) is moved aside to
+# <dst>.bak.<timestamp> instead of deleted, so nothing of yours is lost.
 link() {
   local src="$1" dst="$2"
   if [[ -L "$dst" ]]; then
     [[ "$(readlink "$dst")" == "$src" ]] && { log "up to date: $dst"; return; }
     run "rm '$dst'"
   elif [[ -e "$dst" ]]; then
-    run "rm -rf '$dst'"
+    run "mv '$dst' '$dst.bak.$(date +%Y%m%d%H%M%S)'"
+    log "backed up existing $dst"
   fi
   run "mkdir -p '$(dirname "$dst")'"
   run "ln -s '$src' '$dst'"
@@ -64,6 +74,11 @@ if [[ -d "$SKILLS_SRC" ]]; then
     # scripts/ (if the skill has one) is symlinked whole, same as references/ —
     # e.g. vautocook's bundled plan_tasks.py/run_tasks.py it shells out to.
     [[ -d "${skill_dir}scripts" ]] && link "${skill_dir}scripts" "$dst_dir/scripts"
+    # Root-level helper shell scripts (e.g. vsweep/stop-guard.sh, referenced by
+    # SKILL.md as ~/.claude/skills/<skill>/<file>.sh) are symlinked per-file.
+    for sh_file in "${skill_dir}"*.sh; do
+      [[ -f "$sh_file" ]] && link "$sh_file" "$dst_dir/$(basename "$sh_file")"
+    done
   done
 fi
 

@@ -1,16 +1,16 @@
 ---
 name: vautocook
-description: "Tự động thực thi từng sub-issue của 1 GitHub epic theo thứ tự, mỗi sub-issue chạy như 1 phiên /vcook headless cô lập với branch + PR riêng, sắp theo dependency, resume được, fail-fast. Dựa trên 2 script đi kèm (plan_tasks.py, run_tasks.py) gọi ra `claude -p --dangerously-skip-permissions` cho từng task — rủi ro cao, luôn hiện kế hoạch cho user xác nhận trước khi chạy."
+description: "Tự động thực thi từng sub-issue của 1 GitHub epic theo thứ tự, mỗi sub-issue chạy như 1 phiên /vcook headless cô lập (phiên mới cho mỗi task) commit lên 1 branch epic chung, cuối cùng mở 1 PR duy nhất cho cả epic, sắp theo dependency, resume được, fail-fast. Dựa trên 2 script đi kèm (plan_tasks.py, run_tasks.py) gọi ra `claude -p --dangerously-skip-permissions` cho từng task — rủi ro cao, luôn hiện kế hoạch cho user xác nhận trước khi chạy."
 argument-hint: "<epic_url>"
 user-invocable: true
 disable-model-invocation: true
 when_to_use: "Dùng khi đã có sẵn epic + sub-issues (ví dụ do vtickets tạo) và muốn triển khai tự động, lần lượt từng cái, không cần ngồi canh từng lượt /vcook."
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
-Tự động triển khai từng sub-issue của 1 GitHub epic, tuần tự, không cần người canh. Mỗi sub-issue chạy như 1 phiên `/vcook` cô lập ở chế độ headless (`claude -p --dangerously-skip-permissions`) — có branch riêng, PR riêng, không hỏi lại ai giữa chừng. Dựa trên 2 script đi kèm trong thư mục `scripts/` của skill này; file này chỉ là hướng dẫn *khi nào và chạy sao*, bản thân nó không phải script.
+Tự động triển khai từng sub-issue của 1 GitHub epic, tuần tự, không cần người canh. Mỗi sub-issue chạy như 1 phiên `/vcook` cô lập ở chế độ headless (`claude -p --dangerously-skip-permissions`) — mỗi task 1 phiên mới (context được clear), tất cả commit lên 1 branch epic chung, cuối cùng mở 1 PR duy nhất cho cả epic; không hỏi lại ai giữa chừng. Dựa trên 2 script đi kèm trong thư mục `scripts/` của skill này; file này chỉ là hướng dẫn *khi nào và chạy sao*, bản thân nó không phải script.
 
 Đọc input từ user:
 
@@ -35,18 +35,18 @@ python3 ~/.claude/skills/vautocook/scripts/plan_tasks.py <epic_url>
 ```
 
 - Lấy sub-issues của epic qua GitHub GraphQL API.
-- Chạy DUY NHẤT 1 lần gọi `claude -p` headless để nhờ sắp xếp sub-issues thành chuỗi tuần tự (mỗi task chỉ phụ thuộc đúng task ngay trước nó) và đặt tên branch cho từng task.
-- Phát hiện sub-issue đã xong (issue đã đóng + có PR đã merge vào default branch của repo) và đánh dấu `status: "done"` để bước 3 bỏ qua.
+- Chạy DUY NHẤT 1 lần gọi `claude -p` headless để nhờ sắp xếp sub-issues thành chuỗi tuần tự (mỗi task chỉ phụ thuộc đúng task ngay trước nó) và đặt tên branch epic duy nhất (`feat/epic-<số>-<slug>`).
+- Đánh dấu `status: "done"` cho sub-issue đã đóng để bước 3 bỏ qua.
 - Ghi `tasks.json` cạnh script — trạng thái scratch cục bộ cho lần chạy pipeline này, không phải plan artifact; đừng commit hay trỏ code/PR comment vào đó.
 
 Bước này không sửa code và không mở gì cả — chạy thoải mái không cần hỏi trước.
 
 ## Bước 2 — Hiện kế hoạch, xin xác nhận rõ ràng
 
-Đọc `tasks.json` vừa sinh, in danh sách task đã sắp thứ tự (số issue, title, tên branch, chuỗi phụ thuộc) cho user. **STOP và xin xác nhận rõ ràng trước Bước 3 — đây là gate bắt buộc, không phải tuỳ chọn:** Bước 3 chạy các phiên code hoàn toàn tự động với `--dangerously-skip-permissions`, tự push branch và mở PR thật, chạy nối tiếp nhau, không xác nhận từng task khi đã bắt đầu. Nêu rõ:
+Đọc `tasks.json` vừa sinh, in danh sách task đã sắp thứ tự (số issue, title, chuỗi phụ thuộc) cùng tên branch epic cho user. **STOP và xin xác nhận rõ ràng trước Bước 3 — đây là gate bắt buộc, không phải tuỳ chọn:** Bước 3 chạy các phiên code hoàn toàn tự động với `--dangerously-skip-permissions`, tự push branch và mở PR thật, chạy nối tiếp nhau, không xác nhận từng task khi đã bắt đầu. Nêu rõ:
 - Bao nhiêu task đang pending, bao nhiêu đã done.
 - Đây là fail-fast — 1 task fail thì dừng cả pipeline; task đã done vẫn giữ nguyên.
-- `tasks.json` có thể sửa tay (đổi thứ tự, sửa dependency sai, sửa tên branch sai) trước Bước 3 — đó chính là lý do tách 2 script riêng.
+- `tasks.json` có thể sửa tay (đổi thứ tự, sửa dependency sai, sửa tên branch epic sai) trước Bước 3 — đó chính là lý do tách 2 script riêng.
 
 ## Bước 3 — Chạy pipeline
 
@@ -66,6 +66,11 @@ Chỉ sau khi user xác nhận. Bước này có thể chạy hàng giờ, khôn
   commands = ["python3 ~/.claude/skills/vautocook/scripts/run_tasks.py"]
   ```
 
+  ```bash
+  rm -f ~/.claude/skills/vautocook/scripts/pipeline_status.json
+  open 'warp://tab_config/vautocook'
+  ```
+
   Báo cho user biết 1 tab Warp mới vừa mở chạy pipeline — phiên này không tự
   chạy và không thấy được output live của nó; theo dõi/interrupt trực tiếp ở
   tab đó. Warp's tab-config launcher chỉ hỗ trợ mở theo tên (không nhận tham
@@ -78,11 +83,6 @@ Chỉ sau khi user xác nhận. Bước này có thể chạy hàng giờ, khôn
   cách phiên này biết lúc nào chạy xong mà không cần hỏi user — `run_tasks.py`
   ghi đè file này 1 lần lúc bắt đầu (`"running"`) và 1 lần nữa khi kết thúc,
   dù kết thúc kiểu gì:
-
-  ```bash
-  rm -f ~/.claude/skills/vautocook/scripts/pipeline_status.json
-  open 'warp://tab_config/vautocook'
-  ```
 
   ```bash
   until [ -f ~/.claude/skills/vautocook/scripts/pipeline_status.json ] && grep -qE '"state": "(completed|stopped|interrupted)"' ~/.claude/skills/vautocook/scripts/pipeline_status.json; do sleep 30; done
@@ -102,15 +102,16 @@ Chỉ sau khi user xác nhận. Bước này có thể chạy hàng giờ, khôn
   đủ không lọc luôn nằm ở `scripts/logs/task-<number>-*.jsonl` (xem bên dưới)
   — đọc file đó cho bất kỳ phần nào bản tóm tắt live không hiện.
 
-- Với mỗi task pending, theo thứ tự: checkout branch của nó (từ default branch, hoặc từ branch của task phụ thuộc nếu task đó chưa merge — chuỗi PR chồng lên nhau), điền `scripts/prompt.md` với ngữ cảnh của task, rồi chạy `claude -p <prompt> --dangerously-skip-permissions --output-format stream-json --verbose`. Phiên bên trong đó chạy `/vcook` trên issue ở chế độ headless (không dừng lại hỏi; tự xử lý ambiguity theo root-cause/KISS/DRY, ghi quyết định vào PR body) và được kỳ vọng tự tạo commit + PR qua Step 9 của chính `/vcook`. Nó cũng ghi lại transcript stream-json đầy đủ, không lọc, của từng task vào `scripts/logs/task-<number>-<timestamp>.jsonl` — terminal (tab Warp hoặc terminal của user) hiện bản tóm tắt live dễ đọc, file log là bản ghi đầy đủ để grep lại sau.
-- Sau khi phiên bên trong kết thúc, kiểm tra branch đã có PR chưa; `/vcook` chưa mở được PR → fallback: tự push branch và mở 1 PR tối giản (không gọi thêm AI cho fallback này).
-- **Resume:** Ctrl+C hoặc crash giữa chừng để lại task ở `status: "running"` trong `tasks.json` — chạy lại `run_tasks.py` sẽ tự reset về `pending` và tiếp tục từ đó.
-- **Fail-fast:** task kết thúc mà không có PR sẽ dừng cả lượt chạy; sửa nó (hoặc sửa `tasks.json`) rồi chạy lại để tiếp tục.
-- Khi xong, in ra **thứ tự merge** — vì task sau chồng lên branch của task trước, nên PR phải merge từ trên xuống, từng level một, rebase giữa các level.
+- Checkout branch epic 1 lần (từ default branch, hoặc tiếp tục nếu đã tồn tại ở local/origin). Rồi với mỗi task pending, theo thứ tự: điền `scripts/prompt.md` với ngữ cảnh của task và chạy `claude -p <prompt> --dangerously-skip-permissions --output-format stream-json --verbose` ở **phiên mới** — mỗi task 1 phiên riêng nên không gì từ task trước mang sang ngoài các commit đã nằm trên branch. Phiên bên trong chạy `/vcook` trên issue ở chế độ headless (không dừng lại hỏi; tự xử lý ambiguity theo root-cause/KISS/DRY) và được dặn **chỉ commit — không push, không PR**. Nó cũng ghi transcript stream-json đầy đủ, không lọc, của từng task vào `scripts/logs/task-<number>-<timestamp>.jsonl` — terminal hiện bản tóm tắt live dễ đọc, file log là bản ghi đầy đủ để grep lại sau.
+- Sau khi phiên bên trong kết thúc, kiểm tra nó thực sự đã thêm commit, rồi push branch epic (để crash về sau không mất task đã xong).
+- Sau task cuối, chạy thêm 1 phiên headless (`scripts/pr-prompt.md`) để mở PR duy nhất của epic — body theo ngôn ngữ project, dòng `Closes #N` cho mọi sub-issue ở đầu, theo luật PR ở Step 9 của `/vcook`; phiên đó không mở được → fallback `gh pr create` tối giản.
+- **Resume:** Ctrl+C hoặc crash giữa chừng để lại task ở `status: "running"` trong `tasks.json` — chạy lại `run_tasks.py` sẽ tự reset nó (và mọi task `failed`) về `pending` và tiếp tục từ đó.
+- **Fail-fast:** task thoát lỗi, không tạo commit, hoặc không push được sẽ dừng cả lượt chạy; sửa nó (hoặc sửa `tasks.json`) rồi chạy lại để tiếp tục — task đã xong vẫn giữ nguyên.
+- Chỉ có 1 PR nên không còn thứ tự merge phải lo — merge 1 lần là đóng hết các sub-issue.
 
 ## Bước 4 — Báo cáo
 
-Chạy trong tab Warp → lệnh chờ `run_in_background` ở trên đã tự resolve khi `pipeline_status.json` đạt trạng thái cuối, nên đọc `state` của file đó trước (`completed` / `stopped` / `interrupted`), rồi đọc lại `scripts/tasks.json` từ đầu — phiên này không hề thấy lượt chạy đó, đừng dựa vào bất kỳ gì đã in ra trước đó trong hội thoại này. Chạy trực tiếp trong Bash tool của chính phiên này → tóm tắt từ những gì đã quan sát được, như trước giờ. Dù theo cách nào: task nào xong trong lượt này kèm URL PR, task nào còn `pending`/`failed` (trỏ tới `scripts/logs/task-<number>-*.jsonl` để debug), và thứ tự merge. `stopped`/`interrupted` → nói rõ task nào chặn lại (field `failed_task` trong `pipeline_status.json` cho case `stopped`) và cần sửa trước khi chạy lại. Không được im lặng dừng giữa epic mà không nói rõ task nào chặn lại.
+Chạy trong tab Warp → lệnh chờ `run_in_background` ở trên đã tự resolve khi `pipeline_status.json` đạt trạng thái cuối, nên đọc `state` của file đó trước (`completed` / `stopped` / `interrupted`), rồi đọc lại `scripts/tasks.json` từ đầu — phiên này không hề thấy lượt chạy đó, đừng dựa vào bất kỳ gì đã in ra trước đó trong hội thoại này. Chạy trực tiếp trong Bash tool của chính phiên này → tóm tắt từ những gì đã quan sát được, như trước giờ. Dù theo cách nào: task nào xong trong lượt này kèm URL PR của epic (`epic_pr_url` trong `tasks.json`), task nào còn `pending`/`failed` (trỏ tới `scripts/logs/task-<number>-*.jsonl` để debug). `stopped`/`interrupted` → nói rõ task nào chặn lại (field `failed_task` trong `pipeline_status.json` cho case `stopped`) và cần sửa trước khi chạy lại. Không được im lặng dừng giữa epic mà không nói rõ task nào chặn lại.
 
 ---
 
