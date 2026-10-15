@@ -1,0 +1,12 @@
+[
+  { "query": "cứ brainstorm mọi ý tưởng xoay quanh chủ đề này trong 2 giờ liên tục", "should_trigger": true },
+  { "query": "kiểm tra toàn hệ thống tới sáng", "should_trigger": true },
+  { "query": "work through the whole backlog while I'm away and log anything ambiguous", "should_trigger": true },
+  { "query": "audit every module for bugs overnight, fix what's clear-cut and list the rest for me", "should_trigger": true },
+  { "query": "go through every role until 6am and note what needs a decision", "should_trigger": true },
+  { "query": "fix lỗi dòng 12 file a.ts", "should_trigger": false },
+  { "query": "explain what this function does", "should_trigger": false },
+  { "query": "run typecheck and build on this repo", "should_trigger": false },
+  { "query": "review this PR before merge", "should_trigger": false },
+  { "query": "rename the variable foo to bar in utils.ts", "should_trigger": false }
+]

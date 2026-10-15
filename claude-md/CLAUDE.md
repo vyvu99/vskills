@@ -26,6 +26,13 @@ A generic starter `CLAUDE.md` — the rule set that `vreview` and `vcook` read f
 - Below that bar — a 1-2 file read, a lookup a single grep would answer, a one-line edit — just do it directly. Delegating a trivial task "to be safe" is the same over-engineering this file already warns against.
 - A request bundling 2+ distinct tasks → track them explicitly (a todo list) before starting any of them, don't just hold the list in your head and risk silently dropping one.
 
+## Repeatable Work → Scripts
+
+- Anything you're about to do — or just did — a second time (an operation, a workflow, a verification step) gets turned into a reusable script under `plans/scripts/<tool-set-name>/`: one folder per tool set, with a `README.md` holding copy-paste commands and known gotchas. Don't leave scripts in temp/scratch dirs or scattered around, and don't re-reason or re-check the same thing by hand each time.
+- A verification step becomes a `check-*` script with a deterministic result: a one-line pass/fail, a non-zero exit code on failure, and it works on a single item or a whole directory. The script carries every easy-to-forget setting itself (timeouts, env vars, retries, cleaning up hung processes) so the next run is one command.
+- UI / visual verification: never rely only on a browser-automation MCP (e.g. claude-in-chrome) or on eyeballing — it is often wrong (page not finished loading, session/cookies mixed up, screenshot taken at the wrong moment, subjective conclusions). Back every "UI verified" claim with a script that checks measured data (layout measured in a headless browser, text/numbers extracted from the output, pixels, console/network errors); use the browser MCP only as a supplementary confirmation.
+- Before writing a new script, list the existing tool-set folder and reuse or extend what's there. A subagent given work that belongs to a tool set must use its scripts and append to its README — never create a duplicate.
+
 ## Hard Gates — Stop and Ask
 
 Before doing any of the following, stop and ask the user instead of deciding alone:

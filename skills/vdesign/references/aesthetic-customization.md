@@ -1,30 +1,62 @@
-# Aesthetic Customization
+# Design Decision Checklist
 
-Runs on **every** `vdesign` invocation — no flag gates it. Before Phase 3 touches any code, walk the user through 7 rounds of `AskUserQuestion` (≤4 questions each, 18 criteria total plus a closing catch-all question) covering every axis that actually changes how a redesign looks and feels. The agent does not silently pick a direction; the user always does, explicitly, per run. Skip only the criteria that are structurally inapplicable to the target (e.g. Dark Mode Stance when the project has no theming system at all, or Data & Table Density when the target has no data-heavy surface at all — say so, don't ask a question with no real answer).
+vdesign decides every axis below itself, every run — no `AskUserQuestion`, no per-run
+user picks. This is the taxonomy + decision priority it uses to fill in the Design
+Brief (`SKILL.md` Phase 0 step 7): 18 criteria across 6 groups, covering every axis
+that actually changes how a redesign looks and feels. Skip only the criteria that are
+structurally inapplicable to the target (e.g. Dark Mode Stance when the project has no
+theming system at all, or Data & Table Density when the target has no data-heavy
+surface at all — say so, don't force a decision with no real answer).
 
-Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 / Theme Builder, Relume, Figma design tokens, Fluent 2 / Atlassian / Cloudscape / SAP Fiori design systems, Ant Design, Carbon Design System, Linear, Nielsen Norman Group's empty-state research, Smashing Magazine's CSS `corner-shape` coverage, and standard creative-brief practice — not invented from scratch, and not a fixed catalog to memorize verbatim: treat the options below as the floor, not a ceiling — offer a project-specific option when one obviously fits better.
+Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 /
+Theme Builder, Relume, Figma design tokens, Fluent 2 / Atlassian / Cloudscape / SAP
+Fiori design systems, Ant Design, Carbon Design System, Linear, Nielsen Norman
+Group's empty-state research, Smashing Magazine's CSS `corner-shape` coverage — not
+invented from scratch, and not a fixed catalog to memorize verbatim: treat the
+options below as the floor, not a ceiling — pick a project-specific option when one
+obviously fits better than any listed here.
 
-**Recommend-first.** Before presenting each criterion's options, compute one recommended answer from the resolved Project Profile (existing design tokens, `package.json` dependencies, the "Good reference UI" entry, and any already-read component code) and reorder that option first in the `AskUserQuestion` list, appending `(Recommended)` to its label plus a one-line rationale in its description — grounded in the specific token/file/pattern found, never a generic compliment. When no clear signal exists for a criterion (greenfield, no precedent), say so explicitly and recommend the most common/conservative option instead of guessing confidently. The user still picks explicitly — a recommendation shortens the decision, it never replaces it.
+## Decision priority
+
+For each criterion, decide in this order and state which one actually drove the
+pick (never "just felt right"):
+
+1. **This run's Domain Research** (`SKILL.md` Phase 0 step 6, always runs) — a
+   concrete, current (2026) finding for this exact aspect/domain beats any generic
+   default below.
+2. **Project Profile** — existing design tokens, `package.json` dependencies, the
+   "Good reference UI" entry, already-read component code. Use when there's a real
+   reason to stay consistent, not by default.
+3. **Real User & Purpose** (`SKILL.md` Phase 1 Step 1) — the actual persona and task
+   this screen serves; drives density, tone, and whether a bolder or more
+   restrained choice actually fits the context (e.g. a clinical B2B tool and a
+   consumer wellness app land on different answers for the same criterion).
+4. **Personal Aesthetic Quality Floor** (`SKILL.md`) — when no strong signal exists
+   from 1-3 (greenfield, no precedent), pick the most common/conservative option for
+   that axis rather than guessing boldly, and say so explicitly.
 
 ## Round 0 — Structural Freedom
 
-0. **Structural freedom** — how much the page/component's structure itself may change, not just its styling.
-   - *Preserve structure* — keep the current section order/count/view-type; this run only restyles, never restructures
-   - *Refine if audit finds a fit problem* (default — matches current behavior) — Phase 2's audit may merge/reorder/split sections when it finds a genuine structural fit issue, bounded by "proportional to what's actually broken"
-   - *Open to reinvention* — Phase 2/3 may freely change view-type (list → kanban, table → cards, etc.) when it better serves the data/task from Phase 1's Data & Purpose read — not bounded by "proportional" for structural moves specifically
+0. **Structural freedom** — how much the page/component's structure itself may
+   change, not just its styling. Decided primarily by Phase 1's Real User & Purpose
+   read, not this file: restructure (merge/reorder/split sections, change view-type)
+   whenever the current structure genuinely doesn't fit the real task — never bounded
+   by "proportional to what the audit found" for structural moves specifically, but
+   every restructure must trace to a concrete reason from that read, not "because it
+   could look better."
 
 ## Round 1 — Visual Foundation
 
 1. **Typography** — primary typeface direction and sizing voice.
-   - *Minimal/Professional* (IBM Plex, Source Sans 3) — neutral, technical — webapp `font-sample` value: `"IBM Plex Sans, sans-serif"`
-   - *Bold/Editorial* (Playfair Display, Fraunces, Clash Display) — distinctive, branded — webapp `font-sample` value: `"Playfair Display, serif"`
-   - *Code/Technical* (JetBrains Mono, Fira Code, Space Grotesk) — dev-tool, creative — webapp `font-sample` value: `"JetBrains Mono, monospace"`
-   - *Startup/Modern* (Satoshi, Cabinet Grotesk, Inter Tight) — contemporary, friendly — webapp `font-sample` value: `"Inter Tight, sans-serif"`
+   - *Minimal/Professional* — neutral, technical; representative: `IBM Plex Sans, sans-serif` (IBM Plex, Source Sans 3)
+   - *Bold/Editorial* — distinctive, branded; representative: `Playfair Display, serif` (Playfair Display, Fraunces, Clash Display)
+   - *Code/Technical* — dev-tool, creative; representative: `JetBrains Mono, monospace` (JetBrains Mono, Fira Code, Space Grotesk)
+   - *Startup/Modern* — contemporary, friendly; representative: `Inter Tight, sans-serif` (Satoshi, Cabinet Grotesk, Inter Tight)
 2. **Color palette philosophy** — how the palette gets built.
-   - *Keep existing tokens* — full consistency with the current codebase. Locks: no brand color changes anywhere in this run. — webapp `swatch` value: `"#94A3B8"` (neutral slate, signals "no new color")
-   - *Accent colors only* — keep primary, add a new brand accent. Unlocks: exactly one new accent color; base/primary tokens stay untouched. — webapp `swatch` value: `"#2563EB"`
-   - *Full palette redesign* — new palette from brand colors, built from scratch. Unlocks: full palette replacement — every color token in scope may change. — webapp `swatch` value: `"#7C3AED"`
-   - *Dynamic/auto-generated* — tool-generated palette with accessibility built in (Material Theme Builder style). Unlocks: full palette replacement, same freedom as Full palette redesign, generated rather than hand-picked. — no fixed color to swatch (it's tool-generated at build time): webapp renderHint `"plain"` for this option only, prefix label with "🎲 " instead
+   - *Keep existing tokens* — full consistency with the current codebase, no brand color changes anywhere in this run
+   - *Accent colors only* — keep primary, add exactly one new brand accent; base/primary tokens stay untouched
+   - *Full palette redesign* — new palette from brand colors, built from scratch, every color token in scope may change
+   - *Dynamic/auto-generated* — tool-generated palette with accessibility built in (Material Theme Builder style), same freedom as full redesign
 3. **Motion/animation philosophy** — how much movement the UI carries.
    - *Minimal* — 150-300ms transitions only, no micro-interactions
    - *Balanced* — transitions + a few key micro-interactions (hover, page transition)
@@ -88,11 +120,11 @@ Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 
     - *Playful/Jester* — fun, unexpected, cheeky microcopy
     - *Empathetic/Caregiver* — warm, supportive language
     - *Adventurous/Explorer* — bold, experimental, curious tone
-14. **Aesthetic boldness / overall direction** — the master dial everything else scales against.
+14. **Aesthetic boldness / overall direction** — the master dial everything else scales against. No longer locked to "stay close to the system by default" — Domain Research runs every time, so pick whichever direction this run's findings and the Real User & Purpose read actually support:
     - *Brand-centric/cohesive* — every decision serves one clear, consistent identity; stays close to the project's existing system
     - *Experimental/bold* — pushes norms, unexpected choices, genuine creative freedom, may depart from the existing system entirely
     - *Functional/minimalist* — content-first, no decoration beyond what clarity needs
-    - *Trend-forward* — actively pulls from current (2025-2026) real-world design trends
+    - *Trend-forward* — actively pulls from current (2025-2026) real-world design trends surfaced by this run's Domain Research
     - *Game-inspired/Arcade* — HUD-style panels, glow/neon accents, chunky tactile feedback (squash/bounce on press), weighty satisfying motion; art direction borrowed from game UI, not gamification mechanics (no points/levels/streaks added)
 
 ## Round 5 — Content & States
@@ -113,23 +145,30 @@ Sources behind this list: v0 (Vercel), Galileo AI, Framer AI, Material Design 3 
     - *Illustrated* — custom illustration/icon + friendly copy for empty/error states (onboarding feel)
     - *Text-only/utilitarian* — plain text message, no illustration, fastest to build and lowest visual weight
 
-## Round 6 — Anything Else?
+## How vdesign decides
 
-Closing catch-all — Round 0 plus Rounds 1-5 cover 18 criteria, but they're a floor, not an exhaustive list. Ask exactly 1 `AskUserQuestion`:
-
-- "Anything else about the design direction you want to specify that the questions above didn't cover?"
-  - *Nothing else — the above covers it*
-  - *Yes — I'll specify via Other*
-
-Record the answer verbatim in the Design Brief under a new `## Additional notes (Round 6)` line — write "None" if the user picked the first option, otherwise the free-text answer.
-
-## What the answers drive
-
-- **Structural Freedom** (Round 0) gates how much Phase 2's Information Architecture finding and Phase 3's Fix scope may restructure the target — *Preserve structure* keeps the current structure untouchable, *Refine if audit finds a fit problem* is the existing bounded default, *Open to reinvention* removes Phase 3's "proportional to audit findings" ceiling for structural/view-type moves only — every other category (color, dependency, motion, etc.) still follows its own criterion.
-- **Domain Research** (Phase 0, next step) runs only when it earns its cost: criterion 14 answered *Trend-forward*, *Experimental/bold*, or *Game-inspired/Arcade*, or the user's own answers elsewhere explicitly invoke "what's current right now." *Brand-centric* or *Functional/minimalist* skip it — there's nothing live to ground those in, use the answers directly.
-- **Phase 3 Fix** executes the Design Brief (see below), not a flag. Every place the old `--wow` flag used to unlock something (new brand colors, new dependencies, decorative motion, structural layout changes) is now unlocked or not by the matching criterion answer above, per-run, explicit — never inferred.
-- Hard technical rules (accessibility, no tech-stack migration, no logic/API changes, GPU-safe motion) are never affected by any answer here — they are safety/engineering constraints, not aesthetic ones.
+- **Structural Freedom** (Round 0) is driven by Phase 1's Real User & Purpose read,
+  not guessed from this list — see that section's note above.
+- **Domain Research** (`SKILL.md` Phase 0 step 6) now runs every time, regardless of
+  which boldness direction criterion 14 lands on — it's an input to the decision,
+  not gated by it.
+- **Phase 3 Fix** executes the Design Brief (below) — every axis that used to be
+  unlocked by a flag or a user answer is now unlocked by the Decision Priority
+  above, stated explicitly in the brief, never left implicit.
+- Hard technical rules (accessibility, GPU-safe motion, no DB schema/migration
+  changes) are never affected by any decision here — they are safety/engineering
+  constraints, not aesthetic ones. API/service-layer changes ARE in scope when a
+  decision above needs them (e.g. exposing a field for a new data/table density
+  choice) — see `SKILL.md`'s Hard rules.
 
 ## Design Brief
 
-After all 7 rounds, write a short concrete brief (5-10 lines, not a one-word label per criterion) translating the 18 answers plus Round 6's catch-all note — plus Domain Research findings when it ran — into specific decisions: the actual typeface names, the actual palette approach, the actual motion timing/easing, the actual shape/icon/imagery direction, the actual spacing scale, the actual layout system, the actual tone, the actual boldness level, and (when applicable) the actual data/table, form, and empty/loading/error treatment. State it out loud before Phase 1 starts. This is the single source of truth Phase 3 executes against — an un-synthesized pile of 18 raw answers is not a brief.
+After deciding all 18 criteria (self-determined, not asked), write a short concrete
+brief (5-10 lines, not a one-word label per criterion) translating those decisions —
+plus Domain Research's findings and the Real User & Purpose read — into specific
+choices: the actual typeface names, the actual palette approach, the actual motion
+timing/easing, the actual shape/icon/imagery direction, the actual spacing scale, the
+actual layout system, the actual tone, the actual boldness level, and (when
+applicable) the actual data/table, form, and empty/loading/error treatment. State it
+out loud before Phase 1 starts. This is the single source of truth Phase 3 executes
+against — an un-synthesized pile of 18 raw decisions is not a brief.

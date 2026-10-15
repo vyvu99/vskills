@@ -20,7 +20,7 @@ INPUT
   - `SCRIPT_SCAN.json` — các violation đã được lint rule xác nhận
   - `REPORT.md` — CRITICAL / WARNING / SUGGESTION / CROSS-GROUP ISSUES
   - `ADVERSARIAL.txt` — issue từ pass adversarial; logic đã được merge vào REPORT.md rồi, nên coi item CRITICAL/WARNING ở đây tương đương với REPORT.md
-- Nếu user truyền path khác qua argument → dùng path đó thay cho `.code-review/`; cấu trúc file bên trong phải giống hệt (SCRIPT_SCAN.json / REPORT.md / ADVERSARIAL.txt) — nếu thiếu file nào thì bỏ qua bước tương ứng, không báo lỗi.
+- Nếu user truyền path khác qua argument → dùng path đó thay cho `.code-review/`; cấu trúc file bên trong phải giống hệt (SCRIPT_SCAN.json / REPORT.md / ADVERSARIAL.txt) — nếu thiếu file nào thì bỏ qua bước tương ứng, không báo lỗi. Mọi chỗ nhắc `.code-review/` bên dưới đều hiểu là thư mục đang dùng.
 - Nếu KHÔNG có report nào (không có `.code-review/`, không có path hợp lệ) → hỏi user: có issue cụ thể nào cần fix không, hay gọi thẳng skill `fix` từ mô tả bug bằng lời.
 
 ═══════════════════════════════════════════════════════

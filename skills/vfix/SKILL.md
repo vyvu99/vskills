@@ -20,7 +20,7 @@ INPUT
   - `SCRIPT_SCAN.json` — violations already confirmed by lint rules
   - `REPORT.md` — CRITICAL / WARNING / SUGGESTION / CROSS-GROUP ISSUES
   - `ADVERSARIAL.txt` — adversarial-pass issues; already merged into REPORT.md, so treat CRITICAL/WARNING items here as equivalent to REPORT.md
-- User passes a different path via argument → use it instead of `.code-review/`; same internal file structure (SCRIPT_SCAN.json / REPORT.md / ADVERSARIAL.txt) — missing file → skip that step, no error.
+- User passes a different path via argument → use it instead of `.code-review/`; same internal file structure (SCRIPT_SCAN.json / REPORT.md / ADVERSARIAL.txt) — missing file → skip that step, no error. Every `.code-review/` mentioned below means whichever directory is in use.
 - No report exists (no `.code-review/`, no valid path) → ask the user: a specific issue to fix, or invoke `fix` directly from a verbal bug description.
 
 ═══════════════════════════════════════════════════════

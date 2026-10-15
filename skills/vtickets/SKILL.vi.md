@@ -128,7 +128,7 @@ Ngôn ngữ đơn giản, phi kỹ thuật — không tên file, không tên hà
 <brief — what's in, what's out>
 ```
 
-(Body của epic có thêm marker ẩn `<!-- vplan: <plan-slug> -->` từ Bước 2.5 ở đầu — body của sub-issue không có marker này.)
+(Body của epic có thêm marker ẩn `<!-- vplan: <plan-slug> -->` từ Bước 2 mục 5 ở đầu — body của sub-issue không có marker này.)
 
 ## Bước 5 — Ràng buộc về migration
 

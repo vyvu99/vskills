@@ -42,6 +42,12 @@ BƯỚC 2: XÁC ĐỊNH BRANCH
    - `git checkout <default_branch>` → `git pull` → `git checkout -b <descriptive-branch-name>`
    - Tên branch: kebab-case, tiếng Anh, mô tả chính xác phạm vi thay đổi (không gắn prefix theo tool/agent trừ khi repo bắt buộc theo convention riêng).
 
+**Xác định PR base branch ngay bây giờ, ở cả 2 nhánh trên, trước khi Bước 5 thêm commit** (heuristic merge-base bên dưới kém tin cậy khi đã có commit mới) — Bước 9 dùng giá trị này cho `gh pr create --base`, không bao giờ dùng default của chính `gh`:
+- Nhánh 2 (vừa tách từ `<default_branch>`) → base là `<default_branch>`.
+- Nhánh 1 (đang ở một branch có sẵn, ví dụ caller — người hoặc script như pipeline tự động nhiều task — đã checkout từ đâu đó) → KHÔNG mặc định là `<default_branch>`.
+  - **Caller đã cho biết branch này tách từ đâu** (ví dụ chỉ dẫn kiểu "bạn đang ở branch X, checkout từ Y") → tin thẳng đó là base. Giá trị này đã được tính 1 lần, tất định, bởi bên dựng branch — suy lại từ git history là thừa và, với setup stacked nhiều branch, kém tin cậy hơn câu trả lời đã được đưa.
+  - **Không ai cho biết** (dùng độc lập: bạn hoặc user tự checkout branch này, không có caller điều phối) → tự detect: với mọi branch local/remote `b` khác (trừ branch này), chạy `git merge-base --is-ancestor b HEAD`; trong số những branch pass, branch cần ít commit nhất để tới HEAD (`git rev-list --count b..HEAD`) chính là parent thật. Nếu tổ tiên gần nhất đó là `<default_branch>` (hoặc bản mirror `origin/`) → base = `<default_branch>`. Nếu là branch KHÁC, chưa merge → branch ĐÓ là PR base — đây là tình huống stacked-PR (predecessor thật của branch này chưa merge), và lấy `<default_branch>` làm base sẽ khiến diff lẫn cả mọi commit của predecessor chưa merge đó.
+
 ═══════════════════════════════════════════════════════
 BƯỚC 3: XÁC ĐỊNH CHẾ ĐỘ INPUT
 ═══════════════════════════════════════════════════════
@@ -51,7 +57,7 @@ Input là 1 trong 2 dạng — tự động detect từ `$ARGUMENTS`:
 **Mode A — Có plan path** (ví dụ: `plans/<slug>/`, `plan.md`, `phase-XX-*.md`):
 1. Đọc toàn bộ plan + các phase file liên quan.
 2. Đọc kỹ các vùng codebase mà plan tham chiếu tới (dùng subagent song song theo bước 1).
-3. Cross-check: codebase hiện tại có khớp với assumption của plan không? (file còn tồn tại đúng path, pattern/API còn khớp với mô tả trong plan, dependency chưa đổi...)
+3. Cross-check: codebase hiện tại có khớp với assumption của plan không? (file còn tồn tại đúng path, pattern/API còn khớp với mô tả trong plan, dependency chưa đổi...)? Stamp `Generated against commit` trong `plan.md` lệch với HEAD hiện tại → re-verify các file:line của case PASS trước khi tin.
 4. Nếu có MISMATCH → STOP, trình bày mismatch cụ thể + đề xuất điều chỉnh cho user TRƯỚC khi code. KHÔNG được lệch khỏi plan mà không hỏi.
 5. Nếu khớp → chuyển sang bước 4.
 
@@ -118,7 +124,8 @@ Resolve VCS profile trước: đọc `~/.claude/skills/_vskills-shared/repo-prof
 - Đọc `.github/pull_request_template.md` của project (nếu có) → PR body PHẢI theo đúng template đó. Nếu không có → dùng format mặc định hợp lý (Summary / Changes / Test plan).
 - Title: tiếng Anh, ngắn gọn.
 - Description: viết bằng ngôn ngữ giao tiếp của project — kiểm tra section `## Ngôn ngữ`/`## Language` trong `CLAUDE.md` của project, rồi tới `~/.claude/CLAUDE.md`, cuối cùng tiếng Anh (đúng cách resolve mà `repo-profile.md` §4 mô tả, không cần file đó thực sự tồn tại) — không thuật ngữ kỹ thuật, dành cho người đọc không phải engineer, tập trung vào tác động user/business, không dùng code jargon.
-- Full gh mode (theo §2) → tạo PR bằng `gh` như bình thường. Degraded/local-only → push branch, in thông báo §2 của vcook kèm title + body đã soạn đầy đủ để user tự paste vào UI của host — luôn soạn body ở cả 2 chế độ, không bỏ qua.
+- **Caller bảo "chỉ commit, không PR"** (ví dụ pipeline tự động mở 1 PR chung cho nhiều task) → commit rồi dừng: không push, không tạo PR, không sửa issue. Bỏ qua phần còn lại của mục này.
+- Full gh mode (theo §2) → tạo PR bằng `gh pr create --base <base branch đã xác định ở Bước 2>` — không bao giờ bỏ `--base` rồi dựa vào default của `gh`, vì default đó luôn trỏ về default branch của repo kể cả khi parent thật của branch này là một branch khác chưa merge (xem phần xác định base ở Bước 2). Degraded/local-only → push branch, in thông báo §2 của vcook kèm title + body đã soạn đầy đủ để user tự paste vào UI của host — luôn soạn body ở cả 2 chế độ, không bỏ qua.
 - Nếu có GitHub issue liên quan (từ plan hoặc user cung cấp số issue):
   - Thêm `Closes #<issue>` ở ĐẦU PR body (plain text, hoạt động ở cả 2 chế độ)
   - Full gh mode → `gh issue edit <issue>` để append link tới PR vào CUỐI issue body. Degraded mode → in "thêm link PR vào issue #N thủ công" rồi tiếp tục.

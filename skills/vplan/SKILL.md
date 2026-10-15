@@ -36,7 +36,7 @@ If the path doesn't exist → report the error and stop. **Do not create the spe
 
 For EVERY case in the specs (each row of the Decisions table, each Edge Case) — **verify it yourself by reading the code**, don't guess:
 
-As each case's PASS/FAIL/MISSING verdict is determined, append its row directly to a `plan.md` Case Summary table under construction (create the file at the start of Step 2 if it doesn't exist yet) rather than holding the full comparison in conversation memory until Step 4. Leave Handling Phase / Effort blank for now — Step 4 fills those in once phases are assigned.
+As each case's PASS/FAIL/MISSING verdict is determined, append its row directly to a `plan.md` Case Summary table under construction (create `plans/<feature-slug>/plan.md` at the start of Step 2 if it doesn't exist yet — phase files go in the same directory) rather than holding the full comparison in conversation memory until Step 4. Leave Handling Phase / Effort blank for now — Step 4 fills those in once phases are assigned.
 
 **Format for each case:**
 

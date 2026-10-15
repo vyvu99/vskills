@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/run-evals.sh -- trigger + behavior evals for the vci / vreview skills.
+# scripts/run-evals.sh -- trigger evals (vci / vreview / vsweep) + behavior evals (vci / vreview).
 # Usage: bash scripts/run-evals.sh
 #
 # ISOLATION POSTURE (soft containment, NOT a sandbox -- see
@@ -257,6 +257,8 @@ echo "=== Trigger evals: vci ==="
 run_trigger_evals vci
 echo "=== Trigger evals: vreview ==="
 run_trigger_evals vreview
+echo "=== Trigger evals: vsweep ==="
+run_trigger_evals vsweep
 echo "=== Behavior evals: vci ==="
 run_vci_behavior
 echo "=== Behavior evals: vreview ==="

@@ -165,7 +165,8 @@ export function createServer({ stepTimeoutMs = DEFAULT_STEP_TIMEOUT_MS } = {}) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.VSKILLS_WEBAPP_PORT || 4270);
   const stepTimeoutMs = Number(process.env.VSKILLS_WEBAPP_STEP_TIMEOUT_MS || DEFAULT_STEP_TIMEOUT_MS);
-  createServer({ stepTimeoutMs }).listen(port, () => {
-    console.log(`listening on :${port}`);
+  // Loopback only: the API has no auth, so it must not be reachable from the LAN.
+  createServer({ stepTimeoutMs }).listen(port, 'localhost', () => {
+    console.log(`listening on localhost:${port}`);
   });
 }

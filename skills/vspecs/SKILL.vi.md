@@ -3,7 +3,7 @@ name: vspecs
 description: "Tạo và cập nhật file specs cho một feature qua vòng lặp lặp đi lặp lại: đọc codebase → brainstorm edge case → hỏi user → cập nhật file. Hỗ trợ so sánh với sản phẩm khác."
 user-invocable: true
 when_to_use: "Dùng khi muốn viết specs mới hoặc bổ sung specs hiện có cho một feature."
-argument-hint: "Feature: [tên feature]\nCompare: [tên sản phẩm] (tuỳ chọn)"
+argument-hint: "[tên feature] [Compare: tên sản phẩm]"
 metadata:
   author: vyvu
   version: "1.3.1"

@@ -3,7 +3,7 @@ name: vspecs
 description: "Create and update a specs file for a feature through an iterative loop: read the codebase → brainstorm edge cases → ask the user → update the file. Supports comparison with other products."
 user-invocable: true
 when_to_use: "Invoke when you want to create new specs or add to existing specs for a feature."
-argument-hint: "Feature: [feature name]\nCompare: [product name] (optional)"
+argument-hint: "[feature name] [Compare: product name]"
 metadata:
   author: vyvu
   version: "1.3.1"

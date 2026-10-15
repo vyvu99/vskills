@@ -36,7 +36,7 @@ Nếu đường dẫn không tồn tại → báo lỗi và dừng. **Không t�
 
 Với MỌI case trong specs (mỗi dòng của bảng Decisions, mỗi Edge Case) — **tự mình verify bằng cách đọc code**, không được đoán:
 
-Ngay khi verdict PASS/FAIL/MISSING của một case được xác định, ghi luôn dòng đó vào bảng Case Summary của `plan.md` đang được dựng dở (tạo file này ngay từ đầu Bước 2 nếu chưa có) thay vì giữ toàn bộ so sánh trong bộ nhớ hội thoại tới tận Bước 4. Handling Phase / Effort cứ để trống — Bước 4 sẽ điền sau khi phase được gán.
+Ngay khi verdict PASS/FAIL/MISSING của một case được xác định, ghi luôn dòng đó vào bảng Case Summary của `plan.md` đang được dựng dở (tạo `plans/<feature-slug>/plan.md` ngay từ đầu Bước 2 nếu chưa có — các phase file nằm cùng thư mục) thay vì giữ toàn bộ so sánh trong bộ nhớ hội thoại tới tận Bước 4. Handling Phase / Effort cứ để trống — Bước 4 sẽ điền sau khi phase được gán.
 
 **Format cho mỗi case:**
 

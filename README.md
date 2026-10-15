@@ -20,7 +20,7 @@ cd vskills
 ./install.sh --dry-run             # preview only
 ```
 
-Skills are symlinked, not copied — edit either copy, it's the same file. Re-running `install.sh` removes any skill that was deleted from this repo since your last install.
+Skills are symlinked, not copied — edit either copy, it's the same file. Re-running `install.sh` removes any skill that was deleted from this repo since your last install. A real file/dir already at a destination (not a symlink) is moved aside to `<path>.bak.<timestamp>`, never deleted.
 
 ## Skills
 
@@ -48,8 +48,8 @@ Skills are symlinked, not copied — edit either copy, it's the same file. Re-ru
 | Skill | Description | Example |
 |---|---|---|
 | `vci` | Typecheck, build, and lint in parallel across a JS/TS repo; format and optional tests after. Auto-detects the package manager and workspace. | `/vci --changed` |
-| `vdesign` | Redesigns a page or component's UI through a structured scan → audit → fix → verify process. Always starts by asking 18 style questions. | `/vdesign /clients/[id]` |
-| `vsweep` | Runs an unattended, time-boxed sweep through an open-ended backlog (bugs, security, features, tests, docs, refactors): one subagent at a time, finishes clear-cut items with tests + runtime verification, logs ambiguous ones as pending decisions. Resumes later to implement those decisions with the same rigor. | `/vsweep --until 06:00` |
+| `vdesign` | Redesigns a page or component's UI through a structured scan → audit → fix → verify process. Self-decides all 18 style/structure criteria each run from live design research and a read of the real user/task — no upfront questions. | `/vdesign /clients/[id]` |
+| `vsweep` | Runs an unattended, time-boxed sweep through an open-ended body of work of any kind (code, research, writing, data, ops, brainstorming): dispatches subagents (one at a time by default), finishes clear-cut items with verification that fits the work, logs ambiguous ones as pending decisions, and keeps progress in a state file. Optional stop-guard hook (enabled manually — see the header of `skills/vsweep/stop-guard.sh`) keeps it going until the deadline. Resumes later to implement those decisions with the same rigor. | `/vsweep --until 06:00` |
 | `vrollback`* | Rolls back one applied migration on a confirmed-local database and removes its tracking record. Refuses non-local targets. | `/vrollback 0007_add_status` |
 
 Full behavior, flags, and edge cases: `skills/<name>/SKILL.md`.
@@ -107,7 +107,11 @@ vskills/
 ├── skills/<name>/SKILL.vi.md     # Vietnamese, same line count (checked by scripts/check-skills.js)
 ├── skills/<name>/scripts/        # optional, installed with the skill
 ├── skills/<name>/references/     # optional, installed with the skill
+├── skills/<name>/*.sh            # optional root-level helpers (e.g. vsweep/stop-guard.sh), symlinked per file
 ├── skills/_vskills-shared/       # shared reference docs, always symlinked
+├── claude-md/CLAUDE.md           # starter CLAUDE.md, copied with --with-claude-md
+├── evals/                        # trigger + behavior evals (run via scripts/run-evals.sh; calls `claude -p`, billable)
+├── web/                          # local webapp used by vspecs/vfix for visual steps (node web/server.mjs)
 └── scripts/<name>/               # e.g. lint-rules — opt-in, separate from skills/<name>/scripts/
 ```
 
