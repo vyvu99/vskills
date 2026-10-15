@@ -29,7 +29,7 @@
 # hypothetical): with cwd=$tmp + --add-dir "$tmp" + bypassPermissions, a
 # handful of trigger-eval prompts run in an EMPTY temp dir caused the
 # subprocess to read/edit real tracked files in THIS repo
-# (skills/vfix/SKILL.md, skills/vreview/SKILL.md, skills/vci/SKILL.vi.md,
+# (skills/vcook/SKILL.md, skills/vreview/SKILL.md, skills/vci/SKILL.vi.md,
 # etc.) via absolute paths, and to create new files under scripts/. This is
 # exactly the "--add-dir does not hard-confine" risk the plan's Risk
 # Assessment named -- it was not hypothetical, it happened. `--strict-mcp-config`

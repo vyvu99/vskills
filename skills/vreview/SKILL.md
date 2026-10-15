@@ -1,12 +1,12 @@
 ---
 name: vreview
-description: "Reviews a diff, PR, branch, or directory as a senior code reviewer and writes findings to .code-review/REPORT.md, grouped by CRITICAL/WARNING/SUGGESTION. Use before merging changes."
-argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
+description: "Reviews a diff, PR, branch, or directory as a senior code reviewer and writes findings to .code-review/REPORT.md, grouped by CRITICAL/WARNING/SUGGESTION. Read-only by default; fixes findings only when the user explicitly passes `--fix`. Use before merging changes."
+argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs> | report-dir] [--base <branch>] [--exclude <paths>] [--harvest] [--fix]"
 user-invocable: true
-when_to_use: "Invoke to review current branch diff or specific branches/paths with a 4-phase subagent review (plus a mandatory pre-scan and an opt-in lint-harvest phase)."
+when_to_use: "Invoke to review current branch diff or specific branches/paths with a 4-phase subagent review (plus a mandatory pre-scan and an opt-in lint-harvest phase). Add `--fix` ONLY when the user typed it: fixes the report in priority order, or fixes an existing report directory given as the only argument."
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 You are a senior code reviewer, executing the review through 4 core phases (1-4) below, bracketed by a mandatory Phase 0 pre-scan (runs every time once the file list is ready) and an opt-in Phase 5 lint harvest (skipped by default, runs only with `--harvest`), plus a lightweight Phase 4.5 spot-check. Do NOT skip Phase 0-4.5.
@@ -456,7 +456,17 @@ GENERAL RULES
 10. Phase 4.5 spot-check runs inline in the main agent — never spawn a subagent for it.
 
 ═══════════════════════════════════════════════════════
+FIX MODE (`--fix` — opt-in; a normal review never edits code)
+═══════════════════════════════════════════════════════
+
+Everything above only reads code and writes `.code-review/`. Fixing happens ONLY when the user typed `--fix` themselves — never add it on your own and never infer it from words like "fix" or "resolve" in the request.
+- `--fix` with something to review → run Phase 0-5 above unchanged, THEN fix mode on the fresh report.
+- `--fix` with only a report directory (positional arg: an existing directory containing `REPORT.md`; no branch/PR/`--path`/`--since`) → skip the review, run fix mode directly on that report.
+- Fix mode: read `references/fix-mode.md` now (not before) and follow it exactly — fixed priority order (lint → CRITICAL → WARNING → cross-group → SUGGESTION asked per item), batching, STOP-GATE, verify + commit per batch, `Status:` write-back, wrap-up.
+- Safety: STOP-GATE (business ambiguity, DB migration, shared package, data UPDATE/DELETE) applies to every fix and always asks the user; fix mode commits to the current branch, never pushes, and never deletes the report directory unconfirmed.
+
+═══════════════════════════════════════════════════════
 NEXT STEPS
 ═══════════════════════════════════════════════════════
 
-Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly. (see the shared convention in `_vskills-shared/repo-profile.md` §7)
+Look at what REPORT.md actually found and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly. (see the shared convention in `_vskills-shared/repo-profile.md` §7)

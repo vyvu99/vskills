@@ -1,6 +1,6 @@
 # Webapp interactive step — convention dùng chung
 
-Dùng khi 1 skill (`vfix`/`vspecs`...) cần hỏi user bằng UI trực quan
+Dùng khi 1 skill (`vreview --fix`/`vspecs`...) cần hỏi user bằng UI trực quan
 (màu/font/motion, hoặc duyệt hàng loạt diff) thay vì `AskUserQuestion` text-only.
 Server + frontend nằm ở `web/` (xem `web/README.md` để chạy thủ công/debug).
 

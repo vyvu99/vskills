@@ -33,8 +33,7 @@ Skills are symlinked, not copied — edit either copy, it's the same file. Re-ru
 | `vspecs` | Writes or updates a feature's specs: researches the codebase and real-world usage, then works through edge cases with you. Output is plain language only — no code, no file references. | `/vspecs Feature: appointment rebooking` |
 | `vplan` | Turns a specs file into a phased implementation plan, verifying every case against the actual code (PASS/FAIL/MISSING). | `/vplan plans/specs/appointment-rebooking.md` |
 | `vcook`* | Implements a plan or task end to end: branch, tests first, code, generated-SDK-only API calls, CLAUDE.md review, PR. Stops on a dirty working tree or a plan/code mismatch. | `/vcook plans/appointment-rebooking` |
-| `vreview` | Reviews a diff, PR, branch, or directory: lint pre-scan, parallel per-file review, synthesis, and an adversarial pass. Writes `.code-review/REPORT.md`. | `/vreview #482` |
-| `vfix`* | Fixes a `vreview` report in priority order — lint, Critical, Warning, cross-group, Suggestion. Stops to confirm anything risky. | `/vfix` |
+| `vreview` | Reviews a diff, PR, branch, or directory: lint pre-scan, parallel per-file review, synthesis, and an adversarial pass. Writes `.code-review/REPORT.md`. Read-only by default; add `--fix` to then fix the report in priority order (lint, Critical, Warning, cross-group, Suggestion), stopping to confirm anything risky — or pass an existing report directory to fix it directly. | `/vreview #482` · `/vreview --fix` |
 
 ### GitHub tracking
 
@@ -62,7 +61,7 @@ flowchart LR
     specs --> plan["/vplan"]
     plan --> cook["/vcook"]
     cook --> review["/vreview"]
-    review --> fix["/vfix"]
+    review --> fix["/vreview --fix"]
     fix -. more issues found .-> review
     fix --> ship(["ship"])
 
@@ -84,7 +83,7 @@ flowchart LR
 ├─ "Specs are ready, need an implementation plan"  → /vplan
 ├─ "Have a plan (or just a quick task), need code" → /vcook
 ├─ "Need to review a branch or PR"                 → /vreview
-├─ "Have a review report, need to fix it"          → /vfix
+├─ "Have a review report, need to fix it"          → /vreview --fix
 ├─ "Want a typecheck/build sanity check"           → /vci
 ├─ "Need to track a plan on GitHub"                → /vtickets
 ├─ "Have a GitHub epic, want it built unattended"  → /vautocook
@@ -111,7 +110,7 @@ vskills/
 ├── skills/_vskills-shared/       # shared reference docs, always symlinked
 ├── claude-md/CLAUDE.md           # starter CLAUDE.md, copied with --with-claude-md
 ├── evals/                        # trigger + behavior evals (run via scripts/run-evals.sh; calls `claude -p`, billable)
-├── web/                          # local webapp used by vspecs/vfix for visual steps (node web/server.mjs)
+├── web/                          # local webapp used by vspecs/vreview --fix for visual steps (node web/server.mjs)
 └── scripts/<name>/               # e.g. lint-rules — opt-in, separate from skills/<name>/scripts/
 ```
 

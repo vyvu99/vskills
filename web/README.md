@@ -1,6 +1,6 @@
 # vskills webapp
 
-Local interactive webapp shared by `vfix`/`vspecs` for steps that need
+Local interactive webapp shared by `vreview --fix`/`vspecs` for steps that need
 a visual UI (colors, fonts, batch diff review) instead of chat-only
 `AskUserQuestion`. See `skills/_vskills-shared/webapp-templates.md` for the
 JSON contract and how a skill drives this from Claude.

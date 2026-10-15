@@ -9,6 +9,8 @@
   { "query": "review the files under apps/api/src/services for bugs", "should_trigger": true },
   { "query": "give me a thorough review of this commit", "should_trigger": true },
   { "query": "run vreview on this branch", "should_trigger": true },
+  { "query": "run vreview --fix on this branch and fix what it finds", "should_trigger": true },
+  { "query": "vreview --fix .code-review/ to fix the existing report", "should_trigger": true },
   { "query": "explain what this function does", "should_trigger": false },
   { "query": "run typecheck and build on this repo", "should_trigger": false },
   { "query": "write unit tests for the auth service", "should_trigger": false },

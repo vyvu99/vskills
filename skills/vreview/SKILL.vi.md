@@ -1,12 +1,12 @@
 ---
 name: vreview
-description: "Review một diff, PR, branch, hoặc directory với vai trò reviewer code senior, ghi finding vào .code-review/REPORT.md, nhóm theo CRITICAL/WARNING/SUGGESTION. Dùng trước khi merge."
-argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs>] [--base <branch>] [--exclude <paths>] [--harvest]"
+description: "Review một diff, PR, branch, hoặc directory với vai trò reviewer code senior, ghi finding vào .code-review/REPORT.md, nhóm theo CRITICAL/WARNING/SUGGESTION. Mặc định chỉ đọc; chỉ fix finding khi user truyền `--fix` một cách tường minh. Dùng trước khi merge."
+argument-hint: "[branches | #PR | PR-URL | --since <dur> | --path <dirs> | report-dir] [--base <branch>] [--exclude <paths>] [--harvest] [--fix]"
 user-invocable: true
-when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase (kèm phase pre-scan bắt buộc và phase lint-harvest tùy chọn)."
+when_to_use: "Dùng để review diff của branch hiện tại hoặc các branch/path cụ thể với review subagent 4 phase (kèm phase pre-scan bắt buộc và phase lint-harvest tùy chọn). Chỉ thêm `--fix` KHI user đã gõ: fix report theo thứ tự ưu tiên, hoặc fix một report directory có sẵn nếu đó là argument duy nhất."
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 Bạn là một reviewer code senior, thực hiện review qua 4 phase cốt lõi (1-4) bên dưới, bao quanh bởi Phase 0 pre-scan bắt buộc (luôn chạy ngay khi có file list) và Phase 5 lint harvest tùy chọn (mặc định bỏ qua, chỉ chạy với `--harvest`), cộng thêm Phase 4.5 spot-check nhẹ. KHÔNG được bỏ qua Phase 0-4.5.
@@ -456,7 +456,17 @@ QUY TẮC CHUNG
 10. Phase 4.5 spot-check chạy inline trong main agent — không bao giờ spawn subagent cho nó.
 
 ═══════════════════════════════════════════════════════
+CHẾ ĐỘ FIX (`--fix` — opt-in; review thường không bao giờ sửa code)
+═══════════════════════════════════════════════════════
+
+Mọi thứ phía trên chỉ đọc code và ghi `.code-review/`. Fix CHỈ xảy ra khi user tự gõ `--fix` — không bao giờ tự thêm và không suy ra từ các từ như "fix" hay "sửa" trong yêu cầu.
+- `--fix` kèm thứ cần review → chạy Phase 0-5 phía trên nguyên vẹn, SAU ĐÓ chạy chế độ fix trên report vừa sinh.
+- `--fix` chỉ kèm một report directory (positional arg: thư mục đã tồn tại và chứa `REPORT.md`; không có branch/PR/`--path`/`--since`) → bỏ qua review, chạy thẳng chế độ fix trên report đó.
+- Chế độ fix: đọc `references/fix-mode.vi.md` ngay bây giờ (không đọc trước) và làm đúng theo đó — thứ tự ưu tiên cố định (lint → CRITICAL → WARNING → cross-group → SUGGESTION hỏi từng item), gom batch, STOP-GATE, verify + commit từng batch, ghi `Status:` về report, wrap-up.
+- An toàn: STOP-GATE (mơ hồ business, DB migration, shared package, UPDATE/DELETE data) áp dụng cho mọi fix và luôn hỏi user; chế độ fix commit lên branch hiện tại, không bao giờ push, và không bao giờ xoá report directory khi chưa xác nhận.
+
+═══════════════════════════════════════════════════════
 BƯỚC TIẾP THEO
 ═══════════════════════════════════════════════════════
 
-Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vfix, vci, vtickets, vdesign, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn. (xem convention chung ở `_vskills-shared/repo-profile.md` §7)
+Nhìn vào những gì REPORT.md thực sự tìm thấy và tự đề xuất MỘT hành động tiếp theo hợp lý, 1-2 câu — không chọn theo danh sách cố định. Cân nhắc các skill khác trong bộ này (vspecs, vplan, vcook, vreview, vci, vtickets, vdesign, vrollback) nếu thực sự phù hợp; nếu không cần gì thêm thì nói rõ luôn. (xem convention chung ở `_vskills-shared/repo-profile.md` §7)

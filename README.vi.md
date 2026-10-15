@@ -33,8 +33,7 @@ Skill được symlink chứ không copy — sửa ở đâu cũng là cùng 1 f
 | `vspecs` | Viết/cập nhật specs: research codebase + cách người dùng thật đang làm, rồi cùng bạn đi qua từng edge case. Output chỉ ngôn ngữ thường — không code, không file:line. | `/vspecs Feature: đặt lịch tái khám` |
 | `vplan` | Biến 1 file specs thành plan theo từng phase, verify từng case với code thật (PASS/FAIL/MISSING). | `/vplan plans/specs/dat-lich-tai-kham.md` |
 | `vcook`* | Implement 1 plan hoặc task từ đầu tới cuối: branch, viết test trước, code, chỉ dùng generated SDK, review theo CLAUDE.md, mở PR. Dừng lại nếu working tree dơ hoặc plan lệch code. | `/vcook plans/dat-lich-tai-kham` |
-| `vreview` | Review 1 diff/PR/branch/thư mục: pre-scan lint, review song song theo file, tổng hợp, và 1 lượt adversarial. Ghi `.code-review/REPORT.md`. | `/vreview #482` |
-| `vfix`* | Fix report của `vreview` theo thứ tự ưu tiên — lint, Critical, Warning, cross-group, Suggestion. Dừng lại hỏi trước bất kỳ thứ gì rủi ro. | `/vfix` |
+| `vreview` | Review 1 diff/PR/branch/thư mục: pre-scan lint, review song song theo file, tổng hợp, và 1 lượt adversarial. Ghi `.code-review/REPORT.md`. Mặc định chỉ đọc; thêm `--fix` để fix report theo thứ tự ưu tiên (lint, Critical, Warning, cross-group, Suggestion), dừng lại hỏi trước bất kỳ thứ gì rủi ro — hoặc truyền một report directory có sẵn để fix thẳng. | `/vreview #482` · `/vreview --fix` |
 
 ### Track trên GitHub
 
@@ -62,7 +61,7 @@ flowchart LR
     specs --> plan["/vplan"]
     plan --> cook["/vcook"]
     cook --> review["/vreview"]
-    review --> fix["/vfix"]
+    review --> fix["/vreview --fix"]
     fix -. còn phát hiện thêm vấn đề .-> review
     fix --> ship(["ship"])
 
@@ -84,7 +83,7 @@ flowchart LR
 ├─ "Đã có specs, cần lập plan implementation"     → /vplan
 ├─ "Đã có plan (hoặc chỉ 1 task nhanh), cần code" → /vcook
 ├─ "Cần review 1 branch/PR"                       → /vreview
-├─ "Có report review, cần fix"                    → /vfix
+├─ "Có report review, cần fix"                    → /vreview --fix
 ├─ "Cần check nhanh typecheck/build"              → /vci
 ├─ "Cần track 1 plan trên GitHub"                 → /vtickets
 ├─ "Có 1 epic GitHub, muốn build không cần canh"  → /vautocook
@@ -111,7 +110,7 @@ vskills/
 ├── skills/_vskills-shared/       # reference dùng chung, luôn symlink
 ├── claude-md/CLAUDE.md           # CLAUDE.md starter, được copy khi dùng --with-claude-md
 ├── evals/                        # eval trigger + behavior (chạy bằng scripts/run-evals.sh; gọi `claude -p`, tốn phí)
-├── web/                          # webapp local cho vspecs/vfix ở các bước cần UI (node web/server.mjs)
+├── web/                          # webapp local cho vspecs/vreview --fix ở các bước cần UI (node web/server.mjs)
 └── scripts/<name>/               # vd lint-rules — opt-in, khác với skills/<name>/scripts/
 ```
 
