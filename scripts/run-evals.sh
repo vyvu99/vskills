@@ -1,6 +1,7 @@
 #!/bin/bash
-# scripts/run-evals.sh -- trigger evals (vci / vreview / vsweep) + behavior evals (vci / vreview).
-# Usage: bash scripts/run-evals.sh
+# scripts/run-evals.sh -- trigger evals (vci / vreview / vsweep / vdesign / vspecs / vplan) + behavior evals (vci / vreview / vcook).
+# Usage: bash scripts/run-evals.sh [skill ...]   (no args = everything; e.g. `bash scripts/run-evals.sh vplan vcook`)
+#   A name selects that skill's trigger evals and/or behavior eval. Runs sequentially (concurrency 1).
 #
 # ISOLATION POSTURE (soft containment, NOT a sandbox -- see
 # plans/260909-1608-vskills-review-triage-batch2/phase-03-eval-infrastructure.md):
@@ -82,7 +83,11 @@ RESULTS=()   # "skill|eval_type|name|VERDICT|detail" rows for the final table
 # stream-json transcript to "$tmp_dir/claude_stream.jsonl".
 run_claude() {
   local tmp="$1" prompt="$2"
+  # Load only this repo's skills (project source), not the machine's global ones: skills like
+  # ck:code-review or ck:test otherwise win the trigger and the result depends on the machine.
+  mkdir -p "$tmp/.claude/skills" && ln -sfn "$REPO_ROOT"/skills/* "$tmp/.claude/skills/"
   (cd "$tmp" && $TIMEOUT_CMD claude -p "$prompt" \
+    --setting-sources project \
     --output-format stream-json --verbose \
     --add-dir "$tmp" \
     --permission-mode bypassPermissions \
@@ -130,6 +135,19 @@ final_result_text() {
   jq -s -r '[.[]? | select(.type=="result")] | last | .result // ""' "$1" 2>/dev/null
 }
 
+# make_trigger_repo <dir> -- tiny realistic git repo: main = package.json + tsconfig + specs file +
+# vreview's "before" sources; branch feature/orders-search = vreview's "after" sources (a real diff
+# to review). Without a repo, the model answers directly instead of invoking a skill.
+make_trigger_repo() {
+  local d="$1" g="git -C $1 -c user.name=eval -c user.email=eval@example.com"
+  cp -r "$EVALS_DIR/trigger/fixture/." "$d/"
+  cp -r "$EVALS_DIR/behavior/vreview/fixtures/before/src" "$d/src"
+  git -C "$d" init -q -b main && $g add -A && $g commit -q -m "chore: initial orders api"
+  git -C "$d" checkout -q -b feature/orders-search
+  rm -rf "$d/src" && cp -r "$EVALS_DIR/behavior/vreview/fixtures/after/src" "$d/src"
+  $g add -A && $g commit -q -m "feat: orders search"
+}
+
 run_trigger_evals() {
   local skill="$1"
   local file="$EVALS_DIR/trigger/$skill.json"
@@ -140,6 +158,7 @@ run_trigger_evals() {
     query=$(jq -r ".[$i].query" "$file")
     should_trigger=$(jq -r ".[$i].should_trigger" "$file")
     tmp=$(mktemp -d)
+    make_trigger_repo "$tmp"
     guarded_run_claude "$tmp" "$query" "trigger/$skill: $query"
     invoked="false"
     skill_invoked "$tmp/claude_stream.jsonl" "$skill" && invoked="true"
@@ -253,16 +272,51 @@ run_vreview_behavior() {
   rm -rf "$tmp"
 }
 
-echo "=== Trigger evals: vci ==="
-run_trigger_evals vci
-echo "=== Trigger evals: vreview ==="
-run_trigger_evals vreview
-echo "=== Trigger evals: vsweep ==="
-run_trigger_evals vsweep
-echo "=== Behavior evals: vci ==="
-run_vci_behavior
-echo "=== Behavior evals: vreview ==="
-run_vreview_behavior
+run_vcook_behavior() {
+  local meta="$EVALS_DIR/behavior/vcook/eval_metadata.json"
+  local prompt tmp text branch verdict="PASS" detail="" cmd
+  prompt=$(jq -r '.prompt' "$meta")
+  tmp=$(mktemp -d)
+  cp -r "$EVALS_DIR/behavior/vcook/fixtures/." "$tmp/"
+  git -C "$tmp" init -q -b main && git -C "$tmp" add -A \
+    && git -C "$tmp" -c user.name=eval -c user.email=eval@example.com commit -q -m "chore: initial"
+
+  guarded_run_claude "$tmp" "$prompt" "behavior/vcook"
+  if [ "$BREACH" -eq 1 ]; then
+    FAIL=$((FAIL + 1))
+    RESULTS+=("vcook|behavior|claude-md-no-branch|FAIL|CONTAINMENT BREACH -- reverted, see stderr above")
+    echo "[FAIL] behavior/vcook -- CONTAINMENT BREACH, reverted (see stderr above)"
+    rm -rf "$tmp"
+    return
+  fi
+  # Three checks: still on main, no forbidden command in any Bash tool_use, answer asks about the rule.
+  branch=$(git -C "$tmp" rev-parse --abbrev-ref HEAD)
+  [ "$branch" = "$(jq -r '.assertions.branch_unchanged' "$meta")" ] || { verdict="FAIL"; detail="$detail branch=$branch;"; }
+  while IFS= read -r cmd; do
+    if jq -s -e --arg c "$cmd" 'any(.[]?; .type=="assistant" and ((.message.content // [])
+        | any(.type=="tool_use" and .name=="Bash" and ((.input.command // "") | contains($c)))))' \
+        "$tmp/claude_stream.jsonl" >/dev/null 2>&1; then
+      verdict="FAIL"; detail="$detail ran \"$cmd\";"
+    fi
+  done < <(jq -r '.assertions.forbidden_commands[]' "$meta")
+  text=$(final_result_text "$tmp/claude_stream.jsonl")
+  echo "$text" | grep -qiE "$(jq -r '.assertions.output_must_match' "$meta")" || { verdict="FAIL"; detail="$detail output did not ask about the rule;"; }
+  if [ "$verdict" = "PASS" ]; then PASS=$((PASS + 1)); detail="stayed on main, asked first"; else FAIL=$((FAIL + 1)); fi
+  RESULTS+=("vcook|behavior|claude-md-no-branch|$verdict|$detail")
+  echo "[$verdict] behavior/vcook: $detail"
+  rm -rf "$tmp"
+}
+
+# no args = run everything; otherwise only the named skills
+SELECTED=("$@")
+want_skill() { [ "${#SELECTED[@]}" -eq 0 ] && return 0; local a; for a in "${SELECTED[@]}"; do [ "$a" = "$1" ] && return 0; done; return 1; }
+
+for s in vci vreview vsweep vdesign vspecs vplan; do
+  if want_skill "$s"; then echo "=== Trigger evals: $s ==="; run_trigger_evals "$s"; fi
+done
+want_skill vci && { echo "=== Behavior evals: vci ==="; run_vci_behavior; }
+want_skill vreview && { echo "=== Behavior evals: vreview ==="; run_vreview_behavior; }
+want_skill vcook && { echo "=== Behavior evals: vcook ==="; run_vcook_behavior; }
 
 echo ""
 echo "=== Summary ==="

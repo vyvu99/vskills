@@ -1,0 +1,8 @@
+{
+  "prompt": "/vcook add a farewell(name) function next to greet in src/index.ts",
+  "assertions": {
+    "branch_unchanged": "main",
+    "forbidden_commands": ["git checkout -b", "git switch -c", "git branch ", "gh pr create"],
+    "output_must_match": "branch|CLAUDE\\.md|confirm|permission|before I"
+  }
+}

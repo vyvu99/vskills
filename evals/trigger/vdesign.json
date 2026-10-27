@@ -1,0 +1,58 @@
+[
+  {
+    "query": "redesign the orders page, it looks outdated",
+    "should_trigger": true
+  },
+  {
+    "query": "make the checkout form look and feel better",
+    "should_trigger": true
+  },
+  {
+    "query": "modernize the settings screen UI",
+    "should_trigger": true
+  },
+  {
+    "query": "upgrade the UX of the existing dashboard component",
+    "should_trigger": true
+  },
+  {
+    "query": "redesign the UI of the pages changed in this PR diff",
+    "should_trigger": true
+  },
+  {
+    "query": "the login page feels cluttered, redesign it to be cleaner and accessible",
+    "should_trigger": true
+  },
+  {
+    "query": "build a new page from scratch for user onboarding",
+    "should_trigger": false
+  },
+  {
+    "query": "create a brand new landing page",
+    "should_trigger": false
+  },
+  {
+    "query": "review my branch for bugs",
+    "should_trigger": false
+  },
+  {
+    "query": "fix the button color on line 12 of Button.tsx",
+    "should_trigger": false
+  },
+  {
+    "query": "run typecheck and build on the repo",
+    "should_trigger": false
+  },
+  {
+    "query": "implement the feature from this plan and open a PR",
+    "should_trigger": false
+  },
+  {
+    "query": "critique this design without changing anything",
+    "should_trigger": false
+  },
+  {
+    "query": "write specs for the checkout feature",
+    "should_trigger": false
+  }
+]

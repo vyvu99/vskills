@@ -1,0 +1,58 @@
+[
+  {
+    "query": "make an implementation plan from plans/specs/orders-search.md",
+    "should_trigger": true
+  },
+  {
+    "query": "compare the specs file with the current code and list what is missing",
+    "should_trigger": true
+  },
+  {
+    "query": "turn this specs file into phases I can feed to vcook",
+    "should_trigger": true
+  },
+  {
+    "query": "do a gap analysis of plans/specs/orders-search.md against the code",
+    "should_trigger": true
+  },
+  {
+    "query": "write plan.md and phase files for the orders search specs",
+    "should_trigger": true
+  },
+  {
+    "query": "which cases in the orders-search specs are already passing in the code?",
+    "should_trigger": true
+  },
+  {
+    "query": "write specs for the orders search feature",
+    "should_trigger": false
+  },
+  {
+    "query": "add edge cases to the specs file",
+    "should_trigger": false
+  },
+  {
+    "query": "implement the plan and open a PR",
+    "should_trigger": false
+  },
+  {
+    "query": "review my branch for bugs",
+    "should_trigger": false
+  },
+  {
+    "query": "run typecheck and build on this repo",
+    "should_trigger": false
+  },
+  {
+    "query": "redesign the orders page",
+    "should_trigger": false
+  },
+  {
+    "query": "fix the failing test in orders-service.ts",
+    "should_trigger": false
+  },
+  {
+    "query": "plan my vacation itinerary for next week",
+    "should_trigger": false
+  }
+]

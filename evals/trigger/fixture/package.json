@@ -1,0 +1,6 @@
+{
+  "name": "orders-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "typecheck": "tsc --noEmit", "build": "tsc", "lint": "eslint src" }
+}

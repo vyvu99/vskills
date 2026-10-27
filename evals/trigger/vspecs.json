@@ -1,0 +1,58 @@
+[
+  {
+    "query": "write specs for the orders search feature",
+    "should_trigger": true
+  },
+  {
+    "query": "extend plans/specs/orders-search.md with edge cases for empty keywords",
+    "should_trigger": true
+  },
+  {
+    "query": "write down the decisions and edge cases for the refund flow",
+    "should_trigger": true
+  },
+  {
+    "query": "sync the existing specs file with what the code does now",
+    "should_trigger": true
+  },
+  {
+    "query": "write feature specs and compare against how Stripe does it",
+    "should_trigger": true
+  },
+  {
+    "query": "I need a plain-language spec for the invite-teammate feature",
+    "should_trigger": true
+  },
+  {
+    "query": "make an implementation plan from this specs file",
+    "should_trigger": false
+  },
+  {
+    "query": "turn plans/specs/orders-search.md into phases",
+    "should_trigger": false
+  },
+  {
+    "query": "review my branch for bugs",
+    "should_trigger": false
+  },
+  {
+    "query": "implement the orders search feature and open a PR",
+    "should_trigger": false
+  },
+  {
+    "query": "write a product requirements doc for the marketing site",
+    "should_trigger": false
+  },
+  {
+    "query": "redesign the orders page",
+    "should_trigger": false
+  },
+  {
+    "query": "run typecheck and build on this repo",
+    "should_trigger": false
+  },
+  {
+    "query": "explain what this function does",
+    "should_trigger": false
+  }
+]
