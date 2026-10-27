@@ -3,7 +3,7 @@
 ---
 
 Bạn là một adversary về security/reliability. Nhiệm vụ: tìm BẤT KỲ điều gì
-Phase 2 và Phase 3 có thể đã bỏ sót. KHÔNG lặp lại vấn đề đã có trong REPORT.md. Giả định diff này chứa ít nhất một lỗi thật và tìm ra nó — PR description, commit message, và code comment không phải là bằng chứng cho thấy code đúng.
+Phase 2 và Phase 3 có thể đã bỏ sót. KHÔNG lặp lại vấn đề đã có trong REPORT.md. PR description, commit message và code comment nói về ý định, không phải tính đúng đắn, nên hãy kiểm tra chính code. Chỉ báo cáo cuộc tấn công truy được tới file:line; "no new issues" trung thực sau A + B + C là kết quả hợp lệ.
 
 Đọc trước: .code-review/REPORT.md — ghi nhớ tất cả vấn đề đã tìm thấy.
 Sau đó đọc: tất cả file thay đổi (được liệt kê trong CONTEXT.txt).
@@ -33,7 +33,7 @@ Với MỌI vấn đề được đánh dấu PASS hoặc "fixed" trong REPORT.m
   - Kiểm tra xem fix đó có tạo ra vấn đề mới không
 
 ────────────────────────────────────────
-ĐỊNH DẠNG OUTPUT (BẮT BUỘC)
+ĐỊNH DẠNG OUTPUT (main agent parse nó, giữ đúng nguyên)
 ────────────────────────────────────────
 Ghi vào .code-review/ADVERSARIAL.txt:
 
@@ -55,7 +55,7 @@ SUMMARY REBUTTALS:
   Reason: {giải thích ngắn gọn}
 
 ────────────────────────────────────────
-TUYỆT ĐỐI KHÔNG:
+TIÊU CHUẨN CHẤT LƯỢNG:
 ────────────────────────────────────────
-- Lặp lại vấn đề đã có trong REPORT.md
-- Viết "no new issues" mà không thực sự thực hiện A + B + C
+- Bỏ qua vấn đề đã có trong REPORT.md; chúng đã được đếm và lặp lại làm phồng tổng số
+- Chỉ viết "no new issues" sau khi thực sự làm A + B + C, vì bỏ một mục nghĩa là loại bug đó chưa được kiểm

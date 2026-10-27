@@ -1,168 +1,103 @@
 ---
 name: vtickets
-description: "Tạo/đồng bộ 1 GitHub epic issue + sub-issues từ 1 plan directory, dùng gh CLI + REST sub_issues API (GraphQL addSubIssue làm fallback). Nội dung issue phi kỹ thuật, migration được gộp vào sub-issue chứa nội dung phase 1. Idempotent — chạy lại không tạo trùng."
+description: "Tạo hoặc đồng bộ một epic issue GitHub cùng các sub-issue được link từ một thư mục plan (plan.md + phase-XX-*.md), dùng gh CLI và REST sub_issues API. Nội dung issue phi kỹ thuật, migration gom vào một sub-issue, chạy lại thì cập nhật chứ không tạo trùng. Chạy tường minh bằng /vtickets <plan-path>."
 argument-hint: "<plan-path>"
 user-invocable: true
 disable-model-invocation: true
-when_to_use: "Dùng khi cần tạo hoặc đồng bộ GitHub epic + sub-issues từ 1 plan có sẵn (plan.md + phase-XX-*.md)."
+when_to_use: "Dùng khi user muốn biến một plan có sẵn thành epic GitHub kèm sub-issue, hoặc đồng bộ lại epic đã tạo sau khi plan thay đổi."
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "2.0.0"
 ---
 
 # vtickets
 
-Tạo hoặc đồng bộ 1 GitHub epic issue + sub-issues từ 1 plan directory, dùng `gh` CLI. Idempotent — chạy lần thứ hai sẽ update thay vì tạo trùng.
-
-Đọc input từ user:
+Biến một thư mục plan thành epic GitHub kèm các sub-issue được link. Skill này tạo và sửa issue thật nên chỉ chạy khi user gọi. Phạm vi là các issue và `<plan-path>/issues.md`, không đổi code.
 
 ```
 $ARGUMENTS
 ```
 
-Nếu `$ARGUMENTS` rỗng — hỏi user đường dẫn đến plan directory (ví dụ `plans/<slug>/`).
+Nếu `$ARGUMENTS` rỗng, hỏi thư mục plan (ví dụ `plans/<slug>/`).
 
----
+## Bước 0 — VCS profile
 
-## Bước 0 — Xác định VCS profile
-
-Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (nếu có; nếu không có, giả định GitHub + gh — mặc định hiện tại). Full gh mode → tiếp tục như bình thường bên dưới. Degraded/local-only → in thông báo §2 dành cho vtickets (link sub-issue — cả REST `sub_issues` lẫn GraphQL `addSubIssue` fallback — đều là API riêng của GitHub, không có tương đương ở host khác), rồi vẫn làm Bước 1 (đọc plan) và Bước 4 (soạn nội dung issue), in ra nội dung epic + sub-issue sẵn sàng để paste — đánh dấu sub-issue nào chứa migration theo Bước 5. KHÔNG BAO GIỜ abort chỉ vì thiếu `gh`.
+Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2; file không có thì giả định GitHub + gh. Ở full gh mode, làm tiếp bên dưới. Ở chế độ degraded hoặc local-only, in thông điệp vtickets của §2 (link sub-issue là API riêng của GitHub), chỉ làm Bước 1 và 4, rồi in body epic và sub-issue sẵn để dán, đánh dấu sub-issue chứa migration theo Bước 5. Thiếu `gh` không bao giờ làm dừng cả lượt chạy.
 
 ## Bước 1 — Đọc plan
 
-- Đọc `<plan-path>/plan.md` + TẤT CẢ các file `<plan-path>/phase-XX-*.md` liên quan
-- Hiểu toàn bộ scope: tên feature, các phase, và phase nào đụng đến database/migration
+Đọc `<plan-path>/plan.md` và mọi `phase-XX-*.md`. Ghi nhận tên feature, các phase, và phase nào đụng database hay migration.
 
-## Bước 2 — Tìm/tạo Epic issue
+## Bước 2 — Tìm hoặc tạo epic
 
-Các lệnh này giả định đang ở full gh mode từ Bước 0; ở chế độ degraded, làm theo hướng dẫn thủ công ở Bước 0 thay thế.
+Dùng kết quả đầu tiên của chuỗi sau, check rẻ nhất trước:
 
-Tìm epic theo chuỗi fallback sau, check nào rẻ nhất và đáng tin nhất trước — dừng ngay khi tìm thấy:
-
-1. **Local cache** (nhanh nhất, nhưng chỉ dùng được trên cùng máy) — nếu `<plan-path>/issues.md` tồn tại, đọc dòng epic từ đó và dùng thẳng số issue này.
-2. **Marker search** (sống sót qua clone mới trên máy khác) — mọi epic do skill này tạo đều embed 1 marker ẩn `<!-- vplan: <plan-slug> -->` trong body (xem bước 5 bên dưới), với `<plan-slug>` là basename của plan directory, kebab-case (theo đúng convention slug đã dùng ở nơi khác trong bộ này, ví dụ `[feature-slug]` ở vspecs/vplan). Search marker này, rồi xác nhận khớp chính xác — search của GitHub là fuzzy/tokenized nên chỉ coi kết quả là ứng viên, chưa phải bằng chứng:
-   ```
+1. `<plan-path>/issues.md` tồn tại: lấy số epic từ đó (chỉ đúng trên cùng máy).
+2. Tìm theo marker, sống sót qua clone mới. Mọi epic tạo ở đây có `<!-- vplan: <plan-slug> -->` ở dòng đầu body, với `<plan-slug>` là basename kebab-case của thư mục plan. Marker giữ tên `vplan` cũ vì đổi tên sẽ làm mồ côi các epic đã có. Search của GitHub là fuzzy nên chỉ coi kết quả là ứng viên, và xác nhận đúng chuỗi trong `body` của từng cái:
+   ```bash
    gh issue list --search "\"vplan: <plan-slug>\" in:body" --state all --json number,title,url,body
    ```
-   Grep `body` của từng ứng viên để tìm đúng chuỗi `<!-- vplan: <plan-slug> -->` trước khi tin đó là epic.
-3. **Title search** (phương án cuối cùng — dành cho epic tạo trước khi có marker, hoặc body bị sửa mất marker):
-   ```
+3. Tìm theo title, cho epic có trước marker hoặc bị sửa mất marker. Title khớp rõ ràng thì đó là epic:
+   ```bash
    gh issue list --search "<keyword from plan name>" --state all --json number,title,url,labels
    ```
-   Nếu tìm thấy issue title tương đồng cao → dùng nó làm epic, **KHÔNG tạo mới**.
-4. Nếu cả 3 cách trên đều không tìm thấy → kiểm tra xem label `epic` đã tồn tại trong repo chưa:
-   ```
-   gh label list
-   ```
-   - Label `epic` đã tồn tại → tạo issue với `--label epic`
-   - Chưa tồn tại → **STOP, hỏi user** có muốn tạo label mới không (không bao giờ tự tạo label mà không xác nhận)
-5. Tạo epic mới — embed marker làm dòng đầu tiên của body, trước nội dung Bước 4:
-   ```
-   gh issue create --title "<feature name, in English>" --body "<!-- vplan: <plan-slug> -->
-
-   <epic description, see Step 4>" --label epic
-   ```
-6. Lấy node ID của epic — chỉ cần cho GraphQL fallback ở Bước 3, không cần cho REST path (`<owner>`/`<repo>` xác định theo §2):
-   ```
-   gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id}}}' -f owner=<owner> -f repo=<repo> -F number=<epic_number>
+4. Không thấy gì: kiểm tra `gh label list`. Có `epic` thì tạo với `--label epic`. Chưa có thì hỏi user trước khi tạo label, vì label là trạng thái dùng chung của repo.
+5. Tạo epic. Body issue là text nhiều dòng có dấu nháy và backtick, nên ghi body (dòng marker trước, rồi nội dung Bước 4) vào file tạm và truyền bằng `--body-file`:
+   ```bash
+   gh issue create --title "<feature name, English>" --body-file <temp-file> --label epic
    ```
 
-## Bước 3 — Tạo/cập nhật sub-issues
+## Bước 3 — Tạo, cập nhật và link sub-issue
 
-1. Gom các phase của plan thành sub-issues theo mảng công việc — **KHÔNG** tạo mỗi phase nhỏ 1 sub-issue riêng; các phase liên quan (cùng layer, cùng feature slice) phải gộp vào 1 sub-issue. Tránh tạo quá nhiều issue. Đặt title của mỗi sub-issue theo cách **deterministic**, suy ra trực tiếp từ số phase/mảng công việc mà nó bao phủ (ví dụ 1 template cố định như `<Tên mảng> (Phase N-M)`) — không phrase tự do có thể đổi khác giữa các lần chạy, để check dedupe ở bước 3 luôn khớp đúng title khi chạy lại.
-2. Trước khi tạo/cập nhật hoặc link bất kỳ sub-issue nào, fetch danh sách sub-issues hiện tại của epic **một lần duy nhất cho mỗi lần chạy skill** (REST, `<owner>`/`<repo>` theo §2) — cache danh sách này (`id`, `number`, `title`) và tái dùng cho check dedupe khi tạo ở bước 3, check "đã link chưa" ở bước 5, LẪN check giới hạn số lượng, không fetch lại nhiều lần:
-   ```
+1. Gom phase thành sub-issue theo vùng việc (cùng layer hoặc cùng lát cắt feature). Mỗi phase nhỏ một sub-issue chỉ tạo nhiễu. Đặt title từ một template cố định như `<Area name> (Phase N-M)`, để bước dedupe ở mục 3 khớp đúng title ở mỗi lần chạy lại.
+2. Mỗi lượt chạy, lấy danh sách sub-issue hiện tại của epic đúng một lần và dùng lại cho dedupe, check đã link và check giới hạn:
+   ```bash
    gh api repos/<owner>/<repo>/issues/<epic_number>/sub_issues --paginate --jq '.[] | {id,number,title}'
    ```
-   - Nếu call này fail hẳn → KHÔNG được giả định epic có 0 sub-issue. Cảnh báo user rõ ràng rằng không xác minh được số lượng/link hiện tại, và hỏi user có muốn tiếp tục link hay không.
-   - Nếu thành công → check giới hạn: nếu danh sách đã có từ 100 entry trở lên (giới hạn per-parent chính thức của GitHub — xác minh lại live nếu skill này được sửa lại sau này, không tin số cũ), **STOP** và báo user epic đã đạt giới hạn sub-issue của GitHub; user phải đóng/tái tổ chức sub-issue hiện có trước khi thêm mới. Chỉ check một lần cho cả lần chạy, không check theo từng sub-issue.
-3. Với MỖI sub-issue định tạo — dedupe với danh sách cache từ bước 2 trước, theo exact title match: nếu 1 entry trong cache có title khớp đúng với title đang định tạo, nghĩa là nó đã tồn tại rồi, dùng luôn `number` của entry đó. Chỉ khi epic không có sub-issue nào khớp trong danh sách cache đó, mới fallback sang search title trên toàn repo (dựa trên title, có thể miss do GitHub normalize title hoặc do ký tự đặc biệt):
-   ```
+   Nếu lệnh fail, đừng giả định 0 sub-issue; báo user là không xác minh được các link và hỏi trước khi link bất cứ gì. Nếu danh sách đã có 100 mục (giới hạn mỗi parent của GitHub tại thời điểm viết), dừng và bảo user đóng hoặc sắp xếp lại sub-issue trước.
+3. Dedupe từng sub-issue dự kiến bằng khớp title chính xác với danh sách đã cache và dùng lại cái khớp. Chỉ khi epic không có cái nào khớp mới search title trong repo (có thể sót title mà GitHub chuẩn hóa):
+   ```bash
    gh issue list --search "<planned title>" --state all --json number,title,url
    ```
-4. Nếu đã tồn tại (từ 1 trong 2 cách tìm ở bước 3) → update nội dung theo phase tương ứng:
-   ```
-   gh issue edit <number> --body "<new content>"
-   ```
-   Nếu chưa tồn tại → tạo mới:
-   ```
-   gh issue create --title "<title, in English>" --body "<content, see Step 4>"
-   ```
-5. Với mỗi sub-issue cần link (đã tìm thấy hoặc vừa tạo ở bước 4):
-   a. Fetch `id` dạng số của nó — **KHÔNG PHẢI** `number`, **KHÔNG PHẢI** node ID:
-      ```
-      gh api repos/<owner>/<repo>/issues/<sub_issue_number> --jq .id
-      ```
-   b. Nếu id dạng số này đã có trong danh sách cache từ bước 2 → đã link với epic này từ lần chạy trước, **bỏ qua âm thầm** — đây là kết quả bình thường, thường gặp ở mỗi lần chạy lại, không phải lỗi.
-   c. Nếu chưa → thử link qua REST (cách này cũng xử lý luôn trường hợp sub-issue đang thuộc parent khác, nhờ `replace_parent`):
-      ```
-      gh api repos/<owner>/<repo>/issues/<epic_number>/sub_issues -F sub_issue_id=<numeric_id> -F replace_parent=true
-      ```
-      - **201** → đã link xong, hoàn tất cho sub-issue này.
-      - **401/403** (lỗi permission/auth) → **STOP** và báo lỗi chính xác cho user trực tiếp — KHÔNG fallback sang GraphQL; vấn đề token/permission này rất có thể cũng làm hỏng GraphQL mutation, nên fallback âm thầm sẽ che giấu lỗi cấu hình scope token thay vì báo ra.
-      - **Bất kỳ lỗi nào khác** (404, 410, 422, lỗi mạng, v.v.) → fallback sang GraphQL: lấy cả 2 node ID, rồi gọi `addSubIssue` với `replaceParent: true`:
-        ```
-        gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){issue(number:$number){id}}}' -f owner=<owner> -f repo=<repo> -F number=<sub_issue_number>
-        ```
-        ```
-        gh api graphql -f query='mutation($issueId:ID!,$subIssueId:ID!,$replaceParent:Boolean){addSubIssue(input:{issueId:$issueId,subIssueId:$subIssueId,replaceParent:$replaceParent}){issue{title}subIssue{title}}}' -f issueId=<epic_node_id> -f subIssueId=<sub_issue_node_id> -F replaceParent=true
-        ```
-6. Tùy chọn — milestone/labels: hỏi user một lần (qua `AskUserQuestion`) xem có muốn gán milestone theo phase và/hoặc label theo mảng công việc cho các sub-issue đụng tới trong lần chạy này không. Nếu có:
-   ```
-   gh issue edit <number> --milestone "<milestone>" --add-label "<label>"
-   ```
-   Nếu user từ chối, bỏ qua âm thầm — không hỏi lại theo từng sub-issue.
+4. Đã có: cập nhật bằng `gh issue edit <number> --body-file <temp-file>`. Mới: `gh issue create --title "<title, English>" --body-file <temp-file>`.
+5. Link từng sub-issue (có sẵn hoặc mới tạo):
+   - Lấy `id` dạng số (không phải number, không phải node ID): `gh api repos/<owner>/<repo>/issues/<sub_issue_number> --jq .id`.
+   - Id đã nằm trong danh sách cache: đã link, bỏ qua im lặng. Đây là kết quả bình thường khi chạy lại.
+   - Nếu không, link bằng REST; `replace_parent` cũng chuyển sub-issue từ parent khác sang:
+     ```bash
+     gh api repos/<owner>/<repo>/issues/<epic_number>/sub_issues -F sub_issue_id=<numeric_id> -F replace_parent=true
+     ```
+   - 201: đã link. 401/403: dừng và báo đúng lỗi, vì GraphQL sẽ fail y hệt và fallback sẽ che mất lỗi token. Lỗi khác: làm theo `references/graphql-fallback.md`.
+6. Hỏi một lần (`AskUserQuestion`) có đặt milestone theo phase và label theo vùng việc không. Có: `gh issue edit <number> --milestone "<milestone>" --add-label "<label>"`. Không: đừng hỏi lại.
 
-## Bước 4 — Nội dung issue (cả epic lẫn sub-issue đều theo format này)
+## Bước 4 — Nội dung issue
 
-Ngôn ngữ đơn giản, phi kỹ thuật — không tên file, không tên hàm, không tên table DB, không tên biến. Tập trung vào vấn đề mà end user gặp phải + kết quả mong muốn. Ngôn ngữ của body: resolve theo `repo-profile.md` §4 (giống cách vcook resolve cho PR body) — title luôn giữ tiếng Anh (Bước 2/3), chỉ nội dung body theo ngôn ngữ đã resolve.
+Epic và sub-issue dùng ngôn ngữ thường, không có tên file, hàm, bảng hay biến, vì người đọc là người làm sản phẩm. Ngôn ngữ body theo `repo-profile.md` §4; title luôn là tiếng Anh. Body sub-issue không có marker.
 
 ```md
 ## Current problem
-<description of the problem/gap the user is experiencing>
+<vấn đề hoặc khoảng trống user gặp>
 
 ## Desired outcome
-<after this is done, what can the user do / what experience do they get>
+<sau khi xong, user làm được gì>
 
 ## Scope
-<brief — what's in, what's out>
+<cái gì trong phạm vi, cái gì ngoài>
 ```
 
-(Body của epic có thêm marker ẩn `<!-- vplan: <plan-slug> -->` từ Bước 2 mục 5 ở đầu — body của sub-issue không có marker này.)
+## Bước 5 — Migration
 
-## Bước 5 — Ràng buộc về migration
+Nếu plan đổi database, đặt toàn bộ nội dung migration vào đúng một sub-issue chứa nội dung phase 1 (không nhất thiết là cái tạo đầu tiên, vì Bước 3 gom theo vùng việc). Rải ra nhiều sub-issue sẽ làm mất ràng buộc về thứ tự.
 
-Nếu plan có thay đổi database → đưa TOÀN BỘ nội dung liên quan đến migration vào **sub-issue chứa nội dung phase 1** (không nhất thiết là sub-issue tạo đầu tiên — Bước 3.1 gom nhóm theo mảng công việc, không theo thứ tự phase). KHÔNG rải nội dung migration ra nhiều sub-issue.
+## Bước 6 — Xác minh và báo cáo
 
-## Bước 6 — Bảng link cuối cùng
-
-Cuối lần chạy, in ra 1 bảng liệt kê mọi issue đã đụng tới trong lần chạy này (epic + tất cả sub-issue, dù tạo mới hay update):
+Lấy lại danh sách sub-issue của epic (lệnh ở Bước 3) và so với các sub-issue dự kiến trong lượt này; danh sách live mới là nguồn đúng, còn badge tiến độ `sub_issues_summary` có thể trễ. Báo mọi link bị thiếu. Sau đó in và lưu vào `<plan-path>/issues.md` bảng mọi issue đã động tới:
 
 ```
 | # | title | url | parent |
 |---|---|---|---|
 ```
 
-Đồng thời lưu bảng này vào `<plan-path>/issues.md`, để lần chạy sau của skill trên cùng plan có thể đọc trực tiếp thay vì phải search lại trên GitHub.
+Lượt chạy bị gián đoạn phục hồi bằng cách chạy lại `/vtickets <plan-path>`, vì việc tìm và link tự dựng lại trạng thái từ GitHub và `issues.md`.
 
-Vì việc tìm/link epic và sub-issue (Bước 2-3) là idempotent và luôn suy lại state từ GitHub + `issues.md` ở mỗi lần chạy, một lần chạy bị gián đoạn sẽ tự phục hồi chỉ bằng cách chạy lại `/vtickets <plan-path>` trên cùng plan directory — không cần quy trình recovery riêng.
-
----
-
-## Hard rules
-
-- Luôn check danh sách sub-issues cache của epic trước để dedupe khi tạo sub-issue (bước 3), chỉ fallback sang `gh issue list --search` khi epic không có title nào khớp; riêng epic thì luôn chạy đủ chuỗi discovery trước khi tạo — cache `issues.md` → marker search `<!-- vplan: <plan-slug> -->` → title search — để tránh trùng epic/sub-issue khi chạy lại skill (kể cả từ 1 clone mới trên máy khác)
-- REST `sub_issues` là path link chính; fetch danh sách sub-issues của epic một lần cho mỗi lần chạy (cache lại) và bỏ qua việc link nếu `id` dạng số của sub-issue đã có trong danh sách đó — đây là no-op idempotent, không bao giờ coi là lỗi REST cần fallback
-- Field `sub_issues_summary`/`subIssuesSummary` của GitHub (hiển thị dạng badge tiến độ trên Project board và issue list) có thể bị stale — đây là bug đã biết của GitHub, không phải dấu hiệu link bị lỗi; danh sách `sub_issues` live (REST hoặc GraphQL tương đương) của issue đó luôn là nguồn authoritative, không bao giờ là cái badge
-- Status pin (tính đến 2026-09-11): REST API `sub_issues` và GraphQL mutation `addSubIssue` của GitHub đã xác nhận generally available (GA), không còn beta/preview — GA được công bố ngày 2025-03-17. Đây là snapshot tại 1 thời điểm, không đảm bảo cho các lần chạy sau; vẫn xác minh lại live (theo ghi chú ở bước 3.2 về giới hạn 100 item) nếu skill này được sửa lại sau này và có dấu hiệu bất thường
-- Chỉ fallback sang GraphQL `addSubIssue` mutation (với `replaceParent: true`) khi REST fail thật sự và KHÔNG phải lỗi permission; khi REST trả 401/403, STOP và báo lỗi trực tiếp cho user — không bao giờ âm thầm fallback
-- Không bao giờ link sub-issue khi số lượng sub-issue cache của epic đã ≥ 100 (giới hạn per-parent của GitHub) — STOP và báo user đóng/tái tổ chức sub-issue hiện có trước; nếu bản thân việc fetch số lượng fail, cảnh báo user và hỏi trước khi tiếp tục, không giả định là 0
-- Ngôn ngữ issue luôn phải phi kỹ thuật — không thuật ngữ code, không tên file/hàm/table DB
-- Migration luôn đưa vào sub-issue chứa nội dung phase 1, không bao giờ rải ra nhiều sub-issue
-- Không bao giờ tạo label mới (`epic` hay bất kỳ label nào khác) mà không xác nhận với user trước
-- Gộp các phase nhỏ liên quan thành 1 sub-issue — không tạo mỗi phase 1 issue riêng
-- KHÔNG BAO GIỜ abort chỉ vì thiếu `gh` hoặc remote không phải GitHub — degrade theo §2 và vẫn phải giao đủ nội dung issue
-
-## Bước tiếp theo
-
-Theo convention Next Steps trong `_vskills-shared/repo-profile.md` §7.
+Làm theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

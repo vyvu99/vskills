@@ -1,119 +1,58 @@
 ---
 name: vci
-description: "Run typecheck + build + lint + format (+ optional test) in parallel for all or part of the packages in a JS/TS repo (monorepo or single package). Auto-detects workspace packages and package manager, no hardcoded package names."
+description: "Runs format, typecheck, build and lint (plus tests with --test) in parallel across all or some packages of a JS/TS repo, fixes the errors it finds and rechecks only the packages it fixed. Detects the package manager and workspace packages itself. Use before a commit or PR, or when asked to check that everything still compiles and builds."
 argument-hint: "[package-names...] [--test] [--changed]"
 user-invocable: true
-when_to_use: "Invoke when you need a fast typecheck/build (and test) of the whole repo or a group of packages in a JS/TS monorepo (or single package) before commit/PR."
-allowed-tools: Bash(pnpm:*), Bash(npm:*), Bash(yarn:*), Bash(bun:*), Bash(tsc:*), Bash(turbo:*), Bash(nx:*), Bash(eslint:*), Bash(prettier:*), Bash(biome:*), Bash(git:*)
+when_to_use: "Use when the user wants the whole repo or a group of packages typechecked, built, linted or tested before committing, e.g. 'run typecheck and build', 'does everything still build after this refactor'. Not for explaining code, reviewing a PR or writing tests."
+allowed-tools: Bash(pnpm:*), Bash(npm:*), Bash(yarn:*), Bash(bun:*), Bash(tsc:*), Bash(turbo:*), Bash(nx:*), Bash(eslint:*), Bash(prettier:*), Bash(biome:*), Bash(git:*), Bash(timeout:*), Bash(gtimeout:*), Bash(command:*), Bash(mkdir:*), Bash(cat:*), Bash(echo:*), Bash(wait:*)
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "2.0.0"
 ---
 
 # vci
 
-Runs typecheck + build + lint (+ optional test) in parallel for packages in a JS/TS repo (monorepo or single package), using background commands + `wait`. No hardcoded package names or package manager.
-
-Read input from the user:
+Checks a JS/TS repo (monorepo or single package) with format, typecheck, build and lint, plus tests on request. It edits files: the formatter rewrites them and failing checks get fixed. Scope is the checks only, with no unrequested features, tests or docs.
 
 ```
 $ARGUMENTS
 ```
 
----
+## 1. Resolve the profile and the package list
 
-## Step -1 — Resolve the repo profile
+Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 for the package manager (`pm`), the workspace shape and the script names. If the file is missing, assume pnpm with a workspace. If §1 says this is not a JS/TS project, stop and say so.
 
-Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (if present) to resolve the package manager (`pm`), workspace shape, and the typecheck/build/format script names. Absent → assume pnpm + workspace (`pnpm --filter <pkg> exec …`), today's default. §1 reports "not a JS/TS project" → stop, say so — vci has nothing to do in a non-JS/TS repo.
+Package list, first match wins:
+- Names in `$ARGUMENTS` (after stripping `--test` and `--changed`): use exactly those.
+- `--changed`: map `git diff --name-only <default-branch>...HEAD` to their containing packages and dedupe. Dependents of those packages are not included, so prefer the orchestrator's affected mode when step 2 applies.
+- Otherwise the whole workspace: resolve the globs in `pnpm-workspace.yaml` or `workspaces`, read each `package.json` name, and keep packages that have a `build` script or a `tsconfig.json`. A single-package repo is just the root.
 
-`turbo.json` or `nx.json` exists at the repo root → prefer the orchestrator for Steps 1-2: `turbo run typecheck build` (or `nx run-many --target=typecheck,build`) gets cache hits and topological ordering for free. Fall back to the manual per-package spawn below otherwise.
+If `turbo.json` or `nx.json` exists, use the orchestrator for the checks in step 3 (`turbo run typecheck build lint --filter=<pkg>` or `--affected`, `nx run-many --target=...`). It gives cache hits and dependency order, and you read its output instead of per-package logs.
 
-## Step 0 — Determine the package list
+## 2. Format first
 
-- If `$ARGUMENTS` contains `--test`, treat it as a test-request flag (see Step 4) and strip it before parsing package names
-- If `$ARGUMENTS` contains `--changed`, strip it and derive the package list from `git diff --name-only <base>...HEAD` (base = the repo's default branch, e.g. `origin/main`, fallback `main`) instead of the full workspace: map each changed file path to its containing package directory (the directories resolved in point 2 below), dedupe, and use that list
-- If `$ARGUMENTS` contains a list of package names → use that exact list, skip auto-detect
-- If empty → auto-detect the whole workspace:
-  1. Use the workspace shape from Step -1. **Single-package** → the package list is just the root package; skip glob resolution, go straight to Step 1. **Monorepo** → continue with the glob pattern from `pnpm-workspace.yaml` (or the `workspaces` field in the root `package.json`):
-  2. Resolve the glob into the actual list of package directories
-  3. For each directory, read the child `package.json` to get the `name` field
-  4. Only keep packages that have a `build` script in `package.json` AND/OR a `tsconfig.json` — packages with nothing to check are dropped
+Format before the checks so they verify the final code. Use the first that applies: the root `format`/`format:fix` script, `prettier --write .`, `biome check --write .`, `eslint --fix .`.
 
-## Step 1 — Parallel typecheck
+## 3. Run the checks in parallel
 
-Sanitize the package name for use as a filesystem path first: replace `/` and `@` with `_` (e.g. `@app/api` → `_app_api`) — a scoped name written raw into `/tmp/tsc-<package>.log` breaks (unintended subdirectory, or outright failure).
+Without an orchestrator, run one stage at a time (typecheck, then build, then lint, then test), all packages of a stage in parallel. One Bash call per stage, with the Bash tool timeout set to 600000 ms so a hung package cannot hang `wait`:
 
-`turbo`/`nx` preferred (Step -1) → run the orchestrator's typecheck target instead of the loop below, skip straight to reading its output.
-
-For EACH package in the list, spawn a background command wrapped in `time` so the log carries per-package wall-time:
-
-```
-{ time timeout 600s <pm workspace/root exec template from Step -1> <typecheck cmd> ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &
+```bash
+mkdir -p /tmp/vci
+(<pm exec template> <cmd>; echo "exit=$?") > /tmp/vci/<stage>-<safe-name>.log 2>&1 &
+# ...one line per package...
+wait
 ```
 
-`<typecheck cmd>` = the resolved script from Step -1 (`typecheck` → `type-check` → `tsc --noEmit`). Worked examples:
-- pnpm + workspace, no `typecheck` script → `{ time timeout 600s pnpm --filter <package> exec tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &` (today's default, byte-identical)
-- npm + single-package → `{ time timeout 600s npm exec -- tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &`
+- `<safe-name>`: package name with `/` and `@` replaced by `_`, since a raw scoped name breaks the log path.
+- Prefix `<cmd>` with `timeout 600` (or `gtimeout 600`) only when `command -v` finds one. Stock macOS has neither, and the Bash tool timeout already covers it.
+- Command per stage: typecheck uses `typecheck`, then `type-check`, then `tsc --noEmit`; build uses the package's `build` script and skips packages without one; lint uses `lint`, then `lint:check`, then `eslint .`; test (only with `--test`) prefers `test:run`/`test:ci` over a watch-mode `test`.
+- A package without `tsconfig.json` has no typecheck, which is not an error.
 
-Spawn all packages first, then `wait` — never sequentially. Resuming after an interruption → reuse an existing fresh `/tmp/tsc-<sanitized-package>.log` if present instead of re-spawning that package's check.
+Read each log's last lines. Failure: fix the cause, then rerun only that package and stage. A test failure is never skipped or weakened; fix it or report it.
 
-After `wait`, read each `/tmp/tsc-<sanitized-package>.log`:
-- No errors → report pass, with the wall-time `time` printed at the end of the log
-- Errors → extract file:line + message, fix, recheck **only the package just fixed** (rerun exactly 1 tsc command, do not re-run the whole list)
-- No `tsconfig.json` → treat as "no typecheck config", not a type error — skip/report accordingly
+## 4. Verify and report
 
-## Step 2 — Parallel build
-
-Sanitize the package name for use as a filesystem path first: replace `/` and `@` with `_` (e.g. `@app/api` → `_app_api`) — a scoped name written raw into `/tmp/build-<package>.log` breaks (unintended subdirectory, or outright failure).
-
-`turbo`/`nx` preferred (Step -1) → run the orchestrator's build target instead of the loop below, skip straight to reading its output.
-
-Same as step 1: spawn a background command per package, wrapped in `time`:
-
-```
-{ time timeout 600s <pm workspace/root exec template from Step -1> <build script> ; } > /tmp/build-<sanitized-package>.log 2>&1 &
-```
-
-`<build script>` = the package's declared `build` script (Step -1 — no raw fallback; a package with no `build` script is skipped, not run with a substitute). Worked example: pnpm + workspace → `{ time timeout 600s pnpm --filter <package> build ; } > /tmp/build-<sanitized-package>.log 2>&1 &` (today's default, byte-identical).
-
-Spawn all → `wait` → parse each package's log (pass/fail, with wall-time). Failing package → fix, recheck only that package. Resuming after an interruption → reuse an existing fresh `/tmp/build-<sanitized-package>.log` if present instead of re-spawning.
-
-## Step 2.5 — Parallel lint
-
-Resolve a lint script the same way as typecheck/build (Step -1 pattern): `lint` → `lint:check` → direct `eslint .` fallback.
-
-For EACH package in the list, spawn a background command:
-
-```
-timeout 600s <pm workspace/root exec template from Step -1> <lint cmd> > /tmp/lint-<sanitized-package>.log 2>&1 &
-```
-
-Spawn all → `wait` → parse each package's log (pass/fail). Failing package → fix, recheck only that package — same rules as Steps 1-2. Resuming after an interruption → reuse an existing fresh `/tmp/lint-<sanitized-package>.log` if present instead of re-spawning.
-
-## Step 3 — Format
-
-Try, in order, stopping at the first one that applies:
-1. Root `package.json` format script (`format`, `format:fix`, ...) via the root template from Step -1
-2. `prettier --write .` if `prettier` is a devDependency anywhere in the workspace
-3. `biome check --write .` if `@biomejs/biome` is a devDependency
-4. `eslint --fix .` otherwise, as the last resort
-
-## Step 4 — Test (only when the user requests it or `$ARGUMENTS` contains `--test`)
-
-- Determine the test script in each package's `package.json` that needs testing — prefer non-watch mode (`test:run`, `test:ci`, `test -- --run`, ...) over plain `test` if you suspect the default is watch mode
-- Run in background + `wait`, same as steps 1-2 (prefix with `timeout 600s`)
-- Failure → fix, recheck only that package, repeat until it passes — **never skip a test failure** for any reason
-
----
-
-## Hard rules
-
-- Always spawn every package with background `&` then `wait` — never run packages sequentially one by one
-- Never hardcode any specific package name in the logic — every list must come from the argument or workspace auto-detect
-- Failing package → recheck only that package after fixing, don't re-run the whole list
-- Never skip a test failure to move past a step — must fix and recheck until it passes
-- Wrap every background command in `timeout 600s` (or `gtimeout` on macOS) — a hung package must not hang the whole `wait`.
-
-## Next steps
+After the last fix, rerun the stages that touched fixed files for those packages, so the final state is proven rather than assumed. Print one table, one row per package: typecheck, build, lint, test (pass, fail, or skipped with reason), plus files the formatter changed. If a stage could not run (missing script, tooling error), say so instead of reporting pass.
 
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

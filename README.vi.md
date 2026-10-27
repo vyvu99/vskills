@@ -40,7 +40,6 @@ Skill được symlink chứ không copy — sửa ở đâu cũng là cùng 1 f
 | Skill | Làm gì | Ví dụ |
 |---|---|---|
 | `vtickets`* | Tạo hoặc đồng bộ 1 GitHub epic + sub-issues từ 1 plan directory. Idempotent. | `/vtickets plans/dat-lich-tai-kham` |
-| `vautocook`* | Implement từng sub-issue của 1 GitHub epic không cần canh, mỗi sub-issue 1 phiên mới, tất cả gộp vào 1 PR duy nhất của epic. Cần xác nhận trước khi chạy; không có phương án dự phòng nếu thiếu `gh`/`claude`. | `/vautocook <epic-url>` |
 
 ### Hỗ trợ
 
@@ -66,7 +65,6 @@ flowchart LR
     fix --> ship(["ship"])
 
     plan -. track trên GitHub .-> tickets["/vtickets"]
-    tickets -. implement không cần canh .-> auto["/vautocook"]
     auto -. tự lái .-> cook
     cook -. trước khi mở PR .-> ci["/vci"]
     cook -. UI work .-> design["/vdesign"]
@@ -86,7 +84,6 @@ flowchart LR
 ├─ "Có report review, cần fix"                    → /vreview --fix
 ├─ "Cần check nhanh typecheck/build"              → /vci
 ├─ "Cần track 1 plan trên GitHub"                 → /vtickets
-├─ "Có 1 epic GitHub, muốn build không cần canh"  → /vautocook
 ├─ "Cần redesign UI 1 trang"                      → /vdesign
 ├─ "Rà 1 backlog, không cần canh, tới 1 deadline"  → /vsweep
 └─ "Lỡ chạy nhầm migration ở local"                → /vrollback

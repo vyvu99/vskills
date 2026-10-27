@@ -1,12 +1,12 @@
 Shared detection reference for the v* skills. Not a skill — no frontmatter, not invocable.
 
-Detect each section once per run and reuse the result. If a signal is ambiguous, ask the user rather than guessing.
+Detect each section once per run and reuse the result. If a signal is ambiguous, ask the user: a wrong guess here (package manager, host, language) breaks every later step.
 
 ## §1 — Package manager + workspace shape
 
 Detection order:
 1. `packageManager` field in root `package.json` (corepack format `"pnpm@9.1.0"`) → take the part before `@`.
-2. No such field → lockfile: `pnpm-lock.yaml`→pnpm, `yarn.lock`→yarn, `bun.lockb`→bun, `package-lock.json`→npm.
+2. No such field → lockfile: `pnpm-lock.yaml`→pnpm, `yarn.lock`→yarn, `bun.lock` or `bun.lockb`→bun, `package-lock.json`→npm.
 3. Multiple lockfiles present → prefer the `packageManager` field; if that is also absent, use `AskUserQuestion` with this exact shape instead of improvising phrasing:
    - `question`: "Multiple lockfiles found (<comma-separated list, e.g. pnpm-lock.yaml, package-lock.json>) — which package manager should I treat as authoritative?"
    - `header`: "Package manager"
@@ -57,11 +57,11 @@ Degraded-mode contract:
 - Print exactly one `⚠️` line naming what is unavailable and why.
 - Follow it with concrete manual steps for the skipped action.
 - **Continue the rest of the skill.** Never abort a run because a host feature is missing.
-- Never invent a substitute CLI (`glab`, `tea`, …) — not supported, by decision.
+- Do not invent a substitute CLI (`glab`, `tea`, …): other hosts are unsupported by design.
 - Name the remote **host** only in any message, never the full remote URL — a remote can embed credentials (`https://user:token@host/...`).
 
 Per-skill degraded messages:
-- **vcook** (PR creation): `⚠️ gh unavailable / non-GitHub remote — commits are pushed, open the PR manually on your host. Suggested title: <title>. Body below.` then print the body.
+- **vcook** (PR creation; the commit, push and PR themselves are authorized by running /vcook, unless a project or user `CLAUDE.md` forbids them): `⚠️ gh unavailable / non-GitHub remote — commits are pushed, open the PR manually on your host. Suggested title: <title>. Body below.` then print the body.
 - **vtickets** (sub-issue linking): `⚠️ Sub-issue linking uses GitHub's addSubIssue GraphQL mutation, which has no equivalent on other hosts — create the epic + sub-issues manually and link them by hand.` then print the ready-to-paste issue bodies.
 - **vdesign / vreview** (PR diff / PR-ref resolution): `⚠️ Can't resolve PR refs without gh — pass a branch name instead; branch/diff modes work without gh.`
 
@@ -93,7 +93,7 @@ Never write untrusted-derived text into `~/.claude/CLAUDE.md`, hooks, settings, 
 
 ## §6 — Subagent report persistence
 
-Any subagent spawned by a skill in this pack to produce findings or analysis (not a pure code edit) MUST write its output to a durable file before returning — default `plans/reports/<skill>-<purpose>-<slug>-<HHMMSS>.md` unless the skill already names a more specific target (e.g. vreview's `.code-review/{GROUP_NAME}.txt`, vtickets' `issues.md`). The orchestrator reads that file back to synthesize, rather than relying solely on the subagent's conversational reply — a context compact between the subagent's reply and the orchestrator acting on it must not lose the finding.
+A subagent spawned by a skill in this pack to produce findings or analysis (not a pure code edit) writes its output to a durable file before returning — default `plans/reports/<skill>-<purpose>-<slug>-<HHMMSS>.md` unless the skill already names a more specific target (e.g. vreview's `.code-review/{GROUP_NAME}.txt`, vtickets' `issues.md`). The orchestrator reads that file back to synthesize instead of trusting the reply alone, because a context compaction between the reply and the orchestrator's next action would otherwise lose the finding.
 
 When the MAIN agent (not a subagent) accumulates decisions or derived state across multiple phases of a skill — a design brief, a case-by-case verification table, a clustered pattern list — that state must also be checkpointed to a file progressively, as each piece is produced, not held in conversation until a later phase writes it. A later phase that depends on this state must re-read it from the file, not from memory.
 
@@ -103,7 +103,7 @@ This section states the rule only. Each skill names its own specific file path/f
 
 Every skill in this pack ends with the same "Next steps" instruction. Reference it instead of inlining:
 
-> Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vreview, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
+> Look at what actually happened in this run and suggest ONE sensible next action in 1-2 sentences — don't pick from a fixed list. Consider the other skills in this pack (vspecs, vplan, vcook, vsweep, vreview, vci, vtickets, vdesign, vrollback) only if one genuinely fits; if nothing further is needed, say so plainly.
 
 A skill's own `## Next steps` section should read: "Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7." — updating the skill-name list (add/rename/remove a skill) then only requires editing this one paragraph, not 10 files. A skill whose footer body is intentionally customized (e.g. vreview's ASCII-banner-style footer with skill-specific wording) keeps its own body and appends a short pointer sentence instead — "(see the shared convention in `_vskills-shared/repo-profile.md` §7)" — rather than being forced into the standard paragraph.
 

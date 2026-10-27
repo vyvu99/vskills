@@ -1,119 +1,58 @@
 ---
 name: vci
-description: "Chạy typecheck + build + lint + format (+ test tùy chọn) song song cho toàn bộ hoặc một phần package trong repo JS/TS (monorepo hoặc single package). Tự động phát hiện package trong workspace và package manager, không hardcode tên package."
+description: "Chạy format, typecheck, build và lint (thêm test khi có --test) song song cho toàn bộ hoặc một phần package của repo JS/TS, tự sửa lỗi tìm được và chỉ chạy lại package vừa sửa. Tự nhận diện package manager và các package trong workspace. Dùng trước khi commit/PR, hoặc khi được hỏi liệu mọi thứ còn compile và build được không."
 argument-hint: "[package-names...] [--test] [--changed]"
 user-invocable: true
-when_to_use: "Dùng khi cần typecheck/build (và test) nhanh cho toàn bộ repo hoặc một nhóm package trong monorepo JS/TS (hoặc single package) trước khi commit/PR."
-allowed-tools: Bash(pnpm:*), Bash(npm:*), Bash(yarn:*), Bash(bun:*), Bash(tsc:*), Bash(turbo:*), Bash(nx:*), Bash(eslint:*), Bash(prettier:*), Bash(biome:*), Bash(git:*)
+when_to_use: "Dùng khi user muốn typecheck, build, lint hoặc test toàn repo hay một nhóm package trước khi commit, ví dụ 'chạy typecheck và build', 'sau refactor này mọi thứ còn build được không'. Không dùng để giải thích code, review PR hay viết test."
+allowed-tools: Bash(pnpm:*), Bash(npm:*), Bash(yarn:*), Bash(bun:*), Bash(tsc:*), Bash(turbo:*), Bash(nx:*), Bash(eslint:*), Bash(prettier:*), Bash(biome:*), Bash(git:*), Bash(timeout:*), Bash(gtimeout:*), Bash(command:*), Bash(mkdir:*), Bash(cat:*), Bash(echo:*), Bash(wait:*)
 metadata:
   author: vyvu
-  version: "1.2.0"
+  version: "2.0.0"
 ---
 
 # vci
 
-Chạy typecheck + build + lint (+ test tùy chọn) song song cho các package trong repo JS/TS (monorepo hoặc single package), dùng background command + `wait`. Generic — không hardcode tên package hay package manager.
-
-Đọc input từ user:
+Kiểm tra repo JS/TS (monorepo hoặc single package) bằng format, typecheck, build và lint, thêm test khi được yêu cầu. Skill này có sửa file: formatter ghi đè file và các check lỗi sẽ được sửa. Phạm vi chỉ là các check, không thêm tính năng, test hay tài liệu không được yêu cầu.
 
 ```
 $ARGUMENTS
 ```
 
----
+## 1. Xác định profile và danh sách package
 
-## Bước -1 — Xác định repo profile
+Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §1 để biết package manager (`pm`), workspace shape và tên script. File không có thì giả định pnpm + workspace. Nếu §1 báo đây không phải project JS/TS, dừng và nói rõ.
 
-Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §1 (nếu có) để xác định package manager (`pm`), workspace shape, và tên script typecheck/build/format. Nếu file không tồn tại, giả định pnpm + workspace (`pnpm --filter <pkg> exec …`) — mặc định hiện tại. Nếu §1 báo "not a JS/TS project", dừng ở đây và nói rõ — vci không có gì để làm trong repo không phải JS/TS.
+Danh sách package, khớp trường hợp đầu tiên:
+- Có tên trong `$ARGUMENTS` (sau khi bỏ `--test` và `--changed`): dùng đúng các tên đó.
+- `--changed`: map `git diff --name-only <default-branch>...HEAD` sang package chứa file, loại trùng. Package phụ thuộc vào chúng không được tính, nên ưu tiên chế độ affected của orchestrator khi áp dụng bước 2.
+- Còn lại là toàn workspace: resolve glob trong `pnpm-workspace.yaml` hoặc `workspaces`, đọc `name` từng `package.json`, giữ package có script `build` hoặc `tsconfig.json`. Repo single package thì chỉ có root.
 
-Có `turbo.json` hoặc `nx.json` ở gốc repo → ưu tiên dùng orchestrator cho Bước 1-2: `turbo run typecheck build` (hoặc `nx run-many --target=typecheck,build`) có sẵn cache hit và topological ordering miễn phí. Ngược lại, fallback về cách spawn thủ công từng package bên dưới.
+Nếu có `turbo.json` hoặc `nx.json`, dùng orchestrator cho các check ở bước 3 (`turbo run typecheck build lint --filter=<pkg>` hoặc `--affected`, `nx run-many --target=...`). Nó có cache hit và đúng thứ tự phụ thuộc, và bạn đọc output của nó thay vì log từng package.
 
-## Bước 0 — Xác định danh sách package
+## 2. Format trước
 
-- Nếu `$ARGUMENTS` chứa `--test`, coi đó là cờ yêu cầu chạy test (xem Bước 4) và loại bỏ nó trước khi parse tên package
-- Nếu `$ARGUMENTS` chứa `--changed`, loại bỏ nó và lấy danh sách package từ `git diff --name-only <base>...HEAD` (base = default branch của repo, vd `origin/main`, fallback `main`) thay vì toàn bộ workspace: map từng file thay đổi vào thư mục package chứa nó (các thư mục đã resolve ở điểm 2 bên dưới), loại trùng, rồi dùng danh sách đó
-- Nếu `$ARGUMENTS` chứa danh sách tên package → dùng đúng danh sách đó, bỏ qua auto-detect
-- Nếu rỗng → auto-detect toàn bộ workspace:
-  1. Dùng workspace shape từ Bước -1. **Single-package** → danh sách package chỉ là root package; bỏ qua resolve glob, đi thẳng sang Bước 1. **Monorepo** → tiếp tục với glob pattern từ `pnpm-workspace.yaml` (hoặc field `workspaces` trong `package.json` gốc):
-  2. Resolve glob thành danh sách thư mục package thực tế
-  3. Với mỗi thư mục, đọc `package.json` con để lấy field `name`
-  4. Chỉ giữ lại package có script `build` trong `package.json` VÀ/HOẶC có `tsconfig.json` — package không có gì để check thì loại bỏ
+Format trước các check để chúng kiểm tra đúng code cuối cùng. Dùng cái đầu tiên áp dụng được: script `format`/`format:fix` ở root, `prettier --write .`, `biome check --write .`, `eslint --fix .`.
 
-## Bước 1 — Typecheck song song
+## 3. Chạy các check song song
 
-Sanitize tên package để dùng làm filesystem path trước: thay `/` và `@` bằng `_` (vd: `@app/api` → `_app_api`) — tên package có scope ghi thẳng vào `/tmp/tsc-<package>.log` sẽ lỗi (tạo ra subdirectory ngoài ý muốn, hoặc fail hẳn).
+Không có orchestrator thì chạy từng stage một (typecheck, rồi build, rồi lint, rồi test), mọi package của một stage chạy song song. Mỗi stage một lệnh Bash, đặt timeout của Bash tool là 600000 ms để một package treo không làm `wait` treo theo:
 
-Nếu `turbo`/`nx` được ưu tiên (Bước -1), chạy target typecheck của orchestrator thay vì vòng lặp bên dưới, rồi đọc thẳng output của nó.
-
-Với MỖI package trong danh sách, spawn một background command, bọc trong `time` để log ghi lại wall-time từng package:
-
-```
-{ time timeout 600s <pm workspace/root exec template từ Bước -1> <typecheck cmd> ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &
+```bash
+mkdir -p /tmp/vci
+(<pm exec template> <cmd>; echo "exit=$?") > /tmp/vci/<stage>-<safe-name>.log 2>&1 &
+# ...một dòng cho mỗi package...
+wait
 ```
 
-`<typecheck cmd>` = script đã resolve ở Bước -1 (`typecheck` → `type-check` → `tsc --noEmit`). Ví dụ minh hoạ:
-- pnpm + workspace, không có script `typecheck` → `{ time timeout 600s pnpm --filter <package> exec tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &` (mặc định hiện tại, y hệt)
-- npm + single-package → `{ time timeout 600s npm exec -- tsc --noEmit ; } > /tmp/tsc-<sanitized-package>.log 2>&1 &`
+- `<safe-name>`: tên package với `/` và `@` đổi thành `_`, vì tên scoped để nguyên sẽ làm hỏng đường dẫn log.
+- Chỉ thêm tiền tố `timeout 600` (hoặc `gtimeout 600`) khi `command -v` tìm thấy; macOS gốc không có cả hai, và timeout của Bash tool đã bao phần này.
+- Lệnh theo stage: typecheck dùng `typecheck`, rồi `type-check`, rồi `tsc --noEmit`; build dùng script `build` của package và bỏ qua package không có; lint dùng `lint`, rồi `lint:check`, rồi `eslint .`; test (chỉ khi có `--test`) ưu tiên `test:run`/`test:ci` hơn `test` chạy watch.
+- Package không có `tsconfig.json` thì không có typecheck, đó không phải lỗi.
 
-Spawn tất cả package trước, rồi mới `wait` — KHÔNG chạy tuần tự từng cái một. Nếu resume sau khi bị gián đoạn, tái dùng `/tmp/tsc-<sanitized-package>.log` sẵn có (nếu còn fresh) thay vì spawn lại check cho package đó.
+Đọc những dòng cuối của từng log. Lỗi: sửa nguyên nhân, rồi chạy lại đúng package và stage đó. Test fail thì không bao giờ bị bỏ qua hay nới lỏng; sửa hoặc báo cáo.
 
-Sau `wait`, đọc từng `/tmp/tsc-<sanitized-package>.log`:
-- Không có lỗi → báo pass, kèm wall-time mà `time` in ở cuối log
-- Có lỗi → trích xuất file:line + message cụ thể, fix, rồi recheck **chỉ package vừa fix** (chạy lại đúng 1 lệnh tsc cho package đó, không chạy lại toàn bộ danh sách)
-- Không có `tsconfig.json` → coi là "không có config typecheck", không phải lỗi type — skip/báo cáo tương ứng
+## 4. Xác minh và báo cáo
 
-## Bước 2 — Build song song
+Sau lần sửa cuối, chạy lại các stage liên quan tới file đã sửa cho những package đó, để trạng thái cuối được chứng minh chứ không giả định. In một bảng, mỗi package một dòng: typecheck, build, lint, test (pass, fail, hoặc skipped kèm lý do), thêm các file formatter đã đổi. Stage nào không chạy được (thiếu script, lỗi tooling) thì nói rõ thay vì báo pass.
 
-Sanitize tên package để dùng làm filesystem path trước: thay `/` và `@` bằng `_` (vd: `@app/api` → `_app_api`) — tên package có scope ghi thẳng vào `/tmp/build-<package>.log` sẽ lỗi (tạo ra subdirectory ngoài ý muốn, hoặc fail hẳn).
-
-Nếu `turbo`/`nx` được ưu tiên (Bước -1), chạy target build của orchestrator thay vì vòng lặp bên dưới, rồi đọc thẳng output của nó.
-
-Tương tự bước 1, spawn một background command cho mỗi package, bọc trong `time`:
-
-```
-{ time timeout 600s <pm workspace/root exec template từ Bước -1> <build script> ; } > /tmp/build-<sanitized-package>.log 2>&1 &
-```
-
-`<build script>` = script `build` khai báo của package đó (Bước -1 — không có fallback raw; package không có script `build` thì bị skip, không chạy bằng lệnh thay thế). Ví dụ minh hoạ: pnpm + workspace → `{ time timeout 600s pnpm --filter <package> build ; } > /tmp/build-<sanitized-package>.log 2>&1 &` (mặc định hiện tại, y hệt).
-
-Spawn tất cả → `wait` → parse log từng package (pass/fail, kèm wall-time). Package fail → fix, recheck chỉ package đó. Nếu resume sau khi bị gián đoạn, tái dùng `/tmp/build-<sanitized-package>.log` sẵn có (nếu còn fresh) thay vì spawn lại check cho package đó.
-
-## Bước 2.5 — Lint song song
-
-Resolve script lint theo đúng cách typecheck/build đang dùng (pattern Bước -1): `lint` → `lint:check` → fallback trực tiếp `eslint .` nếu không có script nào.
-
-Với MỖI package trong danh sách, spawn một background command:
-
-```
-timeout 600s <pm workspace/root exec template từ Bước -1> <lint cmd> > /tmp/lint-<sanitized-package>.log 2>&1 &
-```
-
-Spawn tất cả → `wait` → parse log từng package (pass/fail). Package fail → fix, recheck chỉ package đó — quy tắc giống Bước 1-2. Nếu resume sau khi bị gián đoạn, tái dùng `/tmp/lint-<sanitized-package>.log` sẵn có (nếu còn fresh) thay vì spawn lại check cho package đó.
-
-## Bước 3 — Format
-
-Thử lần lượt, dừng ở lựa chọn đầu tiên áp dụng được:
-1. Script format trong `package.json` gốc (`format`, `format:fix`, ...) qua root template từ Bước -1
-2. `prettier --write .` nếu `prettier` là devDependency ở đâu đó trong workspace
-3. `biome check --write .` nếu `@biomejs/biome` là devDependency
-4. `eslint --fix .` nếu không có lựa chọn nào ở trên, làm phương án cuối cùng
-
-## Bước 4 — Test (chỉ khi user yêu cầu hoặc `$ARGUMENTS` chứa `--test`)
-
-- Xác định test script trong `package.json` của từng package cần test — ưu tiên non-watch mode (`test:run`, `test:ci`, `test -- --run`, ...) hơn plain `test` nếu nghi ngờ mặc định là watch mode
-- Chạy background + `wait`, giống bước 1-2 (thêm prefix `timeout 600s`)
-- Fail → fix, recheck chỉ package đó, lặp lại đến khi pass — **KHÔNG BAO GIỜ** bỏ qua test failure vì bất kỳ lý do gì
-
----
-
-## Quy tắc bắt buộc
-
-- LUÔN spawn mọi package bằng background `&` rồi mới `wait` — KHÔNG BAO GIỜ chạy package tuần tự từng cái một
-- KHÔNG BAO GIỜ hardcode bất kỳ tên package cụ thể nào trong logic — mọi danh sách phải đến từ argument hoặc workspace auto-detect
-- Package fail → recheck chỉ package đó sau khi fix, không chạy lại toàn bộ danh sách
-- KHÔNG BAO GIỜ bỏ qua test failure để đi tiếp bước khác — PHẢI fix và recheck đến khi pass
-- Bọc mọi background command trong `timeout 600s` (hoặc `gtimeout` trên macOS) — package bị treo không được làm treo toàn bộ `wait`
-
-## Bước tiếp theo
-
-Theo convention Next Steps trong `_vskills-shared/repo-profile.md` §7.
+Làm theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

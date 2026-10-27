@@ -1,250 +1,188 @@
 ---
 name: vdesign
-description: "Redesign existing UI/UX with high execution quality: refined, harmonious, modern, elegant, accessible. Every run self-decides all 18 style/structure criteria (typography, color, motion, layout, structural freedom, boldness, and more) — no upfront Q&A — grounded in always-on live 2026 design research and a real user/task read, with full creative and API-layer freedom (DB schema stays off-limits). Use when upgrading the UI of an existing page/component/feature/PR."
+description: "Redesigns the UI/UX of an existing page, component, feature, or PR diff to a refined, harmonious, accessible standard. Reads the real user and task, runs current design research, self-decides 18 style and structure criteria (no upfront Q&A), then audits, fixes, and verifies at 375/768/1280px. API-layer changes are in scope; DB schema is not."
 user-invocable: true
-when_to_use: "Invoke when you want to redesign or upgrade the UI/UX of a page, component, feature, or an entire existing diff/PR."
+when_to_use: "Use when the user asks to redesign, upgrade, modernize, or make an existing page, component, feature, or PR look and feel better. Not for building a new UI from scratch, a read-only design critique, or a one-line CSS bug fix."
 argument-hint: "[URL | localhost:PORT/path | component | feature | --pr | --diff | [Image]]"
 metadata:
   author: vyvu
-  version: "9.0.0"
+  version: "10.0.0"
 ---
 
-# vdesign — Personal UI/UX Redesign Skill
+# vdesign — UI/UX Redesign
 
-Upgrade or redesign UI/UX to a high standard of execution quality — **refined · harmonious · modern · elegant · accessible** — while the actual style (bold or restrained, matching the existing system or deliberately departing from it) is self-decided fresh each run from live research and the real user/task, never asked and never assumed from habit.
+Upgrade an existing UI to a high execution standard: refined, harmonious, modern, elegant, accessible. The style itself (bold or restrained, close to the current system or a deliberate departure) is decided fresh each run from current research and the real user/task, so it is never asked and never copied from habit.
 
-No depth-level flags, no `--wow` toggle, no upfront style Q&A. `vdesign <target>` is the only mode — audit-driven: fixes everything Phase 2 finds, regardless of depth (spacing → structural → visual-direction change). Every run opens with Phase 0 self-deciding all 18 style/structure criteria (typography, color, motion, shape, layout, structural freedom, boldness, and more — see `references/aesthetic-customization.md`), grounded in this run's live Domain Research and the real user/task read (Phase 1 Step 1), not asked. No artificial ceiling, no "found it but can't fix it, wrong level" outcome.
+`vdesign <target>` is the only mode. It is audit-driven: it fixes whatever the audit finds, from spacing up to a visual-direction change. Phase 1 self-decides all 18 criteria in `references/aesthetic-customization.md` and commits them to a Design Brief before any code changes.
 
-Do not migrate the tech stack. Do not change the DB schema or run a migration. API/service-layer changes are otherwise in scope when the redesign genuinely needs them.
+Boundaries: keep the tech stack, change only what the audit and the brief require (no unrequested features, tests, or docs), and never change the DB schema or run a migration. API/service-layer changes are in scope when the redesign needs them, because a better view often needs a field the API never returned.
 
 ---
 
-## Input Modes (7 types)
+## Input modes
 
 | Input | Handling |
-|-------|------------|
-| _(empty)_ | Ask the user 1 question: "Which part do you want to redesign?" |
-| `localhost:PORT/path` or URL | Take a screenshot first → then read the corresponding source files |
-| Route path (e.g. `/clients/[id]?tab=notes`) | Resolve to the corresponding pages/components files |
-| Component/feature name (e.g. `TreatmentPlanWizard`) | Grep to find the file → read the entire component tree |
-| `[Image]` / attached screenshot | Analyze the image → extract design gaps → apply fixes. If multiple images form a before/target pair (current state + an aspirational reference — a mockup, competitor screenshot, or AI-generated concept) → treat the reference as the bar to reach, not just inspiration; see "Beating a reference image" in Phase 3 |
-| `--pr` | `gh pr diff` to get changed files → redesign all UI files in it (requires gh, §2 of `repo-profile.md`; unavailable → falls back to `--diff`) |
-| `--diff` | `git diff --name-only` to get staged/unstaged → redesign UI files |
+|-------|----------|
+| _(empty)_ | Ask one question: "Which part do you want to redesign?" |
+| URL or `localhost:PORT/path` | Screenshot first, then read the matching source files |
+| Route path (e.g. `/clients/[id]?tab=notes`) | Resolve to the page and component files |
+| Component or feature name | Grep for the file, then read its component tree |
+| `[Image]` | Extract design gaps and apply fixes. A before/target pair (current state plus a mockup or competitor shot) makes the reference the bar to beat; see "Beating a reference image" in Phase 3 |
+| `--pr` | `gh pr diff --name-only`, redesign every UI file in it. Needs gh (`repo-profile.md` §2); unavailable falls back to `--diff` |
+| `--diff` | `git diff --name-only` for staged and unstaged UI files |
 
 ---
 
-## Personal Aesthetic (Quality Floor)
+## Quality floor
 
-This is the user's vocabulary for execution quality — **ALL** of these hold on every run, regardless of what Phase 0 self-decides. They govern *how well* a choice is executed, not *which* choice gets made:
+These hold on every run whatever the Design Brief decides. They govern how well a choice is executed, not which choice is made.
 
-| Keyword | Practical meaning in code |
-|---------|--------------------------|
-| **Refined** | Micro-details in the right place: consistent border-radius, even icon sizes, text-overflow handled, no odd spacing scale values |
-| **Harmonious** | Whatever direction Phase 0 committed to (matching the existing system or deliberately departing from it) is applied consistently — no "isolated island" of one-off styling within that direction; font-size/spacing/component-size follow a consistent modular scale/ratio, not arbitrary values |
-| **Modern** | No outdated patterns (old-style bordered tables, old-style form labels, flat buttons with no state); makes good use of whitespace |
-| **Elegant** | Clear hierarchy, low visual noise, no unnecessary decoration, clearly distinguished button hierarchy (primary/ghost/link) |
-| **Deep** | Clear elevation tiers, consistent shadow/border/light-source — never flat-and-lifeless, never skeuomorphic (unless the Elevation & Shadow decision explicitly lands on flat/monochromatic — then consistently flat, not accidentally so) |
-| **True to the Design Brief** | Matches whatever Phase 0 self-decided and committed to — design tokens and the project's existing visual language when that's what was decided, a deliberately new direction when that's what was decided. Executing a half-committed version of either reads as sloppy, not tasteful |
-| **Accessible** | Information isn't hidden; labels are clear; important icons have tooltips; empty/loading/error states are all present |
-| **Efficient** | Minimizes clicks/steps: bulk actions, inline-edit, smart defaults where safe |
+| Keyword | Meaning in code |
+|---------|-----------------|
+| Refined | Consistent radius, even icon sizes, text overflow handled, no off-scale spacing |
+| Harmonious | The committed direction is applied everywhere with no one-off islands; type, spacing, and sizes follow one modular scale |
+| Modern | No dated patterns (bordered tables, stateless flat buttons); whitespace used well |
+| Elegant | Clear hierarchy, low noise, a visible primary/ghost/link button hierarchy |
+| Deep | Clear elevation tiers with a consistent light source; flat only when the Elevation decision chose flat |
+| True to the brief | A half-committed version of either direction reads as sloppy, so execute the brief fully |
+| Accessible | Labels clear, important icons have tooltips, empty/loading/error states present |
+| Efficient | Fewer clicks: bulk actions, inline edit, safe smart defaults |
 
-**DO NOT** apply a bolder or more conservative aesthetic than Phase 0's self-decided Design Brief actually committed to — the Design Brief is the contract, not a suggestion to override toward personal habit in either direction.
-
----
-
-## Workflow: Scan → Audit → Fix → Verify
-
-### Phase 0: Determine scope
-
-1. Parse the argument to determine the input mode (see table above)
-2. URL/localhost → **take a screenshot immediately** using whatever screenshot tool is available (Playwright MCP, browser tool, etc.); none available → ask the user to paste a screenshot directly
-3. `--pr` → resolve the VCS profile per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 first (absent → assume full gh mode, today's default). Full gh mode → `gh pr diff --name-only` to get the file list. Degraded (no gh / non-GitHub) → print the §2 message and ask for a branch name, or fall back to `--diff` (`git diff --name-only`, needs no gh) — then continue into Phase 1 normally.
-4. Resolve the Project Profile: check `.vdesign/profile.md` at the target project's git root (`git rev-parse --show-toplevel`). Present → read and use it. Absent → infer UI library/design tokens from `package.json` dependencies, `tailwind.config.*`, and the components folder. Still ambiguous → ask 1 question, then offer (don't force) to save the answer to `.vdesign/profile.md` for next time.
-5. Empty → ask the user via `AskUserQuestion` — **exactly 1 question**: "Which part do you want to redesign?"
-6. **Domain Research** — always, every run, no flag, no gate on any criterion (this is the one source of truth for every pattern pulled in Phase 3 — see "How vdesign decides" in `references/aesthetic-customization.md` for the full 18-criterion taxonomy this feeds, self-decided rather than asked):
-   - **Source credibility over SEO rank** — pull from galleries/sources that are curated or judged (Awwwards, CSS Design Awards, Site Inspire, a real design studio's own case study, Behance/Dribbble "Featured"), never from generic SEO-ranked blog results. When the Design Brief (step 7) lands on *Game-inspired/Arcade*, shift priority toward game-UI-specific galleries (Dribbble tag "game UI", GameUIDatabase.com, Behance HUD design) over Awwwards — its Game category is thin compared to its usual categories.
-   - Domain slug = the domain from the Project Profile's context (e.g. "B2B Healthcare") + the target feature/page name resolved in step 1 (e.g. "booking form") — slugify (e.g. `healthcare-booking-form`)
-   - Aspect list is fixed, always these 8: `ui` (UI/Visual), `ux` (UX/Interaction), `animation` (Animation/Motion), `layout` (Layout/Responsive), `3d` (3D/WebGL/spatial-depth patterns), `text` (Typography/microcopy/tone-of-voice patterns), `features` (competitor/domain feature patterns for the target feature — informational only, never expands redesign scope), `flow` (competitor/domain user-journey patterns for the target feature — informational only, never expands redesign scope)
-   - Cache check per aspect, independently: look in `plans/reports/` for `researcher-vdesign-bold-<slug>-<aspect>*.md` created earlier this session/today — hit → reuse that aspect's report; miss → mark for fresh research
-   - Spawn all cache-missed aspects in parallel — one Task/Agent call per aspect, up to 8, in the same message. Design-pattern aspects (`ui`/`ux`/`animation`/`layout`/`3d`/`text`) each find current (2025-2026) patterns specific to `<target feature>` in `<domain>` product context, scoped to their one assigned aspect, per the source-credibility principle above — report concrete named patterns **with real source URLs** (the specific site/page studied, not just a pattern name). `features`/`flow` agents instead find current competitor/domain feature or flow patterns for `<target feature>` in `<domain>` — framed explicitly as context only, NOT scope to implement; the agent must not propose adding these to the redesign. Save each to `plans/reports/researcher-vdesign-bold-<slug>-<aspect>-<HHMMSS>.md`
-   - **Visual/technical study of top hits (orchestrator-level, not the research subagent — it has no browser tool):** after Domain Research reports back, browser automation (e.g. `claude-in-chrome`) available → open the 1-3 highest-value source URLs and (a) screenshot for overall gestalt (composition, color harmony, hierarchy — judgment a bullet list can't convey) and (b) run `getComputedStyle()` via the browser's JS-execution tool on 1-2 standout elements to extract real, exact design-token values (box-shadow, border-radius, color, transition-duration/easing) — computed values are unaffected by minified/obfuscated production CSS, unlike a site's raw downloaded stylesheet, usually illegible (hashed utility classes, no structure) and not worth fetching. Merge these values into Phase 3's pattern-pull. Browser automation unavailable → step skipped — Domain Research's text-based pattern-plus-source-URL reporting is still the floor, not optional.
-   - An aspect whose agent fails: retry once. Still failing (or `3d`/`features`/`flow` genuinely unavailable) → skip that aspect, note "unavailable" in the Design Brief (step 7) — never block the whole step and never fall back to a hardcoded pattern (there is no static catalog anymore). The other aspects (cached, freshly researched, or noted unavailable) still proceed.
-7. **Design Brief** — before touching any code: decide all 18 criteria from `references/aesthetic-customization.md` (Decision Priority there: this run's Domain Research > Project Profile > Phase 1 Step 1's Real User & Purpose read > Personal Aesthetic Quality Floor) plus Phase 1 Step 1's persona/task read, then synthesize into a concrete 5-10 line brief (see that file's Design Brief section) — actual typeface names, actual palette approach, actual motion timing, actual shape/icon/imagery direction, actual spacing scale, actual layout system, actual tone, actual boldness level. A one-word label per criterion is not a brief. State it out loud, write the 18 decisions + the synthesized Design Brief to `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md` before Phase 1 starts, noting step 6's status per aspect (cached/fresh/unavailable). Phase 3 re-reads this file before executing, rather than relying on conversation memory. An un-synthesized run (18 raw decisions, no committed brief) is the single biggest reason output still reads as generic/safe.
+The Design Brief is the contract. Do not make the result bolder or more conservative than it committed to, because drifting toward personal habit is the main way output turns generic.
 
 ---
 
-### Phase 1: Scan
+## Workflow: Scope → Brief → Audit → Fix → Verify
 
-**Step 1 — Real User & Purpose:** before tracing any component, read the actual data shape feeding this page/component — its prop types/interfaces, the query/hook/server action it calls, and that call's response type or Zod schema (read the type, don't infer field shape from what's currently rendered) — and check whether the backing DB schema (when reachable: Drizzle/Prisma schema file, migration) carries a field never even fetched (feeds Phase 2's Sparse/under-filled check). Then put yourself in the actual persona who uses this screen — role, task goal, context (time pressure, device, frequency, skill level) — inferred from the route/component name plus the Project Profile's context (e.g. "B2B Healthcare: clarity > impressiveness"). From that, state concretely: which field/action must stand out, what's noise worth cutting, and whether the current structure (table, card grid, list, detail panel, form, kanban board, timeline, masonry/bento grid, split master-detail, calendar/heatmap, comparison matrix, tree/outline, carousel/feed — and more, pick by what the data structure and real task actually call for) genuinely fits what this persona is doing, or forces an awkward shape. This is the sole gate on structural freedom (see `references/aesthetic-customization.md`'s Round 0): restructure whenever it genuinely serves the real task — not bounded by "proportional to what the audit found" for structural moves specifically — but every restructure must trace to a concrete reason stated here, never "because it could look better." Write the persona, task, and the 2-3 resulting IA decisions into `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md` alongside the Design Brief, so Phase 3/4 can verify against it. An un-grounded audit still risks polishing the wrong structure.
+### Phase 0: Scope and read
 
-**Step 2 — Component Tree Traversal:** trace the component tree — not just read 1 file:
+1. Parse the input mode. For a URL or localhost target, screenshot immediately with whatever browser tool exists; none available means ask the user to paste one.
+2. `--pr`: resolve the VCS profile per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (absent: assume full gh mode). Degraded mode: print the §2 message, then ask for a branch name or fall back to `--diff`.
+3. Project Profile: use `.vdesign/profile.md` at the git root (`git rev-parse --show-toplevel`) if present. Otherwise infer the UI library and design tokens from `package.json`, `tailwind.config.*`, and the components folder. Still ambiguous: ask one question and offer to save the answer to `.vdesign/profile.md`.
+4. **Real User & Purpose read.** Read the real data shape feeding the target: prop types, the query/hook/server action it calls, and the response type or Zod schema (read the type; rendered output hides unused fields). When the DB schema file is reachable, note fields that are never fetched; Phase 2's sparse check uses them. Then take the persona's view (role, task goal, time pressure, device, skill level) inferred from the route name and the profile context. State which field or action must stand out, what is noise, and whether the current structure (table, card grid, kanban, timeline, master-detail, bento, calendar, comparison matrix, tree, feed, or whatever the data and task call for) fits that persona.
+5. This read is the only gate on structural freedom: restructure whenever it serves the real task, and trace every restructure to a concrete reason stated here. Record the persona, the task, and 2-3 information-architecture decisions in `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md`.
+
+---
+
+### Phase 1: Research, Brief, and scan
+
+The Design Brief depends on Phase 0's read and on the research below, so both come first. Never pick patterns before the brief is written, because the result is a grab-bag instead of a design.
+
+**Domain Research.** Slug = domain from the profile + target feature (e.g. `healthcare-booking-form`).
+
+- Scale the aspects to the target, because broad fan-out on a small target costs far more than it returns:
+  - Single component or a PR diff of 3 files or fewer: `ui`, `ux`.
+  - One page or feature (default): add `animation`, `layout`, `text`.
+  - Whole multi-cluster page or a whole flow: add `3d` (only if the brief might use spatial depth), `features`, `flow`. The last two are informational context and never expand the redesign scope.
+- Reuse per aspect: a `plans/reports/researcher-vdesign-bold-<slug>-<aspect>*.md` from this session or today counts as a hit.
+- Spawn one subagent per missed aspect, all in one message. Each brief must give: the aspect and target feature in its domain; the goal (current named patterns, not generic advice); the sources (curated or judged galleries and real studio case studies such as Awwwards, CSS Design Awards, Site Inspire, Behance/Dribbble Featured; for a Game-inspired brief, game-UI galleries instead); the output (named patterns with real source URLs, saved to `plans/reports/researcher-vdesign-bold-<slug>-<aspect>-<HHMMSS>.md`); and the boundary (research only, no code edits, no proposing scope for `features`/`flow`).
+- Top-hit study, done by you because subagents have no browser: if browser automation exists, open the 1-3 best source URLs, screenshot for composition and hierarchy, and read `getComputedStyle()` on 1-2 standout elements (box-shadow, radius, color, transition). Computed values survive minified CSS. No browser tool means skip this; the text reports are the floor.
+- A failed aspect retries once, then is marked "unavailable" in the brief and replaced by the profile plus the quality floor. It never falls back to a memorized pattern list.
+
+**Design Brief.** Decide all 18 criteria using the priority order in `references/aesthetic-customization.md` (Domain Research, then Project Profile, then the Real User & Purpose read, then the quality floor). Then write a concrete 5-10 line brief: real typeface names, palette approach, motion timing, shape/icon/imagery direction, spacing scale, layout system, tone, boldness level. A one-word label per criterion is not a brief. Save the 18 decisions and the brief to the same `vdesign-brief-<slug>-<HHMMSS>.md`, with the status per aspect (cached, fresh, skipped by size, unavailable). Phase 3 re-reads this file instead of trusting conversation memory.
+
+**Component tree.** Trace it, not just one file:
 
 ```
 Target component/page
-  └── Import local components (level 1) → read
-        └── Import local sub-components (level 2) → read
-              └── Stop at UI library components (@etaro/ui, shadcn, MUI, Radix)
+  └── local components (level 1) → read
+        └── local sub-components (level 2) → read
+              └── stop at UI library components (the project's own UI package, shadcn, MUI, Radix)
 ```
 
-For each file read, identify:
-- Tailwind classes currently used (spacing, color, typography)
-- Components from the UI library: using the right variant? already customized?
-- Layout pattern: flex/grid/absolute positioning
-- Existing animation/transition
-- Existing states: loading, empty, error, hover, focus, active, disabled
+For each file note the classes in use, whether library components use the right variant, the layout pattern, existing motion, and which of loading, empty, error, hover, focus, active, disabled exist. Also read the design tokens (`tailwind.config`, `globals.css`) and a good reference component (the profile's "Good reference UI" entry, else the most polished component in the codebase).
 
-**Also gather:**
-- `tailwind.config` or CSS vars (`globals.css`) → design tokens
-- Find a component in the project that serves as a **good reference** — check the Project Profile's "Good reference UI" entry first (see Project Profile section below); absent → infer from the most polished/consistent-looking component in the codebase → read it to learn the pattern
+When the user says "like X", read X first, because guessing its pattern produces a near-miss.
 
-**Step 3 — When the user says "like X" or "similar to X":**
-→ MUST read component/page X first before implementing — do not guess the pattern
-
-**Step 4 — Component Inventory (only when the target is a whole page/URL with 2+ component clusters; skip for a single-component or PR-diff target — those keep the existing single-pass Fix flow in Phase 3):** enumerate every visible component INSTANCE on the page as a numbered list — not just types (3 stat cards are 3 separate line items, not 1 "stat card" entry). Group instances adjacent in the render tree that share a visual/structural role into clusters (e.g. 3 stat cards in a row = 1 cluster; the data table below them = a separate cluster; the nav = its own cluster). Write this list, with a checkbox per instance, to `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md` under a new `## Component Inventory` section — Phase 3 picks its pilot cluster from here, Phase 4 verifies every checkbox got addressed before reporting done.
+**Component Inventory** (only for a whole page or URL with 2 or more component clusters): list every visible instance as a numbered checkbox (three stat cards are three items) and group adjacent same-role instances into clusters. Append it to the brief file under `## Component Inventory`. Phase 3 picks its pilot from it and Phase 4 checks every box.
 
 ---
 
 ### Phase 2: Audit
 
-Read `references/audit-checklist.md` in full and go through each category — only flag issues that **actually affect visual/UX quality**. That file also covers the framework-conditional syntax note (Tailwind/React shorthand throughout is illustrative, translate to the project's actual stack).
-
-<!-- The full ~150-item checklist (Typography through Sticky & Scroll Behavior) lives in references/audit-checklist.md — kept out of this file to keep the skill body lean. -->
-
-Write the full findings list (checked/flagged items, plus the content-density candidate list) to the same `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md` file (append a `## Audit Findings` section) before Phase 3 starts. When Phase 1's Component Inventory ran, tag each finding with the cluster(s) it belongs to (from the inventory list) so Phase 3 can identify which cluster carries the most findings.
+Read `references/audit-checklist.md` in full and go through each category. Flag only issues that affect visual or UX quality. Append the findings (checked, flagged, and the content-density candidates) to the brief file under `## Audit Findings`; when an inventory exists, tag each finding with its cluster.
 
 ---
 
 ### Phase 3: Fix
 
-**Pilot cluster first, then propagate (only when Phase 1's Component Inventory ran — target is a whole page/URL with 2+ clusters). A single-component or PR-diff target has no Component Inventory — skip straight to "Fix everything Phase 2 found" below, applied once across the whole target, no pilot step.**
+Fix everything Phase 2 found. Spacing, states, component swaps, layout restructures, and full visual-direction changes are all in scope. Keep depth proportional: a spacing-only finding does not license a JSX rewrite. The exception is a generic layout where every section is the same box regardless of content; that is itself a structural finding, so restructure it to fit the content. Structural moves follow the Phase 0 read, not the proportional bound.
 
-1. Pick the cluster tagged with the most Phase 2 findings as the pilot — ties broken by whichever appears first in the Component Inventory list.
-2. Redesign the pilot cluster at full depth — everything below in this Phase 3 section (Design Brief execution, boldness patterns, hard rules, anti-slop gate) applies to it in full.
-3. Present the pilot for approval before touching any other component in the inventory: URL/localhost target → screenshot, show before/after; otherwise describe the treatment in concrete terms (colors, spacing, motion) and show the code diff for the pilot cluster only. Ask via `AskUserQuestion`: approve / adjust (user describes what to change) / try a different direction.
-4. On adjust or a different direction: redo the pilot with that feedback, re-present. Cap at 3 cycles — past 3, ask "approve with the noted disagreement, or stop the run."
-5. Once approved: propagate the SAME design language (color, elevation, radius, spacing scale, motion — not literal copied values) to every remaining item in the Component Inventory, checking each off as done. A component of a different type than the pilot keeps its own correct pattern (a table stays a table, a form stays a form) restyled to match the language, not forced into the pilot's literal shape.
-6. Update the Component Inventory checkboxes in `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md` as each item completes — Phase 4 verifies against this.
+**Pilot first (only when an inventory exists).** A single component or PR diff skips this and is fixed once.
+1. Take the cluster with the most findings (ties: first in the inventory) and redesign it at full depth.
+2. Present it before touching anything else: URL targets get a before/after screenshot, others get a concrete description plus the pilot's diff. Ask via `AskUserQuestion`: approve, adjust, or try another direction. Cap at 3 cycles, then ask whether to approve with the noted disagreement or stop.
+3. After approval, propagate the same design language (color, elevation, radius, spacing scale, motion; not literal values) to the rest, checking each box. A table stays a table, restyled, not forced into the pilot's shape.
 
-**Mid-run decision revisit.** Phase 3 execution reveals one of Phase 0's self-decided criteria no longer fits (e.g., decided *Keep existing tokens* but a real gap now calls for a new accent color) → no need to ask, just re-decide that one criterion against the same Decision Priority (`references/aesthetic-customization.md`), update the Design Brief file's synthesis line for that criterion only with the new reasoning, and continue Phase 3 from where it left off. Note every revisit in the final report so the user can see what changed and why.
+**Execute the brief.** A bold brief (Experimental or Trend-forward) warrants bespoke typography scale, asymmetric layout, custom motion, and expressive completion moments; a restrained brief (Brand-centric or Functional) stays close to the existing system. Restrained still means the full audit drives restyling: a component with zero bugs can still fail hierarchy or depth checks. Usability principles (all states present, visible-choice limits, confirm only destructive actions) are a floor boldness must clear.
 
-Fix everything Phase 2 found — spacing, states, component swaps, grid/layout restructure, and full visual-direction changes are all in scope by default; no depth ceiling to stay under. Depth should still be *proportional* to what's actually broken: a spacing-only audit finding does not license a full JSX rewrite (see Anti-Patterns — "rewrite the entire layout when only a tweak was needed"). This cuts both ways — a genuinely generic/repetitive layout (every section rendered as the same box regardless of what it actually holds or does) is itself a structural-level finding (Information Architecture's view-type fit, Proportion & Scale Harmony's silent-drift check), not a shape to preserve out of caution; restructuring so each section fits its real content is the *proportional* fix there, not an unrequested rewrite. Structural/view-type changes specifically follow Phase 1 Step 1's Real User & Purpose read, not this proportional bound (see `references/aesthetic-customization.md`'s Round 0): restructure whenever it genuinely serves the real task that read surfaced, with no "proportional to the audit" ceiling for structural moves — but still traceable to that concrete reason, never done just because the audit found a fit problem worth mentioning.
+**One signature element.** When the brief is bold, commit to one move (a color discipline, a typeface, a motion language, an illustration style, or an asymmetric layout gesture) and keep the rest restrained around it. Boldness spread thin reads more generic than one committed move, and it must be structural (scale, contrast, motion that clarifies), never purely decorative. A CSS/SVG grain overlay under 10% opacity is a no-dependency texture option.
 
-**Execute the Design Brief.** Phase 0 step 7's self-decided Design Brief — not a flag, not a user answer — decides how bold or restrained this run is, informed by this run's Domain Research and Phase 1 Step 1's Real User & Purpose read. A brief that lands on *Experimental/bold* or *Trend-forward* → bespoke art direction, expressive typography scale, unique/asymmetric layout, custom motion, decorative accents, expressive selection/completion/feedback moments are all warranted — a genuinely delightful transition or a celebratory completion moment is not "unnecessary," it's what the brief calls for. A brief that lands on *Brand-centric/cohesive* or *Functional/minimalist* → stay restrained and close to the existing system. Restrained does not mean audit-fix-only — Phase 2's full checklist (typography hierarchy, elevation/depth, proportion & scale harmony, redundant/dated content) still drives Phase 3 on every component in scope, just executed without decorative moves; a component with zero functional bugs can still fail these checks and need restyling. Either way, what stays as a floor, not a cap: Phase 2's usability principles (all required states present, Hick's Law visible-choice limits, confirm-only-destructive-actions) — boldness must still clear them, not bypass them. Off-limits entirely, regardless of the brief: the hard technical rules below (accessibility, tech stack, DB schema/migration changes, GPU-safe motion) — safety/engineering constraints, not aesthetic choices, no decision above touches them.
+**Pull patterns only from this run's research reports** (`ui`, `ux`, `animation`, `layout`, `3d`, `text`). `features` and `flow` informed the brief and are not pattern sources.
 
-**Beating a reference image, not just matching it.** Input includes a reference/target image (an aspirational mockup, competitor screenshot, or AI-generated concept — see Input Modes) rather than only a "before" screenshot to fix → treat it as the bar to clear, then exceed it on the axes a static image structurally cannot compete on: consistency across every screen in the same flow (not just the one shown), real motion/interaction (a static image is frozen — this run's Domain Research findings on current motion patterns are the source for this, not a static catalog), measurable precision (exact spacing-grid/contrast-ratio conformance — a static mockup often has small unmeasured misalignments a real implementation shouldn't repeat), and real responsiveness/accessibility (the mockup only had to look good at one fixed size). Match its specific devices first (grouping, color tiers, iconography, layout moves), then win on these axes — don't stop at parity.
+**Beating a reference image.** Match its devices first (grouping, color tiers, iconography, layout moves), then exceed it where a static image cannot compete: consistency across the whole flow, real motion, measured spacing and contrast, and real responsiveness and accessibility.
 
-Requires the Design Brief from Phase 0 step 7 first — commit the brief, then pull patterns. Never pull patterns first and rationalize a brief after the fact.
+**Mid-run revisit.** If execution shows one decision no longer fits (e.g. *Keep existing tokens* but a real gap needs an accent), re-decide just that criterion by the same priority, update its line in the brief file, continue, and list it in the final report.
 
-**When the brief calls for boldness: one signature element, not scattered boldness.** Commit to ONE bold move — a color discipline, a custom typeface, a motion language, an illustration style, or an asymmetric layout gesture — and keep everything else restrained around it. Half-committed boldness (a little bit of everything) reads *more* generic than full commitment to one thing; the #1 reason bold output has read as safe in practice. Boldness must be **structural** (typography scale, contrast, motion-as-clarity, custom voice), never purely decorative.
+**Dependencies.** Check `package.json` first. Motion libraries that are standard for this kind of work (GSAP with ScrollTrigger, Motion, Lenis, native scroll-driven animations and View Transitions, Rive, Lottie) fit an *Expressive* or *Balanced* motion decision. Three.js/React Three Fiber (650KB+), Barba.js, paid tools, and custom shaders need the user's approval because of their weight or cost. If the project's own instructions (e.g. its CLAUDE.md) require asking before any new dependency, that rule wins: ask once for the whole set.
 
-CSS/SVG grain-texture overlay (opacity <10%, `<feTurbulence>` or CSS `filter`) is also available as a texture technique when the brief calls for it — no dependency needed.
+**Anti-slop gate.** Applies on every run, because a restrained brief means restrained, not generic. Fail the run on: Inter/Roboto as the only typeface, a purple-to-blue gradient as the dominant look, 3 or more identical cards in a row, placeholder names or round numbers ("John Doe", 50%, $100), generic startup copy ("Elevate", "Seamless", "Next-Gen"), a pure `#000000` background, missing hover/focus states, and unmodified stock flat illustration (unDraw, Storyset, DrawKit, Blush, Icons8 Ouch, ManyPixels, Open Peeps). Illustration preference, best first: custom hand-drawn, line-art, isometric 3D, heavily customized flat, geometric/abstract, none. A single small (32px or less) custom line or duotone icon placed with intent is not slop.
 
-**Pattern-pull comes exclusively from this run's Domain Research, never a static catalog.** Once the Design Brief is committed, pull concrete patterns from this run's own Domain Research reports (`ui`/`ux`/`animation`/`layout`/`3d`/`text` aspects, Phase 0 step 6 — `features`/`flow` reports stay informational-only for the Design Brief, never pattern-pull material) — real, named, source-cited patterns from this run's credible 2026 sources, not a memorized recipe book. An aspect noted "unavailable" (research failed, see step 6) → fall back to the Project Profile + the Personal Aesthetic Quality Floor for that slice, never to a hardcoded pattern. Phase 2's audit always runs in full — covers visual hierarchy, proportion, elevation, and content harmony, not just broken states/a11y/responsive; when the brief is bold it's a floor, not a ceiling on top of that — output is judged by how distinctive the ONE committed signature element is, not just absence of defects.
-
-**Dependency allowlist — add directly, no need to ask, when the self-decided Motion/Animation choice is *Expressive* or *Balanced*:** GSAP (+ ScrollTrigger), Motion (Framer Motion), Lenis (smooth scroll), native CSS scroll-driven animations / View Transitions API, Rive, Lottie — the de-facto standard toolkit on 2025-2026 award-winning sites.
-**Still stop-and-ask, regardless of the brief:** React Three Fiber/Three.js (650KB+ — only if 3D is genuinely core to the concept), Barba.js, any paid/SaaS tool beyond Rive, custom WebGL/GLSL shaders.
-
-**Anti-slop gate before reporting done — every run, regardless of the brief** (a *Functional/minimalist* pick means restrained, not generic): `~/.claude/skills/frontend-design/references/anti-slop-rules.md` exists → read it for the full checklist; absent → the list below is the floor. At minimum fail the run on: Inter/Roboto as the only typeface, purple-to-blue gradient as the dominant aesthetic, 3+ visually-identical cards in a row, placeholder names/numbers ("John Doe", round 50%/$100), generic startup copy ("Elevate", "Seamless", "Next-Gen"), pure `#000000` background, missing hover/focus states, **unmodified stock flat illustration** (unDraw/Storyset/DrawKit/Blush/Icons8-Ouch/ManyPixels/Open-Peeps without custom palette/poses — same tier as purple-gradient; fix by tier: custom hand-drawn > line-art/sketch > isometric 3D > heavily-customized flat > geometric/abstract > skip illustration). **Exception — not slop**: a single small (≤32px) custom line/duotone icon placed with clear intent as a decorative anchor (e.g. beside a title) is NOT a stock illustration scene, and is encouraged, not flagged.
-
-Still mandatory regardless of the brief: accessibility (contrast, focus rings, all required states), no tech-stack migration, no DB schema/migration changes, GPU-safe motion only (`transform`/`opacity` — never animate `width`/`height`/`top`/`left`; mobile LCP is already tight, bold must not blow the budget).
-
-**Hard rules (apply to every run, regardless of the brief):**
-- ✅ Work with the existing tech stack — DO NOT migrate framework
-- ✅ API/service layer is open to change when the redesign genuinely needs it — add/change an endpoint, change a response shape, change service logic. DB schema/migration changes stay off-limits regardless.
-- ✅ **Content-exposure decisions get one batched confirmation, not silence, not per-item approval**: the Information Architecture "sparse/under-filled" check (Phase 2) and Phase 1 Step 1's Real User & Purpose read compile real unrendered-or-unfetched data worth surfacing (including fields that exist at the DB layer but were never even fetched) into one short list before Phase 4 ships — present it as a single `AskUserQuestion` ("wire up these N fields — all / some / none") rather than one question per field, then implement the accepted ones end-to-end (API/service layer + UI). A data-exposure decision, not a purely aesthetic one, so it still gets a confirmation even where execution freedom elsewhere doesn't.
-- ✅ Check `package.json` before adding a dependency — except the dependency allowlist above, addable directly when the Motion decision calls for it
-- ✅ When hiding (not deleting) → use opacity/visibility, don't unmount
-- ✅ Use Tailwind tokens — no hardcoded hex
-- ✅ Use the Project Profile's "Good reference UI" entry as the reference standard when the Design Brief lands on *Brand-centric/cohesive* — absent → the best-looking component already in the project; a *Functional/minimalist*, *Experimental/bold*, or *Trend-forward* brief may depart from it
-- ✅ **Responsive is mandatory**: every layout change MUST be verified at 3 viewports — mobile (375px), tablet (768px), desktop (1280px); write mobile-first, then override with sm:/lg:
-- ✅ Third-party styled component (has `import 'lib/*.css'`) wrapped in a wrapper div → wrapper owns ALL visual state (border, ring, disabled opacity); null out all border/shadow inside the component via CSS var override + scoped `!important`
-- ✅ **ARIA discipline**: prefer native HTML (`<button>`, `<dialog>`, `<details>`, `<label for>`) over ARIA. Only add `role`/`aria-*` when native HTML can't express the interaction, and when added, ensure the full role+state+property set is present — never add ARIA attributes "just in case"
-- ❌ DO NOT add complex animation if Motion/Framer isn't already in the project — exception: the dependency allowlist above applies when the Motion decision calls for it
-- ❌ DO NOT add new brand colors — only use existing tokens, unless the Color Palette decision is *Accent colors only* (new accent) or *Full palette redesign*/*Dynamic* (wholesale new palette)
-- ❌ DO NOT use the component library's default color (shadcn blue) if the project has its own primary color
-- ❌ DO NOT add unnecessary toast notifications — exception: a deliberate celebratory/completion moment the Design Brief actually calls for is not "unnecessary" — the bar is whether it's deliberate, not whether it's minimal
-- ❌ DO NOT change the DB schema or run a migration
+**Hard rules**, each with its reason:
+- Work in the existing stack; a framework migration is out of scope.
+- DB schema and migrations stay off-limits. API/service changes are allowed when the redesign needs them.
+- Content exposure gets one batched confirmation: compile the unrendered or never-fetched fields from Phase 0 and Phase 2 into one `AskUserQuestion` ("wire up these N fields: all / some / none"), then implement the accepted ones end to end. It is a data decision, not an aesthetic one, so it needs a yes even though style does not.
+- Hide with opacity/visibility, not unmount, so component state survives.
+- Use design tokens, not hardcoded hex, so theming keeps working. New brand colors only when the Color decision is *Accent only*, *Full palette*, or *Dynamic*, and never the library's default color (e.g. shadcn blue) when the project has its own primary.
+- Use the profile's "Good reference UI" as the standard when the brief is Brand-centric.
+- Write mobile-first and override with `sm:`/`lg:`; responsiveness is verified in Phase 4.
+- Wrapper around a third-party styled component: the wrapper owns every visual state (border, ring, disabled opacity); null out the inner border and shadow with a CSS-variable override.
+- Prefer native HTML (`<button>`, `<dialog>`, `<details>`, `<label for>`) over ARIA. Add `role`/`aria-*` only when native cannot express it, and then the full role, state, and property set, because partial ARIA is worse than none.
+- Animate only `transform` and `opacity` (never width, height, top, left), so motion stays GPU-composited and mobile LCP stays inside budget.
+- Add a toast only when it is a deliberate completion moment; the bar is intent, not minimalism.
+- Accessibility (contrast, focus rings, all states) is never traded for style.
 
 ---
 
 ### Phase 4: Verify
 
-1. Initial URL/localhost → take an after screenshot, compare before/after
-2. Image input → verify the code matches the image's intent
-3. Run the project's format script (if it has one)
-4. **Accessibility verify**: project has (or the user allows adding) `@axe-core/playwright` or plain `axe-core` → run a short script against the audited route/component, print violations. Unavailable → print the equivalent manual-check command for the user to run themselves — visual/manual review should not be the only verification for accessibility.
-5. Just edited an image file directly under `public/` (overwritten at the same path, name unchanged) and the user reports "not seeing the change" → don't rush to edit the code/image again; tell the user to hard-refresh or clear `.next/cache/images` + restart the dev server first — Next.js Image Optimizer caches by URL+size, not by file content, so the fix is likely already correct but an old cached version is still being served
-6. **Adversarial Verify** (subagent — only when Fix actually touched structural/JSX-level code: component swap, grid/layout restructure, visual-direction change — OR the Design Brief's boldness criterion was *Experimental/bold* or *Trend-forward* — OR UX Efficiency / Content Design & Error Prevention category fixes touched frontend state/interaction logic): spawn 1 fresh subagent with the diff, Phase 2's audit checklist, and the anti-slop gate. It re-audits the final state independently — no access to this run's reasoning — and reports PASS or a list of remaining issues (audit items still broken, fixes that overstepped what was actually needed, anti-slop violations). Issues found → return to Phase 3, fix, re-run this step once. Save its report to `plans/reports/vdesign-adversarial-<slug>-<HHMMSS>.md` before the orchestrator acts on it. Mirrors `vreview`'s Phase 4 Adversarial Pass in this same skill pack.
-7. **Self-Check** (inline, every run, no subagent): before writing the short report, confirm — (a) fix depth was proportional to what Phase 2 actually found, no unrequested rewrites beyond that; (b) every applicable Phase 2 category was addressed or explicitly marked not-applicable; (c) the anti-slop gate (including the illustration check) was actually checked off, not just implied; (d) the final result actually matches the Design Brief from Phase 0 step 7, not a quieter or louder version of it; (e) when Phase 1's Component Inventory ran, every item in it is checked off in `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md` or explicitly marked not-applicable with a 1-line reason — no silently skipped component.
-8. **Content-exposure confirmation** (only if Phase 2's sparse/under-filled check or Phase 1 Step 1 flagged something): read the compiled candidate list from `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md`'s `## Audit Findings` section before asking. Before the short report, present the whole list as ONE `AskUserQuestion` ("wire up these N fields — all / some / none"), not one question per field. On an "all"/"some" answer, wire the accepted fields through the API/service layer and the UI before reporting done (see `SKILL.md`'s Hard rules) — never silently add any of it without this one confirmation.
-9. **Short report**: "Redesigned [X]. Main changes: [list 3-5 bullet points]"
-   - No long summary
-   - Only mention significant changes
-   - 1 line stating the committed Design Brief (condensed — boldness level + the 1-2 criteria that most shaped the result), plus Domain Research's status per aspect (cached/fresh/unavailable), plus Adversarial Verify's PASS/issues-found outcome when it ran
+1. **Viewports (375, 768, 1280px).** For every layout change, load the route at each width (browser tool resize or `page.setViewportSize` in Playwright), screenshot, and run this check; any overflow or clipped content returns to Phase 3:
+   ```js
+   [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1).slice(0, 5)
+   ```
+   An empty list plus `document.documentElement.scrollWidth <= innerWidth` means no horizontal overflow; then check by eye that nothing is clipped, stacked wrongly, or below 44px as a touch target. A component target with no route: render it where the project previews components. No browser or runnable page: say that viewport verification was not done, name the widths, and do not report it as verified.
+2. URL target: compare the before and after screenshots at 1280px. Image input: confirm the code matches the image's intent.
+3. Run the project's format script and its typecheck or lint if it has them, and fix what the redesign broke.
+4. **Accessibility.** If `@axe-core/playwright` or `axe-core` is present (or the user allows adding it), run it against the route and print violations. Otherwise print the manual-check steps for the user, since visual review alone does not verify accessibility.
+5. **Adversarial verify**, only when the fix touched structure (component swap, layout restructure, direction change), the brief was bold, or UX-logic fixes touched interaction state. Spawn one fresh subagent with the diff, `references/audit-checklist.md`, and the anti-slop gate, read-only, and no access to your reasoning. It returns PASS or a list of remaining issues, over-reaching fixes, and slop violations. Save its report to `plans/reports/vdesign-adversarial-<slug>-<HHMMSS>.md`. Fix and re-run once if it finds issues.
+6. **Self-check** (inline): fix depth was proportional; every applicable audit category was addressed or marked not applicable; the anti-slop gate was actually checked; the result matches the committed brief; every inventory box is checked or marked not applicable with one reason.
+7. **Content-exposure confirmation**, only if candidates were flagged: ask the single batched question from the Hard rules, then wire the accepted fields through the API and UI before reporting.
+8. **Short report**: "Redesigned [X]. Main changes:" with 3-5 bullets, then one line with the committed brief (boldness level and the 1-2 criteria that shaped it), the research status per aspect, the viewport result, and the adversarial outcome when it ran. List every mid-run revisit and anything not verified.
+
+Next.js note: an image overwritten at the same path under `public/` may still show the old version because the optimizer caches by URL and size. Hard-refresh or clear `.next/cache/images` before editing again.
 
 ---
 
 ## Project Profile
 
-Resolve in this order before Phase 1:
-1. `.vdesign/profile.md` at the target project's git root — if present, read and use it directly.
-2. Absent → infer from `package.json` dependencies, `tailwind.config.*`, and the components folder.
-3. Still ambiguous → ask 1 question, then offer (don't force) to save the answer to `.vdesign/profile.md` for next time.
-
-### Example — eTARO project profile (illustrative shape, not a default)
+Resolution order is in Phase 0. A profile is a short table of constraints; a typical shape:
 
 | Constraint | Detail |
-|------------|----------|
-| UI library | `@etaro/ui` (packages/ui) + shadcn/ui — always use before writing raw HTML |
-| Design tokens | CSS vars in `globals.css` — don't add new colors |
-| Motion library | Magic UI + Framer Motion already available — usable for micro-animations |
-| Context | B2B Healthcare: **clarity > impressiveness**, **simplicity > creativity** |
-| Good reference UI | Booking form, Sessions page, Notes UI — learn patterns from these |
-| Font | Follow existing config — don't change |
-| Form fields | MUST use `FormTextField`, `FormSelectField`, etc. — no raw boilerplate |
+|------------|--------|
+| UI library | The project's own UI package plus shadcn/ui; use it before raw HTML |
+| Design tokens | CSS variables in `globals.css`; no new colors |
+| Motion library | e.g. Framer Motion already installed |
+| Context | e.g. B2B healthcare: clarity over impressiveness |
+| Good reference UI | Two or three well-built screens to learn patterns from |
+| Form fields | Use the project's form wrappers, not raw boilerplate |
 
----
+## Pitfalls beyond the audit checklist
 
-## Anti-Patterns (DO NOT do)
-
-- ❌ Rewrite the entire layout when only a "tweak" of one part was needed
-- ❌ Change the brand color because it's "nicer" — only use tokens
-- ❌ Ask the user before reading the code — scout first, ask only when actually needed
-- ❌ Fix padding but break responsiveness
-- ❌ Report "done" without verifying via screenshot (when a URL is available)
-- ❌ Use bare `grid-cols-2` or `grid-cols-3` with no mobile collapse (`grid-cols-1 sm:grid-cols-2`)
-- ❌ Use fixed width (`w-[320px]`) with no responsive fallback
-- ❌ Hide an element with `hidden sm:block` without providing a mobile alternative
-- ❌ Hover-only action (`group-hover:opacity-100`) with no visible fallback on mobile
-- ❌ Fixed-height Modal/Dialog on mobile — causes content overflow
-- ❌ Fixed bottom element without `pb-safe` / `env(safe-area-inset-bottom)`
-- ❌ Image with default `objectPosition` when the subject gets cropped off on mobile
-- ❌ Animate opacity of child components — container only
-- ❌ Unmount a component to hide it — use CSS visibility/opacity if state needs to be preserved
-- ❌ Use raw HTML elements instead of `@etaro/ui` components
-- ❌ Use shadcn/MUI default colors when the project has its own primary color token
-- ❌ Add unnecessary toast notifications (a deliberate celebratory/completion moment the Design Brief actually calls for is not "unnecessary" — see Phase 3)
-- ❌ Let the scrollbar eat into the content area's width — always use an overlay/transparent scrollbar
-- ❌ Inconsistent tab style within the same page — check cross-component tab consistency
-- ❌ Guess a component's pattern "like X" — MUST read X first
-- ❌ `float` / `shape-outside` inside a `flex` or `grid` container — has no effect, the browser silently ignores it (no error, no warning), causing confusing layout breakage
-- ❌ Decorative overlay (shine border, border beam, floating badge, glow) without an explicit `z-index` — a sibling with `position: relative` appearing later in the DOM will cover it due to DOM-order stacking when `z-index: auto`
-- ❌ Full-bleed image using `object-contain` without matching the container's `aspect-ratio` to the image file's actual ratio — gets letterboxed on both sides even though the container is full width
-- ❌ Setting `h-full` only on the grid item wrapper while forgetting to set it on the inner visual frame (border/bg/shadow) too — cards still end up mismatched in height even though the grid stretched items equally
-- ❌ Forcing `line-clamp`/fixed height onto copy of varying length across parallel cards instead of rebalancing the text length — line-clamp is a band-aid, rebalancing the copy is the actual root fix for "harmoniousness"
-- ❌ Change structure or add a new field without tracing it back to a concrete need surfaced by the Real User & Purpose read (Phase 1 Step 1) — full creative/API freedom is not license for arbitrariness
-- ❌ Skip synthesizing Phase 0 step 7's self-decided criteria into a real Design Brief before touching code — an un-anchored run still reads as generic/safe; picking patterns before picking a direction produces a grab-bag, not a coherent design
-- ❌ Re-run Domain Research for an aspect already cached this session/day for the same domain-slug (Phase 0 step 6) — check `plans/reports/` per-aspect first, reuse instead of re-researching; only cache-missed aspects get a fresh agent
-- ❌ Mix more than the allowed count of font-size/spacing/border-radius values without a derivable scale — arbitrary one-off values break proportion harmony
-- ❌ Flat, single-tier surfaces everywhere with no elevation distinction — everything reads at the same visual depth
-- ❌ Heavy shadow/skeuomorphic depth in a B2B context — over-correcting flatness into clutter
-- ❌ List/table with only one-at-a-time actions and no bulk/multi-select when the action is naturally batchable
-- ❌ Confirmation dialog for a reversible, low-risk action — use undo instead
-- ❌ Generic button labels ("Submit", "OK") when a specific outcome-based label is available
-- ❌ Validating a field on every keystroke instead of on blur — creates error-message flicker while typing
-- ❌ Reusing the same dark-mode shadow/contrast values from light mode without re-verification
-- ❌ Burying the highest-priority info/action below the fold on a dense dashboard
-- ❌ Picking table row density arbitrarily instead of matching the actual user type (casual vs power-user)
+- Rewriting the whole layout when one part needed a tweak; it hides the real change and risks regressions.
+- Line-clamping varied-length copy in parallel cards; rebalancing the copy is the root fix for uneven cards.
+- Changing structure or adding a field with no link to the Phase 0 read; creative freedom is not license for arbitrariness.
+- Writing code before the brief exists; patterns picked first produce a grab-bag.
+- Re-running research for an aspect already cached for the same slug; it wastes subagents.
+- Reporting done without a screenshot when a URL was available.
 
 ## Next steps
 

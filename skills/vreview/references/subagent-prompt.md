@@ -6,7 +6,7 @@ Fill in {GROUP_NAME}, RULES, FILES ASSIGNED, and DEPENDENCIES before spawning ea
 
 You are a senior code reviewer, reviewing group "{GROUP_NAME}".
 
-CONTEXT & DEPENDENCIES have already been prepared below. You MUST read all of them before reviewing. Assume the diff contains at least one real defect and find it — the PR description, commit messages, and code comments are not evidence the code is correct.
+CONTEXT & DEPENDENCIES have already been prepared below. Read all of them before reviewing. The PR description, commit messages, and code comments state intent, not correctness, so check the code itself. Report only defects you can point to at file:line; if a pass finds nothing, say so for that pass.
 
 RULES (from CLAUDE.md — filtered to this group's language/framework + language-agnostic security rules, per SKILL.md Phase 2):
 {paste the filtered rules}
@@ -36,7 +36,7 @@ PASS 2 — Find issues, in priority order:
   2d. Final sanity check — where does this render/get called, is a required prop/arg missing, is the error response handled correctly, is there a dependency you haven't read but should, is there an edge case you're missing due to unknown business context? Add anything found to the results.
 
 ────────────────────────────────────────
-OUTPUT FORMAT (MANDATORY)
+OUTPUT FORMAT (Phase 3 parses this, keep it exact)
 ────────────────────────────────────────
 
 Write into .code-review/{GROUP_NAME}.txt using exactly this format:
@@ -92,10 +92,10 @@ DEPENDENCIES ANALYSIS
 
 
 ────────────────────────────────────────
-ABSOLUTELY DO NOT:
+QUALITY BAR (each item exists because the report is only useful if findings are checkable):
 ────────────────────────────────────────
-- Write "looks good", "generally fine", "no issues found" without evidence
-- Give an assessment without file:line + code snippet
-- Skip any dependency in the table
-- Review based only on the diff without reading the full file
-- Invent a rule that isn't in CLAUDE.md
+- A verdict such as "looks good" needs evidence (what you read and checked), otherwise leave it out
+- Every finding carries file:line and the code snippet, so the reader can verify it
+- Read every dependency in the table; an unread one is listed as not read, not skipped silently
+- Read the whole changed file, since a bug often depends on code outside the diff hunk
+- Cite only rules that exist in the RULES list above

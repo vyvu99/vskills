@@ -2,7 +2,7 @@
 
 vdesign decides every axis below itself, every run — no `AskUserQuestion`, no per-run
 user picks. This is the taxonomy + decision priority it uses to fill in the Design
-Brief (`SKILL.md` Phase 0 step 7): 18 criteria across 6 groups, covering every axis
+Brief (`SKILL.md` Phase 1, Design Brief): 18 criteria across 6 groups, covering every axis
 that actually changes how a redesign looks and feels. Skip only the criteria that are
 structurally inapplicable to the target (e.g. Dark Mode Stance when the project has no
 theming system at all, or Data & Table Density when the target has no data-heavy
@@ -21,13 +21,13 @@ obviously fits better than any listed here.
 For each criterion, decide in this order and state which one actually drove the
 pick (never "just felt right"):
 
-1. **This run's Domain Research** (`SKILL.md` Phase 0 step 6, always runs) — a
-   concrete, current (2026) finding for this exact aspect/domain beats any generic
+1. **This run's Domain Research** (`SKILL.md` Phase 1, Domain Research) — a
+   concrete, current finding for this exact aspect/domain beats any generic
    default below.
 2. **Project Profile** — existing design tokens, `package.json` dependencies, the
    "Good reference UI" entry, already-read component code. Use when there's a real
    reason to stay consistent, not by default.
-3. **Real User & Purpose** (`SKILL.md` Phase 1 Step 1) — the actual persona and task
+3. **Real User & Purpose** (`SKILL.md` Phase 0, Real User & Purpose read) — the actual persona and task
    this screen serves; drives density, tone, and whether a bolder or more
    restrained choice actually fits the context (e.g. a clinical B2B tool and a
    consumer wellness app land on different answers for the same criterion).
@@ -38,7 +38,7 @@ pick (never "just felt right"):
 ## Round 0 — Structural Freedom
 
 0. **Structural freedom** — how much the page/component's structure itself may
-   change, not just its styling. Decided primarily by Phase 1's Real User & Purpose
+   change, not just its styling. Decided primarily by Phase 0's Real User & Purpose
    read, not this file: restructure (merge/reorder/split sections, change view-type)
    whenever the current structure genuinely doesn't fit the real task — never bounded
    by "proportional to what the audit found" for structural moves specifically, but
@@ -124,7 +124,7 @@ pick (never "just felt right"):
     - *Brand-centric/cohesive* — every decision serves one clear, consistent identity; stays close to the project's existing system
     - *Experimental/bold* — pushes norms, unexpected choices, genuine creative freedom, may depart from the existing system entirely
     - *Functional/minimalist* — content-first, no decoration beyond what clarity needs
-    - *Trend-forward* — actively pulls from current (2025-2026) real-world design trends surfaced by this run's Domain Research
+    - *Trend-forward* — actively pulls from current real-world design trends surfaced by this run's Domain Research
     - *Game-inspired/Arcade* — HUD-style panels, glow/neon accents, chunky tactile feedback (squash/bounce on press), weighty satisfying motion; art direction borrowed from game UI, not gamification mechanics (no points/levels/streaks added)
 
 ## Round 5 — Content & States
@@ -147,9 +147,9 @@ pick (never "just felt right"):
 
 ## How vdesign decides
 
-- **Structural Freedom** (Round 0) is driven by Phase 1's Real User & Purpose read,
+- **Structural Freedom** (Round 0) is driven by Phase 0's Real User & Purpose read,
   not guessed from this list — see that section's note above.
-- **Domain Research** (`SKILL.md` Phase 0 step 6) now runs every time, regardless of
+- **Domain Research** (`SKILL.md` Phase 1) runs every time, regardless of
   which boldness direction criterion 14 lands on — it's an input to the decision,
   not gated by it.
 - **Phase 3 Fix** executes the Design Brief (below) — every axis that used to be
@@ -170,5 +170,5 @@ choices: the actual typeface names, the actual palette approach, the actual moti
 timing/easing, the actual shape/icon/imagery direction, the actual spacing scale, the
 actual layout system, the actual tone, the actual boldness level, and (when
 applicable) the actual data/table, form, and empty/loading/error treatment. State it
-out loud before Phase 1 starts. This is the single source of truth Phase 3 executes
+out loud before Phase 2 starts. This is the single source of truth Phase 3 executes
 against — an un-synthesized pile of 18 raw decisions is not a brief.

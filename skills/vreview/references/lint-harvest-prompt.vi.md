@@ -70,7 +70,7 @@ so sánh pattern/scope của nó với vi phạm vừa tìm thấy.
 
 ### Phân tích SCRIPT_SCAN.json
 
-PHÂN TÍCH SCRIPT_SCAN.json — BẮT BUỘC cho MỌI rule đã bắt được vi phạm:
+PHÂN TÍCH SCRIPT_SCAN.json — cần làm cho mọi rule đã bắt được vi phạm (rule có false positive làm bẩn các lần review sau):
 
 5. Đọc script rule hiện có: `cat ~/.claude/scripts/lint-rules/rules/{rule_id}.sh`
 6. FP SPOT-CHECK (bắt buộc): lấy mẫu 2-3 vi phạm từ SCRIPT_SCAN.json, đọc code context thực tế
@@ -124,11 +124,11 @@ done
 - Format: {domain}-{check}-candidate.sh
 - Tên file UPDATE phải GIỐNG HỆT tên file gốc trong rules/ (để cp ghi đè đúng)
 
-### Rule generic (BẮT BUỘC)
+### Rule generic (cần có)
 
 - Grep pattern PHẢI hoạt động trên bất kỳ project TypeScript nào
 - Scope filter PHẢI dùng suffix file generic: *-service.ts, *-schemas.ts, *.tsx, *-route.ts, v.v.
-- TUYỆT ĐỐI KHÔNG hardcode: tên file của project cụ thể, tên function domain, route/API path
+- Không hardcode: tên file của project cụ thể, tên function domain, route/API path
 
 ### Lưu + output cuối cùng
 

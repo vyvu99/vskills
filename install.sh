@@ -72,7 +72,7 @@ if [[ -d "$SKILLS_SRC" ]]; then
     # references/ dir gets it (generic, not hardcoded to a specific skill).
     [[ -d "${skill_dir}references" ]] && link "${skill_dir}references" "$dst_dir/references"
     # scripts/ (if the skill has one) is symlinked whole, same as references/ —
-    # e.g. vautocook's bundled plan_tasks.py/run_tasks.py it shells out to.
+    # e.g. a bundled helper script the skill shells out to.
     [[ -d "${skill_dir}scripts" ]] && link "${skill_dir}scripts" "$dst_dir/scripts"
     # Root-level helper shell scripts (e.g. vsweep/stop-guard.sh, referenced by
     # SKILL.md as ~/.claude/skills/<skill>/<file>.sh) are symlinked per-file.

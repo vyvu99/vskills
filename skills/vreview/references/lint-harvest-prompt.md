@@ -10,7 +10,7 @@ Only used when the user passes `--harvest`.
 5. [Analyzing SCRIPT_SCAN.json](#analyzing-script_scanjson) — FP spot-check
 6. [Script format](#script-format) — trust boundary + template
 7. [Naming](#naming)
-8. [Generic rule requirements](#generic-rule-mandatory)
+8. [Generic rule requirements](#generic-rule-required)
 9. [Save + final output](#save--final-output)
 
 ---
@@ -70,7 +70,7 @@ compare its pattern/scope against the violation just found.
 
 ### Analyzing SCRIPT_SCAN.json
 
-ANALYZING SCRIPT_SCAN.json — MANDATORY for EVERY rule that caught violations:
+ANALYZING SCRIPT_SCAN.json — required for every rule that caught violations (a rule with false positives pollutes future reviews):
 
 5. Read the existing rule script: `cat ~/.claude/scripts/lint-rules/rules/{rule_id}.sh`
 6. FP SPOT-CHECK (mandatory): sample 2-3 violations from SCRIPT_SCAN.json, read the actual code context
@@ -124,11 +124,11 @@ done
 - Format: {domain}-{check}-candidate.sh
 - The UPDATE file name must be IDENTICAL to the original file name in rules/ (so cp overwrites it correctly)
 
-### Generic rule (MANDATORY)
+### Generic rule (required)
 
 - The grep pattern MUST work on any TypeScript project
 - The scope filter MUST use a generic file suffix: *-service.ts, *-schemas.ts, *.tsx, *-route.ts, etc.
-- ABSOLUTELY DO NOT hardcode: a specific project's file name, domain function name, route/API path
+- Do not hardcode: a specific project's file name, domain function name, route/API path
 
 ### Save + final output
 

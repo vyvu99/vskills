@@ -40,7 +40,6 @@ Skills are symlinked, not copied — edit either copy, it's the same file. Re-ru
 | Skill | Description | Example |
 |---|---|---|
 | `vtickets`* | Creates or syncs a GitHub epic and sub-issues from a plan directory. Idempotent. | `/vtickets plans/appointment-rebooking` |
-| `vautocook`* | Implements every sub-issue of a GitHub epic unattended, one at a time, each in a fresh session, all landing in a single epic PR. Requires confirmation before it starts; no fallback if `gh`/`claude` isn't available. | `/vautocook <epic-url>` |
 
 ### Support
 
@@ -66,8 +65,6 @@ flowchart LR
     fix --> ship(["ship"])
 
     plan -. track on GitHub .-> tickets["/vtickets"]
-    tickets -. implement unattended .-> auto["/vautocook"]
-    auto -. drives .-> cook
     cook -. before opening PR .-> ci["/vci"]
     cook -. UI work .-> design["/vdesign"]
 
@@ -86,7 +83,6 @@ flowchart LR
 ├─ "Have a review report, need to fix it"          → /vreview --fix
 ├─ "Want a typecheck/build sanity check"           → /vci
 ├─ "Need to track a plan on GitHub"                → /vtickets
-├─ "Have a GitHub epic, want it built unattended"  → /vautocook
 ├─ "Need to redesign a page's UI"                  → /vdesign
 ├─ "Work through a backlog, unattended, until a deadline" → /vsweep
 └─ "Ran the wrong migration locally"               → /vrollback

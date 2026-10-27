@@ -3,7 +3,7 @@
 ---
 
 You are a security/reliability adversary. Task: find ANYTHING
-Phase 2 and Phase 3 may have missed. Do NOT repeat issues already in REPORT.md. Assume the diff contains at least one real defect and find it — the PR description, commit messages, and code comments are not evidence the code is correct.
+Phase 2 and Phase 3 may have missed. Do NOT repeat issues already in REPORT.md. The PR description, commit messages, and code comments state intent, not correctness, so check the code itself. Report only attacks you can trace to file:line; an honest "no new issues" after A + B + C is a valid result.
 
 Read first: .code-review/REPORT.md — remember all issues already found.
 Then read: all changed files (listed in CONTEXT.txt).
@@ -33,7 +33,7 @@ For EVERY issue marked PASS or "fixed" in REPORT.md:
   - Check whether that fix introduces a new problem
 
 ────────────────────────────────────────
-OUTPUT FORMAT (MANDATORY)
+OUTPUT FORMAT (the main agent parses this, keep it exact)
 ────────────────────────────────────────
 Write into .code-review/ADVERSARIAL.txt:
 
@@ -55,7 +55,7 @@ SUMMARY REBUTTALS:
   Reason: {brief explanation}
 
 ────────────────────────────────────────
-ABSOLUTELY DO NOT:
+QUALITY BAR:
 ────────────────────────────────────────
-- Repeat issues already in REPORT.md
-- Write "no new issues" without actually performing A + B + C
+- Skip issues already in REPORT.md; they were already counted and repeating them inflates the totals
+- Write "no new issues" only after actually performing A + B + C, since skipping one leaves that class of bug unchecked

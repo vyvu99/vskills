@@ -1,148 +1,97 @@
 ---
 name: vcook
-description: "Checklist 9 bước bắt buộc khi implement feature/fix: subagent song song → xác định branch → xác định chế độ plan/no-plan → viết test trước → implement đầy đủ BE+FE → bắt buộc dùng generated SDK client → review đối chiếu CLAUDE.md → test đến khi pass → squash commit + tạo PR từ template. KHÔNG được bỏ qua bước nào."
+description: "Implement một feature hoặc fix từ đầu đến cuối, từ đường dẫn plan hoặc mô tả ngắn: tạo branch, viết test trước, code backend và frontend, review đối chiếu CLAUDE.md, chạy test, commit và mở PR. Chạy tường minh bằng /vcook."
 argument-hint: "[plan-path | mô tả task] [--issue <number>]"
 user-invocable: true
 disable-model-invocation: true
-when_to_use: "Invoke để implement một feature/fix từ plan có sẵn hoặc từ mô tả nhanh — tự động tạo branch, viết test, code, review, chạy test, commit, và tạo PR."
+when_to_use: "Dùng khi user muốn một task hoặc plan của vplan được implement và mong đợi commit cùng pull request, không chỉ sửa code."
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "2.0.0"
 ---
 
-Bạn là một senior engineer implement task này từ đầu đến cuối qua checklist 9 bước bắt buộc dưới đây. KHÔNG được bỏ qua bước nào.
+Bạn là senior engineer implement task từ đầu đến cuối qua 9 bước dưới đây. Theo dõi các bước bằng checklist (TodoWrite hoặc công cụ task của session) và chỉ đánh dấu xong khi việc của bước đó đã xong; Bước 1 là rule xuyên suốt nên giữ mở đến khi Bước 9 kết thúc.
 
-**TRƯỚC KHI BẮT ĐẦU:** Tạo checklist 9 bước bằng `TodoWrite` (mỗi item ứng với 1 bước). Sau khi hoàn thành mỗi bước → đánh dấu `completed` trước khi chuyển sang bước tiếp theo. KHÔNG đánh dấu completed trước khi công việc thực sự xong. Ngoại lệ: bước 1 là rule áp dụng xuyên suốt các bước khác, không phải task 1 lần — giữ `in_progress` đến khi bước 9 xong, không đánh dấu completed sớm.
+**Ưu tiên:** chạy /vcook là yêu cầu tường minh của user để tạo branch, commit, push và mở PR, nên các hành động đó không cần xác nhận thêm. Nếu `CLAUDE.md` của project hoặc của user cấm bất kỳ hành động nào (ví dụ "không tự tạo branch hay PR khi chưa hỏi"), rule đó thắng và bạn phải hỏi trước.
 
-Nếu session bị gián đoạn, resume bằng cách đọc trạng thái các bước trong TodoWrite + `git status`/`git diff` so với branch đã tạo ở bước 2 + (Mode A) file plan — xác định lại bước nào trong 2-9 đã thực sự xong dựa trên state thật của repo, đừng tin tuyệt đối vào TodoWrite status cũ vì code state mới là nguồn sự thật.
+**Phạm vi:** chỉ implement đúng những gì plan hoặc mô tả yêu cầu. Cải tiến thêm thì đề xuất chứ không tự làm, và không thêm test, docs hay refactor không được yêu cầu.
 
-═══════════════════════════════════════════════════════
-BƯỚC 1: SONG SONG HOÁ CÔNG VIỆC READ-ONLY VÀO SUBAGENT
-═══════════════════════════════════════════════════════
+Sau khi bị gián đoạn, dựng lại tiến độ từ `git status`, `git diff` so với branch ở Bước 2 và (Mode A) file plan. Trạng thái repo là sự thật, không phải status cũ trong checklist.
 
-Trước khi thực hiện mỗi bước dưới đây, đánh giá phần nào độc lập → delegate cho các subagent chạy song song trong CÙNG 1 message (không tuần tự nếu không có dependency). Áp dụng xuyên suốt, không chỉ ở đầu:
-- Đọc plan + đọc codebase liên quan (bước 3) → subagent song song
-- Research pattern/docs cho các thư viện đang dùng → subagent song song
-- Review đối chiếu CLAUDE.md trên nhiều file độc lập (bước 7) → subagent song song
+## Bước 1 - Delegate việc read-only
 
-Phạm vi: subagent ở bước này là READ-ONLY (research, đọc plan/codebase, review đối chiếu CLAUDE.md). Việc viết code implementation (bước 5) KHÔNG được delegate cho subagent song song ở bước này — tự viết code thật, tuần tự, trong session này. Mục đích: giảm token usage của main agent — main agent chỉ tổng hợp kết quả.
+Delegate cho subagent khi việc read-only vừa độc lập vừa rộng: đọc plan cùng nhiều vùng code, research docs thư viện, hoặc review nhiều nhóm file riêng biệt đối chiếu CLAUDE.md. Tự làm khi chỉ tra 1-2 file, vì subagent bắt đầu với context rỗng và tốn một brief cùng một bản tóm tắt.
 
-Mọi subagent được spawn trong bước này PHẢI ghi findings vào `{work_context}/plans/reports/<agent-type>-<HHMMSS>-<slug>.md` trước khi trả lời, theo `_vskills-shared/repo-profile.md` §6 — orchestrator đọc lại file đó để tổng hợp, không chỉ dựa vào câu trả lời hội thoại. Đây là điều giữ cho các lần spawn lặp lại ở Bước 1 an toàn xuyên suốt một session Bước 1→9 dài.
+- Subagent độc lập đặt trong cùng 1 message để chạy song song; chia batch theo `_vskills-shared/repo-profile.md` §10.
+- Brief nêu mục tiêu, file hoặc vùng trong phạm vi, việc subagent chỉ được đọc, và file báo cáo `{work_context}/plans/reports/<agent-type>-<HHMMSS>-<slug>.md` mà subagent ghi trước khi trả lời (§6). Đọc lại file đó thay vì tin vào câu trả lời.
+- Tự viết code implementation trong session này, từng bước một: một writer duy nhất giữ các chỉnh sửa nhất quán.
+- Các writer thực sự độc lập trên file khác nhau mỗi người dùng git worktree riêng để working tree không đụng nhau.
 
-Nếu cần công việc *implementation* song song thực sự (nhiều writer độc lập chạm vào file/feature khác nhau cùng lúc, không chỉ research read-only song song) → mỗi parallel writer nên dùng git worktree riêng để tránh xung đột working-tree.
+## Bước 2 - Xác định branch
 
-═══════════════════════════════════════════════════════
-BƯỚC 2: XÁC ĐỊNH BRANCH
-═══════════════════════════════════════════════════════
+1. Branch hiện tại đã khớp task (user chủ ý tiếp tục) -> giữ nguyên.
+2. Nếu không: xác định default branch (`repo-profile.md` §9). `git status --porcelain` có output thì hỏi user nên stash, commit hay tiếp tục trên branch hiện tại. Sau đó `git checkout <default_branch>`, `git pull`, `git checkout -b <branch-name>`; tên là kebab-case tiếng Anh mô tả thay đổi, không prefix theo tool hay agent trừ khi repo bắt buộc.
 
-1. Kiểm tra branch hiện tại: nếu tên/nội dung đã khớp với task đang làm (user đang chủ ý tiếp tục trên branch đó) → BỎ QUA bước tạo branch, dùng branch hiện tại.
-2. Nếu không khớp:
-   - Tự động detect default branch theo `_vskills-shared/repo-profile.md` §9.
-   - Chạy `git status --porcelain`; nếu có output (working tree dirty) → DỪNG LẠI, hỏi user (stash / commit / tiếp tục trên branch hiện tại) trước khi tiếp tục.
-   - `git checkout <default_branch>` → `git pull` → `git checkout -b <descriptive-branch-name>`
-   - Tên branch: kebab-case, tiếng Anh, mô tả chính xác phạm vi thay đổi (không gắn prefix theo tool/agent trừ khi repo bắt buộc theo convention riêng).
+Chốt PR base branch ngay bây giờ, trước khi Bước 5 thêm commit, vì detect bằng merge-base kém tin cậy sau đó. Bước 9 truyền nó vào `gh pr create --base`; default của `gh` luôn nhắm vào default branch, sai với branch stacked.
+- Vừa tách từ `<default_branch>` ở bước này -> base là `<default_branch>`.
+- Đang ở branch có sẵn và caller đã nói nó tách từ đâu ("checkout từ Y") -> dùng Y; bên dựng branch đã tính 1 lần, tốt hơn suy lại.
+- Đang ở branch có sẵn và không ai nói -> với mỗi branch local và remote `b` khác, giữ những branch pass `git merge-base --is-ancestor b HEAD`; branch có `git rev-list --count b..HEAD` nhỏ nhất là parent. Parent là `<default_branch>` (hoặc bản mirror `origin/`) -> base là `<default_branch>`; là branch khác chưa merge -> branch đó là base (stacked PR), vì dùng default branch sẽ kéo commit của predecessor vào diff của PR này.
 
-**Xác định PR base branch ngay bây giờ, ở cả 2 nhánh trên, trước khi Bước 5 thêm commit** (heuristic merge-base bên dưới kém tin cậy khi đã có commit mới) — Bước 9 dùng giá trị này cho `gh pr create --base`, không bao giờ dùng default của chính `gh`:
-- Nhánh 2 (vừa tách từ `<default_branch>`) → base là `<default_branch>`.
-- Nhánh 1 (đang ở một branch có sẵn, ví dụ caller — người hoặc script như pipeline tự động nhiều task — đã checkout từ đâu đó) → KHÔNG mặc định là `<default_branch>`.
-  - **Caller đã cho biết branch này tách từ đâu** (ví dụ chỉ dẫn kiểu "bạn đang ở branch X, checkout từ Y") → tin thẳng đó là base. Giá trị này đã được tính 1 lần, tất định, bởi bên dựng branch — suy lại từ git history là thừa và, với setup stacked nhiều branch, kém tin cậy hơn câu trả lời đã được đưa.
-  - **Không ai cho biết** (dùng độc lập: bạn hoặc user tự checkout branch này, không có caller điều phối) → tự detect: với mọi branch local/remote `b` khác (trừ branch này), chạy `git merge-base --is-ancestor b HEAD`; trong số những branch pass, branch cần ít commit nhất để tới HEAD (`git rev-list --count b..HEAD`) chính là parent thật. Nếu tổ tiên gần nhất đó là `<default_branch>` (hoặc bản mirror `origin/`) → base = `<default_branch>`. Nếu là branch KHÁC, chưa merge → branch ĐÓ là PR base — đây là tình huống stacked-PR (predecessor thật của branch này chưa merge), và lấy `<default_branch>` làm base sẽ khiến diff lẫn cả mọi commit của predecessor chưa merge đó.
+## Bước 3 - Xác định chế độ input
 
-═══════════════════════════════════════════════════════
-BƯỚC 3: XÁC ĐỊNH CHẾ ĐỘ INPUT
-═══════════════════════════════════════════════════════
+**Mode A - `$ARGUMENTS` là đường dẫn plan** (`plans/<slug>/`, `plan.md`, `phase-XX-*.md`):
+1. Đọc toàn bộ plan và các phase file, rồi các vùng code nó tham chiếu (áp dụng delegate ở Bước 1).
+2. Kiểm tra code còn khớp assumption của plan: file đúng path, API và pattern như mô tả, dependency chưa đổi. Nếu stamp `Generated against commit` của `plan.md` lệch HEAD, re-verify trước các file:line của case PASS.
+3. Lệch -> dừng, trình bày chỗ lệch kèm đề xuất điều chỉnh, rồi chờ. Không tự lệch khỏi plan.
 
-Input là 1 trong 2 dạng — tự động detect từ `$ARGUMENTS`:
+**Mode B - mô tả hoặc diff có sẵn:** tự quyết phạm vi từ đó và đặt tên branch theo thay đổi nếu Bước 2 chưa làm.
 
-**Mode A — Có plan path** (ví dụ: `plans/<slug>/`, `plan.md`, `phase-XX-*.md`):
-1. Đọc toàn bộ plan + các phase file liên quan.
-2. Đọc kỹ các vùng codebase mà plan tham chiếu tới (dùng subagent song song theo bước 1).
-3. Cross-check: codebase hiện tại có khớp với assumption của plan không? (file còn tồn tại đúng path, pattern/API còn khớp với mô tả trong plan, dependency chưa đổi...)? Stamp `Generated against commit` trong `plan.md` lệch với HEAD hiện tại → re-verify các file:line của case PASS trước khi tin.
-4. Nếu có MISMATCH → STOP, trình bày mismatch cụ thể + đề xuất điều chỉnh cho user TRƯỚC khi code. KHÔNG được lệch khỏi plan mà không hỏi.
-5. Nếu khớp → chuyển sang bước 4.
+## Bước 4 - Test trước
 
-**Mode B — Không có plan** (mô tả nhanh, hoặc diff đã tồn tại sẵn — "PR từ trên trời rơi xuống"):
-1. Bỏ qua bước đọc plan.
-2. Tự xác định scope từ mô tả/diff hiện có.
-3. Đặt tên branch (nếu chưa làm ở bước 2) khớp với bản chất thay đổi quan sát được.
+Với mỗi function hoặc endpoint mới/sửa có logic API hoặc backend:
+1. Liệt kê test hiện có chạm vào code đó (grep file test, theo import).
+2. Viết test cho happy path và edge case (null, rỗng, 0, âm, biên, đồng thời).
+3. Chạy và xác nhận test fail trước khi implement; test pass ngay thì chẳng chứng minh gì, viết lại. Ghi output fail vào item checklist (output dài ghi vào `{work_context}/plans/reports/vcook-test-log-<HHMMSS>.md`).
 
-═══════════════════════════════════════════════════════
-BƯỚC 4: VIẾT TEST CASE + EDGE CASE TRƯỚC KHI CODE
-═══════════════════════════════════════════════════════
+Việc thuần UI (chỉ style hoặc layout, không có business logic) được bỏ qua test-first; ghi "pure UI, skipping test-first" vào checklist.
 
-- **Bắt buộc** với API/backend logic: với mỗi function/endpoint mới hoặc sửa đổi —
-  1. Liệt kê test hiện có đang chạm vào đoạn code sắp thay đổi (grep file test / theo import graph của module).
-  2. Viết test mới bao phủ happy path + edge case (null/undefined/empty/0/negative/boundary/concurrent).
-  3. Chạy test và xác nhận nó FAIL trước khi viết implementation — paste output fail vào note của item TodoWrite tương ứng bước 4 (hoặc, nếu output dài, append vào `{work_context}/plans/reports/vcook-test-log-<HHMMSS>.md` rồi link từ note TodoWrite). Test pass ngay lập tức là không hợp lệ — viết lại.
-- **Không bắt buộc** với pure UI (chỉ style/layout, không business logic). Nếu bỏ qua → ghi rõ lý do trong checklist ("pure UI, skipping test-first").
+## Bước 5 - Implement
 
-═══════════════════════════════════════════════════════
-BƯỚC 5: IMPLEMENT
-═══════════════════════════════════════════════════════
+- Làm theo plan (Mode A) hoặc mô tả (Mode B).
+- Khi cả backend và frontend bị ảnh hưởng thì implement cả hai; backend đổi mà UI chưa phản ánh là chưa xong.
 
-- Bám sát plan (Mode A) hoặc mô tả (Mode B).
-- Nếu ảnh hưởng cả BE lẫn FE → implement ĐẦY ĐỦ CẢ HAI, không để BE xong mà UI chưa reflect (FE/BE Balance).
-- Nếu phát hiện improvement phù hợp trong lúc code → đề xuất với user, KHÔNG tự ý mở rộng scope ngoài plan/mô tả.
+## Bước 6 - Dùng API client được generate
 
-═══════════════════════════════════════════════════════
-BƯỚC 6: BẮT BUỘC DÙNG GENERATED SDK/API CLIENT
-═══════════════════════════════════════════════════════
+- Mọi lời gọi API phía client đi qua generated SDK, vì `fetch` hay `axios` thô bỏ qua contract có type mà việc regenerate giữ đồng bộ.
+- Tìm SDK: script `sdk:generate`, `api:generate` hoặc `codegen` trong `package.json`, hoặc thư mục `generated/`, `__generated__/`, `sdk/`.
+- Route mới thiếu response schema -> thêm schema vào package schema dùng chung, chạy lệnh generate, rồi mới viết code frontend.
+- Không có tầng SDK -> dùng API client sẵn có của project (vẫn không dùng fetch thô) hoặc hỏi user.
 
-- Mọi API call phía client/web-app → PHẢI dùng generated SDK. Raw `fetch`/`axios` là CẤM.
-- Tự động detect xem SDK có tồn tại không: grep `package.json` tìm script `sdk:generate` / `api:generate` / `codegen`, hoặc tìm thư mục `generated/`, `__generated__/`, `sdk/`, hoặc pattern đặc trưng của Fern/openapi-generator/orval.
-- Route BE mới trả về `void`/thiếu response schema → thêm response schema vào shared schema package TRƯỚC, rồi chạy generate command đã tìm được (tối thiểu map trên BE nếu FE chưa cần dùng ngay).
-- Không tìm thấy generate script/SDK directory → project không có SDK layer riêng, dùng API client hiện có của project (vẫn KHÔNG raw fetch/axios trực tiếp) hoặc hỏi user nếu chưa rõ.
+## Bước 7 - Review đối chiếu CLAUDE.md
 
-═══════════════════════════════════════════════════════
-BƯỚC 7: REVIEW ĐỐI CHIẾU CLAUDE.md
-═══════════════════════════════════════════════════════
+- Áp dụng rule trong `CLAUDE.md` của project và của user ngay khi code.
+- Trước khi commit, đối chiếu diff cuối với toàn bộ các rule đó (subagent theo từng nhóm file độc lập, Bước 1). Lần đối chiếu này chính là review; chỉ thêm subagent reviewer riêng khi thay đổi lớn hoặc rủi ro cao.
 
-- Đọc `~/.claude/CLAUDE.md` (nếu chưa nắm rõ), tự áp dụng rule liên quan NGAY TRONG LÚC code (TypeScript, Styling, Form Fields, Backend, Frontend, File & Folder Structure...) — việc này giảm bớt lượng lỗi mà double-check dưới đây phải bắt, không thay thế nó.
-- Trước khi commit → LUÔN double-check toàn bộ diff cuối cùng đối chiếu với rule (dùng subagent song song nếu có nhiều file độc lập) — bước này bắt buộc bất kể code lúc viết đã cẩn thận tới đâu.
-- Double-check đó CHÍNH LÀ review; chỉ bỏ qua lớp PHỤ THÊM là giao diff cho 1 subagent review riêng khi code đã làm đúng ngay từ đầu.
+## Bước 8 - Verify
 
-═══════════════════════════════════════════════════════
-BƯỚC 8: CHẠY TEST, FIX ĐẾN KHI PASS
-═══════════════════════════════════════════════════════
+- Chạy full test suite của mọi package bị chạm, không chỉ test liên quan, cộng typecheck và lint nếu project có. Báo coverage delta nếu repo theo dõi coverage.
+- Fail thì sửa root cause và chạy lại đến khi pass hết. Không skip, làm yếu hay mock test để ra xanh.
+- Nếu thay đổi gọi được qua HTTP hoặc CLI, gọi thật một lần và đưa output thật vào báo cáo. Nếu cần server chưa chạy thì không tự start; nhờ user start hoặc báo "chưa chạy thử" kèm lý do.
+- Nếu không chạy được test, typecheck hay lệnh run nào ở đây, nói rõ trong báo cáo và đánh dấu thay đổi là chưa verify.
 
-- Chạy TOÀN BỘ test suite của (các) package bị chạm tới (unit/integration theo convention của project) — không chỉ test "liên quan". Nếu project có track coverage → báo cáo coverage delta.
-- Nếu fail → fix root cause (không patch triệu chứng) → chạy lại.
-- Lặp lại đến khi pass 100%. KHÔNG được skip test fail để commit nhanh hơn, KHÔNG dùng mock/fake data/tricks để giả vờ pass.
-- Sau khi test pass, nếu thay đổi có thể gọi qua HTTP/CLI → thực sự gọi thử một lần (curl endpoint mới/đã sửa, chạy CLI command mới/đã sửa) và đưa output thật vào completion report — chỉ nói "tests pass" là chưa đủ.
+## Bước 9 - Commit và mở PR
 
-═══════════════════════════════════════════════════════
-BƯỚC 9: COMMIT + TẠO PR
-═══════════════════════════════════════════════════════
+Xác định VCS profile trước (`repo-profile.md` §2; nếu thiếu file thì giả định GitHub với `gh`).
 
-Resolve VCS profile trước: đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (fallback nếu file không tồn tại: giả định GitHub + gh).
-
-**Commit:**
-- Message tiếng Anh, conventional commit format (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`).
-- Mỗi logical group thay đổi = 1 commit. Nếu kết quả nhiều hơn 5 commit, cân nhắc squash các commit liên quan. Luôn in `git log --oneline <base>..HEAD` trước khi push để user thấy danh sách commit cuối cùng.
+**Commit:** message tiếng Anh theo conventional commit (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`), mỗi nhóm thay đổi logic một commit. Hơn 5 commit thì cân nhắc squash các commit liên quan. In `git log --oneline <base>..HEAD` trước khi push để user thấy danh sách cuối.
 
 **PR:**
-- Đọc `.github/pull_request_template.md` của project (nếu có) → PR body PHẢI theo đúng template đó. Nếu không có → dùng format mặc định hợp lý (Summary / Changes / Test plan).
-- Title: tiếng Anh, ngắn gọn.
-- Description: viết bằng ngôn ngữ giao tiếp của project — kiểm tra section `## Ngôn ngữ`/`## Language` trong `CLAUDE.md` của project, rồi tới `~/.claude/CLAUDE.md`, cuối cùng tiếng Anh (đúng cách resolve mà `repo-profile.md` §4 mô tả, không cần file đó thực sự tồn tại) — không thuật ngữ kỹ thuật, dành cho người đọc không phải engineer, tập trung vào tác động user/business, không dùng code jargon.
-- **Caller bảo "chỉ commit, không PR"** (ví dụ pipeline tự động mở 1 PR chung cho nhiều task) → commit rồi dừng: không push, không tạo PR, không sửa issue. Bỏ qua phần còn lại của mục này.
-- Full gh mode (theo §2) → tạo PR bằng `gh pr create --base <base branch đã xác định ở Bước 2>` — không bao giờ bỏ `--base` rồi dựa vào default của `gh`, vì default đó luôn trỏ về default branch của repo kể cả khi parent thật của branch này là một branch khác chưa merge (xem phần xác định base ở Bước 2). Degraded/local-only → push branch, in thông báo §2 của vcook kèm title + body đã soạn đầy đủ để user tự paste vào UI của host — luôn soạn body ở cả 2 chế độ, không bỏ qua.
-- Nếu có GitHub issue liên quan (từ plan hoặc user cung cấp số issue):
-  - Thêm `Closes #<issue>` ở ĐẦU PR body (plain text, hoạt động ở cả 2 chế độ)
-  - Full gh mode → `gh issue edit <issue>` để append link tới PR vào CUỐI issue body. Degraded mode → in "thêm link PR vào issue #N thủ công" rồi tiếp tục.
+- Caller nói "chỉ commit, không PR" (ví dụ pipeline mở 1 PR cho nhiều task) -> commit rồi dừng: không push, không PR, không sửa issue.
+- Theo đúng `.github/pull_request_template.md` nếu có, không thì Summary / Changes / Test plan. Title tiếng Anh, ngắn gọn.
+- Ngôn ngữ description: `repo-profile.md` §4. Viết cho người không phải engineer: tác động tới user và business, không jargon code.
+- Full gh mode -> `gh pr create --base <base từ Bước 2>`. Degraded hoặc local-only -> push branch, in message vcook của §2 và title cùng body đã soạn để user dán. Soạn body ở cả hai chế độ.
+- Issue liên quan (từ plan hoặc `--issue`): đặt `Closes #<issue>` ở đầu body PR; ở full gh mode thêm link PR vào cuối body issue bằng `gh issue edit`, không thì báo user tự thêm.
 
----
+## Next steps
 
-## Hard rules
-
-- **KHÔNG được bỏ qua bước nào** trong 9 bước — kể cả khi task trông "đơn giản"
-- **Codebase lệch so với plan** → dừng lại, trình bày mismatch + đề xuất, chờ user xác nhận. TUYỆT ĐỐI KHÔNG lệch khỏi plan mà không hỏi
-- **Test fail** → fix root cause đến khi pass 100%, KHÔNG commit khi test đang fail, KHÔNG mock/fake để né test
-- **Commit** → mỗi logical group thay đổi = 1 commit; nếu nhiều hơn 5 commit thì cân nhắc squash các commit liên quan; luôn in `git log --oneline <base>..HEAD` trước khi push
-- **API call phía client** → LUÔN dùng generated SDK, raw fetch/axios CẤM; thiếu response schema → thêm schema + regenerate SDK trước khi viết code FE
-- **Scope** → bám sát chặt scope của plan/mô tả; improvement thêm → đề xuất, không tự ý mở rộng scope
-- **PR description** → ngôn ngữ resolve theo `repo-profile.md` §4 (CLAUDE.md project → CLAUDE.md global → tiếng Anh), không thuật ngữ kỹ thuật, theo đúng `.github/pull_request_template.md` nếu có
-- **Test-first** → bắt buộc với API/backend logic, không bắt buộc với pure UI (phải ghi rõ lý do khi bỏ qua)
-
-## Bước tiếp theo
-
-Theo convention Next Steps trong `_vskills-shared/repo-profile.md` §7.
+Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

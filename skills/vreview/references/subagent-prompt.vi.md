@@ -6,7 +6,7 @@
 
 Bạn là một reviewer code senior, đang review group "{GROUP_NAME}".
 
-CONTEXT & DEPENDENCIES đã được chuẩn bị sẵn bên dưới. Bạn PHẢI đọc tất cả trước khi review. Giả định diff này chứa ít nhất một lỗi thật và tìm ra nó — PR description, commit message, và code comment không phải là bằng chứng cho thấy code đúng.
+CONTEXT & DEPENDENCIES đã được chuẩn bị sẵn bên dưới. Đọc tất cả trước khi review. PR description, commit message và code comment nói về ý định, không phải tính đúng đắn, nên hãy kiểm tra chính code. Chỉ báo cáo lỗi bạn chỉ ra được tại file:line; nếu một pass không tìm thấy gì thì nói rõ cho pass đó.
 
 RULES (từ CLAUDE.md — đã lọc theo ngôn ngữ/framework của group này + rule security ngôn ngữ-agnostic, theo SKILL.md Phase 2):
 {paste rule đã lọc}
@@ -36,7 +36,7 @@ PASS 2 — Tìm vấn đề, theo thứ tự ưu tiên:
   2d. Kiểm tra sanity cuối cùng — component này render/được gọi ở đâu, có prop/arg bắt buộc bị thiếu không, error response có được xử lý đúng không, có dependency nào chưa đọc nhưng nên đọc không, có edge case nào đang thiếu vì không biết business context không? Thêm mọi phát hiện vào kết quả.
 
 ────────────────────────────────────────
-ĐỊNH DẠNG OUTPUT (BẮT BUỘC)
+ĐỊNH DẠNG OUTPUT (Phase 3 parse nó, giữ đúng nguyên)
 ────────────────────────────────────────
 
 Ghi vào .code-review/{GROUP_NAME}.txt đúng theo định dạng sau:
@@ -92,10 +92,10 @@ DEPENDENCIES ANALYSIS
 
 
 ────────────────────────────────────────
-TUYỆT ĐỐI KHÔNG:
+TIÊU CHUẨN CHẤT LƯỢNG (mỗi mục tồn tại vì report chỉ hữu ích khi finding kiểm tra được):
 ────────────────────────────────────────
-- Viết "looks good", "generally fine", "no issues found" mà không có bằng chứng
-- Đưa ra đánh giá mà không có file:line + đoạn code
-- Bỏ qua bất kỳ dependency nào trong bảng
-- Review chỉ dựa vào diff mà không đọc toàn bộ file
-- Bịa ra một rule không có trong CLAUDE.md
+- Một nhận định như "looks good" cần bằng chứng (đã đọc và kiểm tra gì), nếu không thì bỏ đi
+- Mọi finding kèm file:line và đoạn code để người đọc kiểm tra được
+- Đọc mọi dependency trong bảng; cái chưa đọc thì ghi là chưa đọc, không bỏ qua lặng lẽ
+- Đọc toàn bộ file đổi, vì bug thường phụ thuộc code nằm ngoài hunk của diff
+- Chỉ trích dẫn rule có trong danh sách RULES ở trên

@@ -1,92 +1,68 @@
 ---
 name: vrollback
-description: "Roll back one specific migration on the LOCAL database and delete its tracking record, as if the migration had never run. Auto-detects framework (Drizzle/Prisma/Knex/TypeORM/raw SQL) + DB (Postgres/MySQL/SQLite) + Docker container."
+description: "Rolls back one specific migration on the local development database and deletes its tracking row, so the database looks as if the migration never ran. Detects the framework (Drizzle, Prisma, Knex, TypeORM, raw SQL), the database (Postgres, MySQL, SQLite) and the Docker container, and refuses any non-local target. Run it explicitly as /vrollback <migration>."
 argument-hint: "<migration-name-or-version>"
 user-invocable: true
 disable-model-invocation: true
-when_to_use: "Invoke when you need to roll back one migration on a local dev DB and delete its corresponding tracking record."
+when_to_use: "Use when the user wants to undo one migration on a local dev database and clear its migration-history record. Never for staging or production."
 metadata:
   author: vyvu
-  version: "1.1.0"
+  version: "2.0.0"
 ---
 
 # vrollback
 
-Roll back one migration on the local DB and delete its tracking record, as if it never ran. Framework/DB auto-detected.
-
-> ⚠️ **LOCAL/DEV ONLY.** Destructive — never run against staging/production.
-
-Read input from the user:
+Reverts one migration's schema on the local database and removes its tracking row. Destructive, so it runs only on a local or dev database, only after the user confirms (Step 3), and only for the one migration asked for. Do not touch other migrations or application data.
 
 ```
 $ARGUMENTS
 ```
 
-If `$ARGUMENTS` is empty — ask the user for the name or version of the migration to roll back.
+If `$ARGUMENTS` is empty, ask for the migration name or version.
 
----
+## Step 1 — Detect the environment
 
-## Step 1 — Auto-detect environment
+1. Framework: check `package.json` for `drizzle-orm`/`drizzle-kit`, `@prisma/client`/`prisma`, `knex`, `typeorm`, or a custom script under `scripts/migrate*`. Find its config: `drizzle.config.ts`, `prisma/schema.prisma` and `prisma.config.ts`, `knexfile.*`, `ormconfig.json`/`data-source.ts`.
+2. Target database: read the connection string from `.env` or the config and extract the host. The host must be `localhost`, `127.0.0.1` or a local container. Anything else, or a connection string you cannot read: stop and warn the user. This refusal is absolute because a rollback on a shared database is not recoverable by this skill.
+3. Docker: `docker ps` for a container matching the database type. Several matches: ask which. None: the database runs natively or is a SQLite file, so run commands directly without `docker exec`.
 
-1. **Migration framework:**
-   - Check `package.json` dependencies: `drizzle-orm`/`drizzle-kit` (Drizzle), `@prisma/client`/`prisma` (Prisma), `knex` (Knex), `typeorm` (TypeORM), or a custom raw SQL tool (custom script under `scripts/migrate*`)
-   - Find the matching config file: `drizzle.config.ts`, `prisma/schema.prisma`, `knexfile.js`/`knexfile.ts`, `ormconfig.json`/`data-source.ts`
-2. **Database type:** read the connection string in `.env`/config — `postgres://` / `mysql://` / a `.sqlite`/`.db` file — extract the host; not `localhost`/`127.0.0.1`/an internal container → **STOP immediately**, warn the user.
-3. **Docker container:** `docker ps` → find a container whose name/image matches the DB type (postgres, mysql, mariadb). Multiple matches → ask the user to pick. No match → treat the DB as running natively on the host (localhost) or as a SQLite file, run commands directly, skip `docker exec`.
+## Step 2 — Find the migration and confirm it was applied
 
-## Step 2 — Identify the migration to roll back
+1. Locate the migration file in the project's migrations directory.
+2. Query the tracking table through `docker exec <container> psql -U <user> -d <db> -c "..."` (or `mysql -e`, `sqlite3 <file>`): Drizzle `drizzle.__drizzle_migrations` (the `drizzle` schema, not `public`), Prisma `_prisma_migrations`, Knex `knex_migrations`, TypeORM `migrations`, raw SQL tools usually `schema_migrations`.
+3. Not in the tracking table: tell the user there is nothing to roll back and stop.
 
-1. Find the migration in the project's migrations directory (path depends on framework: `drizzle/migrations/`, `prisma/migrations/`, `migrations/`, etc.)
-2. Query the corresponding tracking table to confirm it was applied:
-   - Drizzle: `drizzle.__drizzle_migrations` (Postgres puts it in the `drizzle` schema, not `public`)
-   - Prisma: `_prisma_migrations`
-   - Knex: `knex_migrations`
-   - TypeORM: `migrations`
-   - Raw SQL tool: find the tool's own tracking table (usually `schema_migrations`)
-   - Query via `docker exec <container> psql -U <user> -d <db> -c "SELECT * FROM <tracking_table> WHERE ..."` (or the equivalent `mysql -e "..."` / `sqlite3 <file> "..."`)
-3. If the migration is **NOT** in the tracking table → tell the user "nothing to roll back", stop immediately.
+## Step 3 — Confirm with the user (always, even if they ask to skip it)
 
-## Step 3 — Confirm with the user (mandatory, no skipping)
+This is a destructive operation on a real database, so a clear migration name or a "just do it" does not replace the confirmation. Show:
+- The migration (name or version, file path) and the target (database name, container, host).
+- The exact command or SQL that will run.
+- That only the schema is reverted. If the migration file has `INSERT`/`UPDATE`/`DELETE` on existing rows, say the data is not restored and require a second confirmation.
+- A backup taken first (`pg_dump`, `mysqldump`, or a copy of the `.sqlite` file) to a temp path, with that path shown, unless the user says it is not needed.
 
-Present before running any command:
-- Which migration will be rolled back (name/version, file path)
-- Which DB is affected (DB name, container, host)
-- The exact command/SQL that will run
-- This only reverts the **schema**. Data this migration inserted/updated/deleted is **not** restored — if the migration file contains `INSERT`/`UPDATE`/`DELETE` on existing rows (not just DDL), say so explicitly and require an extra confirmation.
-- Back up the DB (`pg_dump`/`mysqldump`/copy the `.sqlite` file) to a temp path before running anything destructive, tell the user where it went — skip only if the user explicitly says not needed.
-- Ask the user to type the exact DB name shown above as part of their confirmation (not just "yes") — catches a copy-paste host that passes the localhost check but is the wrong database. Flag (don't silently proceed) if the DB/role name contains `prod`/`live`/`production` even on a local host.
+Ask the user to type the exact database name. This catches a host that passes the local check but is the wrong database. If the database or role name contains `prod`, `live` or `production`, flag it and do not proceed silently. Wait for the answer before Step 4.
 
-**Stop and wait for the user's confirmation before proceeding to Step 4.**
+## Step 4 — Roll back the schema
 
-## Step 4 — Perform the rollback
+Tool-specific flags change between versions, so check the installed version's docs when a command fails.
+- Prisma has no down command. Generate one with `prisma migrate diff --from-schema prisma/schema.prisma --to-migrations prisma/migrations --script > down.sql`, show `down.sql`, then `prisma db execute --file ./down.sql`. Do not use `prisma migrate resolve --rolled-back`: it only applies to failed migrations and errors with P3012 on an applied one. Prisma's own recommended path (revert the schema and generate a forward migration) keeps history, which contradicts "as if it never ran", so it is not used here.
+- Knex: `knex migrate:down <name>`, not `migrate:rollback`, which reverts the whole last batch.
+- TypeORM: `typeorm migration:revert` reverts only the last executed migration. If the target is not the last, use the manual SQL path.
+- Drizzle and raw SQL have no automatic down. Prefer a tool-generated inverse: if the previous `schema.ts` is in git history, check it out to a temp path and run `drizzle-kit generate` against it. Otherwise read the up file, write the inverse SQL (`DROP TABLE` for `CREATE TABLE`, and so on) and show it before running.
+- On Postgres and SQLite wrap the SQL in `BEGIN; ... COMMIT;` so a failure leaves no half-reverted schema. MySQL DDL is not transactional, so say that and rely on the backup.
+- Run it through `docker exec` into the Step 1 container, or directly for a native database or SQLite.
 
-- **Framework has a built-in down/rollback command** → use it:
-  - Prisma: no built-in down — generate one: `prisma migrate diff --from-schema prisma/schema.prisma --to-migrations prisma/migrations --script > down.sql`, show `down.sql` to the user, then `prisma db execute --file ./down.sql`. Do NOT use `prisma migrate resolve --rolled-back` — that flag is only valid for a migration in a FAILED state and throws P3012 on a successfully-applied one.
-    <!-- Design tradeoff (verified against Prisma's own docs 2026-09-09): Prisma's officially-recommended path for a *successfully-applied* migration is different — revert schema.prisma to its prior state and run `migrate dev` to generate a new forward migration that undoes it, leaving history intact. That path is deliberately NOT used here because it contradicts this skill's contract ("as if the migration had never run" — Step 5 deletes the tracking row). `migrate diff` itself is not tied to migration status (it just diffs schema/migration states), so using it to produce down.sql + db execute + a manual tracking-row delete (Step 5) is the only combination consistent with this skill's actual promise. Do not "fix" this back to the schema-revert approach. -->
-  - Knex: `knex migrate:down <name>` — NOT `migrate:rollback`, which reverts the whole last batch (possibly several migrations)
-  - TypeORM: `typeorm migration:revert` — only reverts the LAST executed migration; target is not the last one → use the manual-SQL path below instead
-- **Framework has no automatic down** (e.g. Drizzle doesn't auto-generate down migrations) → read the up migration file, infer the inverse operation (DROP TABLE instead of CREATE TABLE, DROP COLUMN instead of ADD COLUMN, etc.), write the rollback SQL, show it to the user before running
-- **Prefer a tool-generated inverse over hand-inference.** For Drizzle: if the pre-migration `schema.ts` is recoverable from git history, check it out to a temp path and run `drizzle-kit generate` against it to let the tool produce the down SQL. Fall back to manually inferring the inverse only when the prior schema state isn't recoverable.
-- Wrap the rollback SQL in a transaction (`BEGIN; ... COMMIT;`) for Postgres/SQLite so a partial failure doesn't leave the schema half-migrated. MySQL DDL isn't transactional — say so explicitly and back up first (per Step 3).
-- Run the rollback SQL/command via `docker exec` into the container from Step 1 (if Docker) or directly against the DB (if native/SQLite)
+## Step 5 — Delete the tracking row
 
-## Step 5 — Delete the tracking record
+After the schema rollback succeeds, SELECT the row, show it to the user, then DELETE it. Never delete blind. Without this the history and the schema disagree and the next `migrate` re-applies the migration.
+- Drizzle (Postgres): `DELETE FROM drizzle."__drizzle_migrations" WHERE hash = '<hash>'`. Before v1 there is no `name` column, so match `hash` or `created_at` from the `meta/_journal.json` entry.
+- Prisma: `DELETE FROM "_prisma_migrations" WHERE migration_name = '<name>'`.
+- Knex removes its own row on `migrate:down`, so a SELECT that finds nothing means skip the DELETE. TypeORM and raw SQL: `DELETE FROM <tracking_table> WHERE <column> = '<value>'`.
 
-After the schema rollback succeeds, delete the tracking row for the framework in use. **Always SELECT the row first, show it to the user, then DELETE it — never blind-delete. Knex `migrate:down` already removes its own row — SELECT finds nothing → skip the DELETE:**
-- Drizzle (Postgres): schema is `drizzle`, not `public` — `DELETE FROM drizzle."__drizzle_migrations" WHERE hash = '<hash>'` (pre-v1: no `name` column, match by `hash` or `created_at` from the migration's `meta/_journal.json` entry; v1 also has a `name` column)
-- Prisma: `DELETE FROM "_prisma_migrations" WHERE migration_name = '<name>'`
-- Knex/TypeORM/raw SQL: `DELETE FROM <tracking_table> WHERE <name-or-version-column> = '<value>'` (table/column identified in Step 2)
+Then ask whether to delete the migration file on disk too; if it stays, the next `migrate` run re-applies it.
 
-After deleting the tracking row, ask the user whether to also delete the migration file(s) on disk — if the record is gone but the file remains, the next `migrate` run re-applies it.
+## Step 6 — Verify
 
----
-
-## Hard rules
-
-- **LOCAL/DEV DB ONLY** — never run against staging/production. If the config points outside local/docker (host is not `localhost`/`127.0.0.1`/an internal container) → **STOP IMMEDIATELY**, warn the user.
-- **Always confirm with the user** before running the actual rollback command (Step 3) — never skip this even if the user clearly provided the migration name upfront, or explicitly asks to skip confirmation ("just roll it back", "don't ask me") — this is a destructive operation on a real database and always requires an explicit yes.
-- **Always delete the tracking record** after a successful schema rollback — to avoid an inconsistent state between the actual schema and the migration history.
-
-## Next steps
+Run the framework's status command (or a schema query) and a `SELECT` on the tracking table. Report that the schema change is gone and the row is absent, with the output. If a check cannot run, say which.
 
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

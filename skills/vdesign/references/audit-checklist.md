@@ -17,7 +17,7 @@ Read this file in full at Phase 2 and go through each category — only flag iss
 - [ ] Background/border/shadow consistent with same-type components elsewhere in the project?
 - [ ] **Contrast — measure, don't guess**: resolve actual fg/bg color values (CSS vars, Tailwind config, or literal hex/rgb), compute WCAG relative luminance (`L = 0.2126*R + 0.7152*G + 0.0722*B`, linearized sRGB) and contrast ratio `(L1+0.05)/(L2+0.05)`. Report PASS/FAIL vs 4.5:1 (normal text) / 3:1 (large text ≥18pt/14pt-bold, non-text UI per SC 1.4.11). Can't resolve statically (runtime-computed, external design system) → **"NOT MEASURED — verify manually"**, never assume PASS.
 - [ ] Do active/selected/highlighted states have a distinguishing color?
-- [ ] **NOT using the component's default color** (e.g. shadcn's default blue) — must use the system's primary color (`primary`, `accent` tokens)?
+- [ ] **Not using the component's default color** (e.g. shadcn's default blue) — must use the system's primary color (`primary`, `accent` tokens)?
 
 #### Depth & Elevation
 - [ ] Elevation tiers defined (3-5 named levels: base/card/elevated-card/overlay) and consistently assigned — each surface type always uses the same tier?
@@ -89,9 +89,9 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 **Scope note (UX Efficiency + Content Design & Error Prevention):** fixes here commonly only need frontend interaction state (React state/hooks, localStorage) — when a fix genuinely needs a new/changed API endpoint (e.g. a true bulk-delete endpoint), implement it directly (API/service layer is in scope, see `SKILL.md`'s hard rules) rather than faking it client-side; DB schema/migration changes stay out of scope regardless.
 
 #### Information Architecture & Scannability
-- [ ] **View-type fit**: does the chosen view type (table, card grid, kanban, timeline, master-detail, calendar, tree, etc. — picked for what the data/task calls for) match the data shape and task named in Phase 1's Real User & Purpose step, or force an awkward fit (e.g. nested data crammed into a flat table)?
+- [ ] **View-type fit**: does the chosen view type (table, card grid, kanban, timeline, master-detail, calendar, tree, etc. — picked for what the data/task calls for) match the data shape and task named in Phase 0's Real User & Purpose step, or force an awkward fit (e.g. nested data crammed into a flat table)?
 - [ ] **Generic-repetition check**: sections/cards with meaningfully different content/purpose rendered as identical generic boxes just for visual sameness — flag the genericness itself (not a safe default) and restructure each section's layout to fit its actual content.
-- [ ] A field Phase 1's task actually needs is missing from the view because it was never fetched at all (not just fetched-but-unrendered — see Sparse/under-filled below)? Trace whether it already exists upstream (DB column, service-layer data) — if so, wire it through the API/service layer (never invent it client-side) and surface it, subject to Phase 4's content-exposure confirmation; if it doesn't exist upstream either, flag it as a product/backend dependency instead.
+- [ ] A field Phase 0's task actually needs is missing from the view because it was never fetched at all (not just fetched-but-unrendered — see Sparse/under-filled below)? Trace whether it already exists upstream (DB column, service-layer data) — if so, wire it through the API/service layer (never invent it client-side) and surface it, subject to Phase 4's content-exposure confirmation; if it doesn't exist upstream either, flag it as a product/backend dependency instead.
 - [ ] Above-the-fold content on a dense page/dashboard prioritizes the highest-value info top-left (F-pattern) — critical KPI/action isn't buried below the fold?
 - [ ] Dense data table row height matches the actual user: comfortable default (~48-52px, fewer rows/viewport) for mixed/occasional users, compact option (~28-32px) for power-user/analyst contexts — not picked arbitrarily?
 - [ ] A list/table with many items provides a way to scan key info without opening each row individually (column choice, summary badges) — not forcing per-row drill-down for basic comparison?
@@ -110,13 +110,13 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 #### Animation & Motion
 - [ ] Animation only where it has **meaning**: hover reveal, state transition, page enter
 - [ ] Do not animate opacity of **child components** — only the container wrapper
-- [ ] When hiding a component but needing to keep its state → use `opacity-0 w-0` / `visibility: hidden`, **DO NOT unmount**
+- [ ] When hiding a component but needing to keep its state → use `opacity-0 w-0` / `visibility: hidden`, **do not unmount**
 - [ ] Action bar/toolbar → only show on hover (`group-hover:opacity-100`)
 - [ ] Animation duration: subtle (150-300ms), not too flashy for a B2B app
 - [ ] Has a `prefers-reduced-motion` guard if using CSS animation
 
 #### Media & Images (banner, hero character, background art, video)
-- [ ] Full-bleed image with `object-contain` → container MUST set `aspect-ratio` matching the image's actual W/H (measure via PIL/`sips -g pixelWidth -g pixelHeight`, don't guess) — a mismatched ratio letterboxes the image even at full width
+- [ ] Full-bleed image with `object-contain` → container must set `aspect-ratio` matching the image's actual W/H (measure via PIL/`sips -g pixelWidth -g pixelHeight`, don't guess) — a mismatched ratio letterboxes the image even at full width
 - [ ] For full-bleed with acceptable minor cropping instead of computing aspect-ratio → use `object-cover` with `mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent)` to fade the edges and hide the hard crop marks
 - [ ] Illustration must "grow" without taking sibling (text/button) layout space → `position: absolute`, but still reserve room for adjacent text via `max-width: calc(100% - Npx)` or matching padding, to avoid overlap
 - [ ] `float` + `shape-outside` (text wraps around an image's contour) only works as a direct child of a **block container** — no effect inside `flex`/`grid` (browser silently ignores it, no warning). If the parent must be flex, use `absolute` + `max-width` reservation instead
@@ -161,7 +161,7 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 - [ ] Every breakpoint change must have a clear reason: layout collapse, font scale up, sidebar unhide, etc.
 
 **Layout & Grid:**
-- [ ] Multi-column grid MUST collapse: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` — no bare `grid-cols-3`
+- [ ] Multi-column grid must collapse: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` — no bare `grid-cols-3`
 - [ ] Flex row on desktop → `flex-col` on mobile: `flex flex-col sm:flex-row`
 - [ ] Sidebar layout: `hidden lg:block` sidebar + full-width content on mobile, or a Sheet/Drawer
 - [ ] No fixed/absolute width (e.g. `w-[320px]`) without a responsive fallback
@@ -173,7 +173,7 @@ Applies when encountering a component with `import 'lib/styles.css'` or that inj
 
 **Touch & Interaction:**
 - [ ] Touch targets ≥ 44×44px for every interactive element (button, link, checkbox, toggle)
-- [ ] Hover-only interactions MUST have a mobile fallback: action buttons always visible, not only `group-hover:`
+- [ ] Hover-only interactions need a mobile fallback: action buttons always visible, not only `group-hover:`
 - [ ] Spacing between touch targets: gap ≥ 8px to avoid fat-finger errors
 
 **Overflow & Scroll:**
