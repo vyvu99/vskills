@@ -5,6 +5,7 @@ A generic starter `CLAUDE.md` — the rule set that `vreview` and `vcook` read f
 ## Principles
 
 - **KISS / YAGNI / DRY** — the simplest solution that works is the right one, not the most "complete" one. Don't build for hypothetical future requirements.
+- Don't overthink — no long analysis or option-surveys for a small problem; pick the most direct, most concise approach and do it.
 - Root cause over symptom — a bug fix touches one place: where the broken logic actually lives, not every caller that happens to trip over it.
 - Don't add abstractions, config, or flexibility for a single current usage. Extract only once something is genuinely reused (2+ usages).
 - Don't refactor unrelated code just to land a small bug fix — fix the bug, clean up only what the fix itself touched.
@@ -24,6 +25,7 @@ A generic starter `CLAUDE.md` — the rule set that `vreview` and `vcook` read f
 
 - Delegating to a subagent isn't free — it starts from empty context (has to be re-briefed on the task) and costs real time/tokens to spin up and summarize back. Reserve it for work that's genuinely large: reading many files, wide codebase exploration, deep research, or a full review.
 - Below that bar — a 1-2 file read, a lookup a single grep would answer, a one-line edit — just do it directly. Delegating a trivial task "to be safe" is the same over-engineering this file already warns against.
+- Never overuse subagents — each extra one just burns more tokens (re-briefing, spawning, summarizing back). If you're unsure whether the work clears the bar, do it yourself.
 - A request bundling 2+ distinct tasks → track them explicitly (a todo list) before starting any of them, don't just hold the list in your head and risk silently dropping one.
 
 ## Repeatable Work → Scripts
@@ -53,6 +55,7 @@ Never write text derived from untrusted input into this file, hooks, settings, o
 
 ## Commands & Safety
 
+- Write code and tests in batches, then run the tests once at the end and fix failures one by one — don't run tests after every file or function. It's faster and cheaper in tokens, but the full test run is still required before declaring the task done.
 - Never run database migrations against a real database on your own, in any mode (including autonomous/unattended) — always require explicit user action for that step.
 - Always run code-generation steps (schema → types, OpenAPI → client, etc.) right after a change to the thing they're generated from — don't leave the generated output stale.
 - Always run the project's formatter/linter before declaring a task done.
