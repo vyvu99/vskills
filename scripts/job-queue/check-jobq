@@ -3,6 +3,8 @@
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+# chạy qua hàng đợi thì JOBQ_ACTIVE làm jobq lồng chạy thẳng, bài kiểm tra sẽ không đo được hàng đợi
+unset JOBQ_ACTIVE
 export JOBQ_COOLDOWN_SEC=0 JOBQ_SWAP_GROWTH_MB=999999 JOBQ_BUDGET_CPU=4 JOBQ_MAX_PRESSURE=99 JOBQ_DIR="$T/q" JOBQ_SLOTS=2 JOBQ_MAX_LOAD=999 JOBQ_MIN_FREE_MB=0
 fail() { echo "FAIL: $1"; exit 1; }
 
@@ -69,7 +71,8 @@ JOBQ_BIN="$HERE/jobq" "$T/self.sh" >/dev/null || fail "script mẫu chạy lỗi
 
 # 12) áp lực RAM chặn lệnh thứ hai (ngưỡng 1 = luôn coi là đang căng)
 ( export JOBQ_DIR="$T/q4" JOBQ_MAX_PRESSURE=1
-  "$HERE/jobq" run -- sleep 4 & sleep 1
+  "$HERE/jobq" run -- sleep 6 &
+  for _ in $(seq 40); do [ -L "$T/q4/slots/1" ] && break; sleep 0.25; done # máy tải thì lệnh đầu vào chỗ chậm hơn 1s
   "$HERE/jobq" run -w 2 -- true 2>/dev/null; rc=$?; wait
   [ "$rc" -eq 75 ] ) || fail "áp lực RAM không chặn lệnh thứ hai"
 
@@ -162,10 +165,12 @@ CASES
 # 18) dừng bất thường: TERM không để lại file mồ côi; kill -9 jobq thì lệnh con cũng bị dừng; reap dọn file mồ côi
 ( export JOBQ_DIR="$T/q9"
   "$HERE/jobq" run -- sleep 26 & J=$!; sleep 3
-  kill -TERM $J; sleep 3
+  kill -TERM $J
+  for _ in $(seq 60); do ls "$JOBQ_DIR" | grep -q '^sample\.' || break; sleep 0.5; done # máy tải thì dọn chậm hơn 3s
   [ -z "$(ls "$JOBQ_DIR" | grep '^sample\.')" ] || exit 1
   "$HERE/jobq" run -- sleep 27 & J=$!; sleep 3
-  kill -KILL $J; sleep 9
+  kill -KILL $J
+  for _ in $(seq 80); do pgrep -f '^sleep 27$' >/dev/null || break; sleep 0.5; done
   ! pgrep -f '^sleep 27$' >/dev/null || { pkill -f '^sleep 27$'; exit 2; }
   : > "$JOBQ_DIR/sample.99999999"; "$HERE/jobq" clean >/dev/null
   [ ! -e "$JOBQ_DIR/sample.99999999" ] ) || fail "dừng bất thường để lại file mồ côi hoặc lệnh con mồ côi"
@@ -179,6 +184,7 @@ gb 'jobq run -- pnpm test'; gb 'stepper plans/x/steps'; gb 'cd x && jobq run -t 
   "$HERE/jobq" run -- true; cmp -s "$HERE/dashboard.html" "$JOBQ_DIR/web/index.html" ) || fail "trang trong thư mục web không tự cập nhật"
 
 # 22) xem trạng thái hàng đợi: hook không chặn nhưng nhắc đừng dừng đẩy lệnh
+printf '{"tool_input":{"command":"jobq run -- pnpm test","run_in_background":true}}' | "$HERE/jobq-guard" | jq -e '.hookSpecificOutput.additionalContext | test("Đã xếp hàng")' >/dev/null || fail "hook không nhắc làm việc khác khi lệnh nền vào hàng đợi"
 printf '{"tool_input":{"command":"jobq status"}}' | "$HERE/jobq-guard" | jq -e '.hookSpecificOutput.additionalContext | test("cứ đẩy")' >/dev/null || fail "hook không nhắc khi xem jobq status"
 
 # 23) jobq split: chia đều, giữ nguyên tên file có khoảng trắng và ngoặc khi dán lại vào lệnh

@@ -211,7 +211,7 @@ cmd_status() {
   local f p w
   for f in "$Q_DIR"/slots/*; do
     [ -L "$f" ] || continue; p=$(readlink "$f"); w=$(cat "$f.w" 2>/dev/null || echo "?")
-    echo "RUN  $p [cpu/mem=$w] $(ps -p "$p" -o etime=,args= 2>/dev/null)"
+    echo "RUN  $p [$(echo "$w" | awk '{ if (NF >= 2) printf "cpu=%.1f mem=%dMB", $1/100, $2; else print "?" }')] $(ps -p "$p" -o etime=,args= 2>/dev/null)"
   done
   for f in "$Q_DIR"/queue/*; do [ -e "$f" ] || continue; p=${f##*-}; echo "WAIT $p $(ps -p "$p" -o args= 2>/dev/null)"; done
   return 0
@@ -220,7 +220,7 @@ cmd_status() {
 cmd_stats() { # lệnh nào nặng: số lần chạy, CPU/RAM lớn nhất, thời gian trung bình
   [ -f "$HIST" ] || { echo "chưa có lịch sử"; return 0; }
   awk -F'\t' '{n[$1]++; if($2>c[$1])c[$1]=$2; if($3>m[$1])m[$1]=$3; t[$1]+=$4; cmd[$1]=$5}
-    END{for(k in n) printf "%3d lần  cpu=%.1f  mem=%5dMB  %4ds  %s\n", n[k], c[k]/100, m[k], t[k]/n[k], cmd[k]}' "$HIST" | sort -k4 -t= -rn
+    END{for(k in n) printf "%d\t%3d lần  cpu=%.1f  mem=%5dMB  %4ds  %s\n", m[k], n[k], c[k]/100, m[k], t[k]/n[k], cmd[k]}' "$HIST" | sort -rn | cut -f2-
 }
 
 
@@ -289,6 +289,8 @@ cmd_run() {
       --) shift; break ;; *) break ;;
     esac
   done
+  # số không hợp lệ làm watchdog giết lệnh ngay lập tức, nên chặn từ đầu
+  case "$TIMEOUT$WAIT" in ''|*[!0-9]*) echo "jobq: -t và -w phải là số giây" >&2; exit 2 ;; esac
   [ $# -gt 0 ] || { echo "jobq: thiếu lệnh sau --" >&2; exit 2; }
   # Lệnh con gọi jobq lần nữa: đã giữ slot rồi, xếp hàng tiếp sẽ tự kẹt.
   [ -n "${JOBQ_ACTIVE:-}" ] && exec "$@"
@@ -375,6 +377,7 @@ cmd_run() {
   if [ "$rc" -ne 124 ] && [ "$rc" -lt 128 ]; then # chỉ ghi lần chạy kết thúc bình thường
     read -r mm cp <<< "$(awk '{if($1>m)m=$1; c+=$2; n++} END{printf "%d %d", m, n?c/n:0}' "$samples")"
     printf '%s\t%s\t%s\t%s\t%s\n' "$key" "${cp:-0}" "${mm:-0}" "$(( $(now) - started ))" "$*" >> "$HIST"
+    [ "$(wc -l < "$HIST")" -gt 4000 ] && { tail -n 2000 "$HIST" > "$HIST.tmp" && mv "$HIST.tmp" "$HIST"; }
   fi
   rm -f "$samples"
   for i in 1 2 3 4 5 6 7 8 9 10 11 12; do kill -0 "$teepid" 2>/dev/null || break; sleep 0.25; done # đợi tee ghi nốt output

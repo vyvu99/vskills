@@ -59,6 +59,8 @@ if printf '%s\n' "$stripped" | grep -qE "${START}([^[:space:]]*/)?(jobq[[:space:
     echo "BLOCKED: lệnh qua jobq phải chạy nền (run_in_background: true). Hãy làm việc độc lập khác trong lúc chờ, kết quả sẽ tự báo khi xong, không poll và không sleep. Bước kế tiếp thật sự cần kết quả ngay thì thêm JOBQ_FG=1 trước lệnh." >&2
     exit 2
   fi
+  # chạy nền hợp lệ: nhắc ngay để Claude làm việc khác thay vì đứng chờ
+  [ "$bg" = true ] && jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:"Đã xếp hàng. Làm việc độc lập khác trong lúc chờ; kết quả sẽ tự báo khi xong, không poll và không sleep."}}'
   exit 0
 fi
 
