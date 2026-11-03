@@ -140,4 +140,4 @@ git push
 
 ## License
 
-[MIT](LICENSE)
+Copyright (c) 2026 vyvu. Cấp phép theo [AGPL-3.0](LICENSE). Bản đã tải trước khi đổi license vẫn thuộc MIT với đúng các phiên bản đó.

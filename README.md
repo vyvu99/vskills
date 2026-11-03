@@ -139,4 +139,4 @@ git push
 
 ## License
 
-[MIT](LICENSE)
+Copyright (c) 2026 vyvu. Licensed under [AGPL-3.0](LICENSE). Copies obtained before the license change remain under MIT for the versions you received.
