@@ -1,11 +1,51 @@
 #!/usr/bin/env bash
 # jobq-guard: hook PreToolUse(Bash) chặn lệnh nặng chạy trực tiếp. Usage: gắn vào settings.json, đọc JSON từ stdin
-# Chặn (exit 2) khi lệnh nặng đứng ở đầu câu lệnh mà không đi qua `jobq run`; lệnh khác để qua.
+# Chặn (exit 2) khi lệnh nặng đứng ở đầu câu lệnh mà không đi qua `jobq run`; lệnh khác để qua. Danh sách lệnh nặng sửa ở biến HEAVY bên dưới.
 set -euo pipefail
 cmd=$(jq -r '.tool_input.command // empty')
 case "$cmd" in *"jobq run"*|*"stepper "*|"") exit 0 ;; esac
-heavy='(^|[;&|(] *)((pnpm|npm|yarn|bun)( --filter[= ][^ ]+| -r| run| exec)* (test|check-types|typecheck|build|e2e|test:[a-z:-]+)|turbo( run)? |(npx |pnpm exec )?(vitest|jest|playwright test|tsc( |$))|next build|docker build)'
-if printf '%s' "$cmd" | grep -qE "$heavy"; then
+
+# Vị trí được coi là "đầu lệnh": đầu chuỗi, sau ; & | (, sau bash -c ', kèm tiền tố time/env/VAR=x/rtk.
+START='(^|[;&|(][[:space:]]*|(bash|sh|zsh)[[:space:]]+-[a-z]*c[[:space:]]+["'"'"'][[:space:]]*)((time|nice|env|rtk|command|exec)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^ ]*[[:space:]]+)*'
+FLAGS='([[:space:]]+(--filter[= ][^ ]+|-F [^ ]+|-r|--recursive|run|run-script|exec|x|dlx|workspaces|foreach|-A|--all|-p|-t|-w|--workspace[= ][^ ]+|--silent|-s|--))*'
+SCRIPTS='(test|check|check-types|typecheck|type-check|build|lint|format|e2e|coverage|storybook|sdk:generate|verify|validate|compile|bundle|analyze|codegen|generate|typegen|prebuild|export|package|bench|benchmark|knip|spell|(test|build|lint|format|e2e|check|verify|validate|generate|typecheck|ci|bench)[:-][a-zA-Z0-9:_-]+)'
+END='([[:space:]"'"'"';&|)]|$)'
+PKG="(pnpm|npm|yarn|bun)${FLAGS}[[:space:]]+${SCRIPTS}${END}"
+# Công cụ gọi trực tiếp hoặc qua npx/bunx/pnpm exec/dlx...: build, test, lint, kiểm kiểu, xử lý ảnh/video, đo hiệu năng, build app di động, trình chạy tác vụ.
+NAMES='(tsc|vue-tsc|svelte-check|vitest|jest|mocha|ava|karma|nyc|c8|playwright|cypress|detox|maestro|cucumber-js|eslint|prettier|stylelint|biome|knip|depcheck|madge|size-limit|turbo|nx|webpack|rollup|parcel|esbuild|rspack|tsup|storybook|chromatic|lighthouse|lhci|k6|artillery|autocannon|hyperfine|fern|pytest|mypy|pylint|tox|nox|ffmpeg|magick|convert|mogrify|montage|sips|pngquant|optipng|cwebp|gifsicle|xcodebuild|fastlane|ng[[:space:]]+(build|test|lint|e2e)|astro[[:space:]]+(build|check)|nuxt[[:space:]]+(build|generate)|remix[[:space:]]+build|expo[[:space:]]+(export|prebuild)|eas[[:space:]]+build|next[[:space:]]+(build|lint)|vite[[:space:]]+build|wrangler[[:space:]]+(deploy|build)|docker[[:space:]]+(build|compose[[:space:]]+build)|cargo[[:space:]]+(build|test|check|clippy|bench)|go[[:space:]]+(build|test|vet)|swift[[:space:]]+(build|test)|pod[[:space:]]+install|flutter[[:space:]]+(build|test|analyze)|dotnet[[:space:]]+(build|test|publish)|mvn|gradle|\./gradlew|bundle[[:space:]]+exec|rake|phpunit|mix[[:space:]]+(test|compile)|deno[[:space:]]+(test|check|lint|bench|compile)|make|gmake|just[[:space:]]+(test|check|build|lint|ci|e2e|bench|verify)|ninja|cmake|bazel|python3?[[:space:]]+-m[[:space:]]+(pytest|unittest|mypy|pylint|tox))'
+RUNNER="(((npx|bunx|bun x)[[:space:]]+(--[[:space:]]+)?|(pnpm|npm|yarn|bun)${FLAGS}[[:space:]]+))?"
+TOOLS="${RUNNER}${NAMES}${END}"
+# Script test/check tự viết gọi bằng interpreter hoặc đường dẫn: bash scripts/check-x.sh, node test-foo.mjs, ./e2e-run.sh
+SCRIPTFILES='((bash|sh|zsh|node|bun|python3?)[[:space:]]+)?[^ ]*(check|test|e2e|bench)[-_][^ ]*\.(sh|mjs|cjs|js|ts|py)'
+HEAVY="${START}(${PKG}|${TOOLS}|${SCRIPTFILES}${END})"
+
+# Nội dung heredoc (<<EOF ... EOF) là dữ liệu ghi vào tệp/nhập cho lệnh, không phải lệnh được chạy: bỏ đi để khỏi chặn nhầm.
+body=$(printf '%s\n' "$cmd" | awk '
+  h != "" { if ($0 == h || $0 ~ "^[[:space:]]*" h "$") h = ""; next }
+  match($0, /<<-?[[:space:]]*["'"'"']?[A-Za-z_][A-Za-z0-9_]*/) { t = substr($0, RSTART, RLENGTH); gsub(/<<-?[[:space:]]*["'"'"']?/, "", t); h = t }
+  { print }')
+
+# Chữ nằm trong dấu nháy (mẫu grep/sed, jq, lời nhắn commit) là dữ liệu, không phải lệnh: thay bằng khoảng trắng.
+# Ngoại lệ: nội dung ngay sau bash|sh|zsh -c vẫn là lệnh nên được giữ. Nháy lẻ (không đóng) thì dùng nguyên văn, thà chặn thừa còn hơn để lọt.
+stripped=$(printf '%s\n' "$body" | awk '
+  BEGIN { q = ""; keep = 0 }
+  {
+    out = ""; n = length($0)
+    for (i = 1; i <= n; i++) {
+      c = substr($0, i, 1)
+      if (q == "") {
+        if (c == "\"" || c == "\047") { keep = (out ~ /(bash|sh|zsh)[ \t]+-[a-z]*c[ \t]+$/); q = c }
+        out = out c
+      } else if (c == q) { q = ""; keep = 0; out = out c }
+      else if (q == "\"" && c == "\\") { out = out (keep ? c substr($0, i + 1, 1) : "  "); i++ }
+      else out = out (keep ? c : " ")
+    }
+    print out
+  }
+  END { if (q != "") print "\001UNBALANCED" }')
+case "$stripped" in *$'\001UNBALANCED'*) stripped=$body ;; esac
+
+if printf '%s\n' "$stripped" | grep -qE "$HEAVY"; then
   echo "BLOCKED: lệnh nặng phải chạy qua hàng đợi: jobq run -- <lệnh>  (xem jobq status)" >&2
   exit 2
 fi

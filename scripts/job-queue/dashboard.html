@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>jobq · Theo dõi các lệnh nặng</title>
+<style>
+:root{color-scheme:light dark;
+  --bg:light-dark(#f4f5f7,#0d1017);--card:light-dark(#fff,#161b24);--soft:light-dark(#f8f9fb,#121720);
+  --text:light-dark(#111827,#eceff4);--muted:light-dark(#5b6472,#a3adbb);--faint:light-dark(#8b94a3,#6f7a8a);--line:light-dark(#e3e6eb,#252c38);
+  --blue:light-dark(#2557d6,#7ea3ff);--blue-bg:light-dark(#e8efff,#18233f);
+  --green:light-dark(#0f7a4f,#4ccb8d);--green-bg:light-dark(#e3f5ec,#10281f);
+  --amber:light-dark(#a15c07,#f2b35a);--amber-bg:light-dark(#fdf1de,#2c2210);
+  --red:light-dark(#b4234b,#ff8aa8);--red-bg:light-dark(#fce8ee,#2e1520);
+  --track:light-dark(#e6e9ee,#262d39);--shadow:light-dark(0 1px 2px rgba(17,24,39,.06),none)}
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.wrap{max-width:880px;margin:0 auto;padding:28px 18px 56px;display:grid;gap:22px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-weight:700;letter-spacing:.02em}.brand small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.seg button{font:inherit;font-size:13px;padding:6px 12px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--blue-bg);color:var(--blue);font-weight:600}
+.seg button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.live{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.live.fresh .dot{background:var(--green)}.live.old .dot{background:var(--amber)}
+.banner{border-radius:16px;padding:22px 24px;border:1px solid transparent;display:grid;gap:6px}
+.banner.ok{background:var(--green-bg);border-color:color-mix(in srgb,var(--green) 28%,transparent)}
+.banner.busy{background:var(--blue-bg);border-color:color-mix(in srgb,var(--blue) 28%,transparent)}
+.banner.warn{background:var(--amber-bg);border-color:color-mix(in srgb,var(--amber) 32%,transparent)}
+.banner h1{margin:0;font-size:22px;line-height:1.3}
+.banner.ok h1{color:var(--green)}.banner.busy h1{color:var(--blue)}.banner.warn h1{color:var(--amber)}
+.banner p{margin:0;color:var(--text)}.banner .sub{color:var(--muted);font-size:14px}
+.notice{display:none;padding:12px 16px;border-radius:12px;background:var(--amber-bg);color:var(--amber)}
+h2{margin:0 0 4px;font-size:17px}.lead.flush{margin:0}.lead{margin:0 0 14px;color:var(--muted);font-size:14px}
+.tiles{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.tile{padding:16px 18px;display:grid;gap:4px}
+.tile .name{color:var(--muted);font-size:13px}
+.tile .big{font-size:26px;font-weight:700;line-height:1.2}
+.tile .of{font-size:15px;font-weight:400;color:var(--muted)}
+.tile .state{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600}
+.tile .state i{width:9px;height:9px;border-radius:50%;background:currentColor}
+.tile .hint{color:var(--muted);font-size:13px}
+.good{color:var(--green)}.mid{color:var(--amber)}.bad{color:var(--red)}
+.list{display:grid}
+.item{padding:16px 18px;border-top:1px solid var(--line);display:grid;gap:8px}
+.item:first-child{border-top:0}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.title{font-weight:650;font-size:16px}
+.pos{display:inline-grid;place-items:center;min-width:26px;height:26px;border-radius:8px;background:var(--blue-bg);color:var(--blue);font-weight:700;font-size:13px;margin-right:8px}
+.cmd{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.meta{color:var(--muted);font-size:13px;display:flex;gap:14px;flex-wrap:wrap}
+.time{font-weight:600;color:var(--text)}.time.warn{color:var(--amber)}.time.bad{color:var(--red)}
+.track{height:6px;border-radius:3px;background:var(--track);overflow:hidden}
+.fill{height:100%;background:var(--blue);border-radius:3px}.fill.warn{background:var(--amber)}.fill.bad{background:var(--red)}
+.why{font-size:14px;color:var(--amber);background:var(--amber-bg);border-radius:8px;padding:6px 10px;width:fit-content;max-width:100%}
+.empty{padding:26px 18px;color:var(--faint);text-align:center}
+table{width:100%;border-collapse:collapse}
+th{padding:10px 18px;text-align:left;font-size:13px;color:var(--muted);font-weight:600;background:var(--soft);border-bottom:1px solid var(--line)}
+td{padding:12px 18px;border-top:1px solid var(--line);vertical-align:top}tr:first-child td{border-top:0}
+.n{text-align:right;white-space:nowrap}
+details{padding:4px 18px}summary{cursor:pointer;padding:14px 0;font-weight:650}
+dl{margin:0 0 14px;display:grid;gap:10px}dt{font-weight:650}dd{margin:0;color:var(--muted);font-size:14px}
+@media (max-width:620px){.wrap{padding:18px 12px 40px}.banner{padding:18px}.banner h1{font-size:19px}th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">jobq<small>Theo dõi các lệnh nặng của máy</small></div>
+    <div class="tools">
+      <span id="live" class="live" role="status"><span class="dot"></span><span id="fresh">Đang tải dữ liệu</span></span>
+      <div class="seg" role="group" aria-label="Giao diện"><button type="button" data-theme="auto">Tự động</button><button type="button" data-theme="light">Sáng</button><button type="button" data-theme="dark">Tối</button></div>
+    </div>
+  </div>
+  <div id="stale" class="notice" role="alert">Trang chưa nhận được dữ liệu mới. Nếu các lệnh vẫn đang chạy thì có thể jobq đã dừng đột ngột.</div>
+  <section id="banner" class="banner busy" role="status"><h1>Đang tải…</h1></section>
+  <section>
+    <h2>Tình trạng máy</h2><p class="lead">jobq chỉ cho thêm lệnh chạy khi cả ba mục dưới đây đều ổn.</p>
+    <div class="tiles" id="tiles"></div>
+  </section>
+  <section class="card"><div class="item"><h2>Đang chạy</h2><p class="lead flush">Những lệnh đã được cho phép chạy.</p></div><div class="list" id="running"></div></section>
+  <section class="card"><div class="item"><h2>Đang chờ tới lượt</h2><p class="lead flush">Những lệnh đã gửi nhưng chưa được chạy, kèm lý do.</p></div><div class="list" id="waiting"></div></section>
+  <section class="card"><div class="item"><h2>Những lệnh tốn tài nguyên nhất</h2><p class="lead flush">Số đo từ các lần chạy trước. jobq dựa vào đây để biết còn chỗ cho lệnh khác hay không.</p></div><div id="stats"></div></section>
+  <section class="card"><details><summary>Giải thích các từ trong trang này</summary><dl>
+    <dt>Lệnh nặng</dt><dd>Các lệnh tốn nhiều CPU hoặc RAM như chạy test, kiểm tra kiểu, build, xử lý ảnh. Claude gửi chúng vào hàng đợi thay vì chạy cùng lúc để máy không bị đơ.</dd>
+    <dt>Nhân CPU</dt><dd>Máy có 8 nhân. Một lệnh dùng "1,5 nhân" nghĩa là nó chiếm khoảng một rưỡi trên tổng 8 nhân đó.</dd>
+    <dt>Tải CPU</dt><dd>Số tiến trình trung bình đang cần CPU. Tải càng gần hoặc vượt số nhân thì máy càng chậm.</dd>
+    <dt>Áp lực bộ nhớ</dt><dd>Mức macOS đánh giá về việc thiếu RAM. Bình thường thì ổn; cảnh báo hoặc nguy cấp nghĩa là máy đang phải nén hoặc đẩy dữ liệu ra ổ đĩa nên rất chậm.</dd>
+    <dt>Mức cho phép</dt><dd>Số lệnh tối đa được chạy cùng lúc. jobq tự giảm mức này khi máy bận và tăng lại khi máy rảnh.</dd>
+    <dt>Vì sao chỉ chạy một lệnh?</dt><dd>Thường do máy đang bận (tải CPU cao hoặc thiếu RAM) nên jobq giảm mức cho phép xuống còn 1 lệnh. Lệnh đầu tiên luôn được chạy để hàng đợi không bị kẹt.</dd>
+  </dl></details></section>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const fmtTime = (s) => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60); return m >= 60 ? Math.floor(m / 60) + " giờ " + (m % 60) + " phút" : m > 0 ? m + " phút" + (s % 60 ? " " + (s % 60) + " giây" : "") : s + " giây"; };
+const fmtMem = (mb) => mb >= 1024 ? (mb / 1024).toFixed(1).replace(".", ",") + "GB" : Math.round(mb) + "MB";
+const fmtCpu = (c) => (c / 100).toFixed(1).replace(".", ",");
+// Chuỗi lệnh luôn đi qua textContent nên ký tự đặc biệt trong lệnh không bị hiểu thành HTML.
+function niceTitle(cmd) {
+  const t = (cmd || "").trim().split(/\s+/); let scope = ""; const rest = [];
+  if (/^(sh|bash|zsh)$/.test(t[0]) && t[1] === "-c") t.splice(0, 2); // lệnh bọc trong sh -c: lấy tên lệnh thật bên trong
+  for (let i = 0; i < t.length; i++) {
+    if ((t[i] === "--filter" || t[i] === "-F") && t[i + 1]) { scope = t[++i]; continue; }
+    if (/^(pnpm|npm|yarn|bun|npx|bunx|exec|run|dlx|-r|--recursive)$/.test(t[i]) && !rest.length) continue;
+    rest.push(t[i]);
+  }
+  const head = rest.slice(0, 2).join(" ") || cmd || "(không đọc được lệnh)";
+  return scope ? scope + " · " + head : head;
+}
+function derive(d) {
+  const waiting = [...d.waiting].sort((a, b) => a.queued - b.queued);
+  const used = d.running.reduce((a, j) => ({ cpu: a.cpu + j.cpu, mem: a.mem + j.mem }), { cpu: 0, mem: 0 });
+  const allow = Math.max(1, Math.round(d.jobs * d.scale / 100));
+  return { waiting, used, allow, eCpu: d.cpu * d.scale / 100, eMem: d.mem * d.scale / 100,
+    cpuHigh: d.load >= d.maxLoad, ramLow: d.freeMb < d.minFreeMb, pressure: d.pressure >= d.maxPressure };
+}
+function machineProblem(p) {
+  if (p.pressure) return "Máy đang thiếu RAM nên jobq tạm không nhận thêm lệnh.";
+  if (p.cpuHigh) return "CPU của máy đang bận nên jobq tạm không nhận thêm lệnh.";
+  if (p.ramLow) return "RAM trống còn ít nên jobq tạm không nhận thêm lệnh.";
+  return "";
+}
+function waitReason(job, idx, d, p) {
+  if (idx > 0) return "Đang xếp sau " + idx + " lệnh khác.";
+  if (d.running.length >= p.allow) return "Đang có " + d.running.length + " lệnh chạy, mức cho phép hiện là " + p.allow + " lệnh cùng lúc.";
+  if (p.used.cpu + job.cpu > p.eCpu) return "Lệnh này cần khoảng " + fmtCpu(job.cpu) + " nhân CPU nhưng chỉ còn " + fmtCpu(Math.max(0, p.eCpu - p.used.cpu)) + " nhân trống.";
+  if (p.used.mem + job.mem > p.eMem) return "Lệnh này cần khoảng " + fmtMem(job.mem) + " RAM nhưng chỉ còn " + fmtMem(Math.max(0, p.eMem - p.used.mem)) + " trống trong mức cho phép.";
+  return machineProblem(p) || "Sắp tới lượt, đang kiểm tra lại mỗi giây.";
+}
+function renderBanner(d, p) {
+  const b = $("banner"); b.replaceChildren();
+  const busyMachine = p.cpuHigh || p.ramLow || p.pressure;
+  let cls, title;
+  if (!d.running.length && !d.waiting.length) { cls = "ok"; title = "Máy đang rảnh, lệnh mới sẽ chạy ngay"; }
+  else if (d.waiting.length) { cls = busyMachine ? "warn" : "busy"; title = "Đang chạy " + d.running.length + " lệnh, " + d.waiting.length + " lệnh đang xếp hàng chờ"; }
+  else { cls = busyMachine ? "warn" : "busy"; title = "Đang chạy " + d.running.length + " lệnh"; }
+  b.className = "banner " + cls; b.append(el("h1", "", title));
+  const prob = machineProblem(p);
+  if (prob) b.append(el("p", "", prob));
+  else if (d.waiting.length) b.append(el("p", "", "Các lệnh chờ sẽ tự chạy khi có chỗ trống."));
+  b.append(el("p", "sub", "Mức cho phép hiện tại: tối đa " + p.allow + " lệnh chạy cùng lúc" + (d.scale < 100 ? ", đã tự giảm vì máy đang bận." : ".")));
+}
+function tile(name, big, of, stateText, cls, hint) {
+  const t = el("div", "card tile"), s = el("div", "state " + cls), b = el("div", "big", big);
+  if (of) b.append(el("span", "of", " " + of));
+  s.append(el("i"), el("span", "", stateText));
+  t.append(el("div", "name", name), b, s, el("div", "hint", hint)); return t;
+}
+function renderTiles(d, p) {
+  const cpuCls = p.cpuHigh ? "bad" : d.load >= d.maxLoad * 0.75 ? "mid" : "good";
+  const ramCls = p.ramLow ? "bad" : d.freeMb < d.minFreeMb * 2 ? "mid" : "good";
+  $("tiles").replaceChildren(
+    tile("CPU của máy", String(d.load).replace(".", ","), "trên " + d.maxLoad, cpuCls === "good" ? "Còn rảnh" : cpuCls === "mid" ? "Khá bận" : "Quá bận", cpuCls, "Mức tối đa cho phép là " + d.maxLoad + ". Cao hơn thì lệnh mới phải chờ."),
+    tile("RAM còn trống", fmtMem(d.freeMb), "", ramCls === "good" ? "Đủ dùng" : ramCls === "mid" ? "Hơi ít" : "Quá ít", ramCls, "Cần ít nhất " + fmtMem(d.minFreeMb) + " để chạy thêm lệnh."),
+    tile("Áp lực bộ nhớ", p.pressure ? "Cao" : "Bình thường", "", p.pressure ? "Máy đang chậm vì thiếu RAM" : "Ổn", p.pressure ? "bad" : "good", "Do macOS đánh giá. Cao nghĩa là máy đang phải đẩy dữ liệu ra ổ đĩa."));
+}
+function jobItem(j, kind, idx, d, p) {
+  const it = el("div", "item"), r1 = el("div", "row"), tt = el("div", "title");
+  if (kind === "wait") tt.append(el("span", "pos", String(idx + 1)));
+  tt.append(document.createTextNode(niceTitle(j.cmd)));
+  const t = el("span", "time"); t.dataset.since = j[kind === "run" ? "started" : "queued"]; t.dataset.kind = kind; t.dataset.timeout = kind === "run" ? d.timeout : 0;
+  r1.append(tt, t); it.append(r1);
+  if (kind === "run") { const tr = el("div", "track"), f = el("div", "fill"); tr.dataset.since = j.started; tr.dataset.timeout = d.timeout; tr.setAttribute("role", "progressbar"); tr.setAttribute("aria-label", "Thời gian đã dùng so với giới hạn"); tr.setAttribute("aria-valuemin", "0"); tr.setAttribute("aria-valuemax", "100"); tr.append(f); it.append(tr); }
+  else it.append(el("div", "why", waitReason(j, idx, d, p)));
+  const cmd = el("div", "cmd", j.cmd || ""); cmd.title = j.cmd || "";
+  it.append(cmd, el("div", "meta", "Dự kiến dùng khoảng " + fmtCpu(j.cpu) + " nhân CPU và " + fmtMem(j.mem) + " RAM"));
+  return it;
+}
+function renderList(box, items, empty) { box.replaceChildren(); if (!items.length) box.append(el("div", "empty", empty)); else items.forEach((i) => box.append(i)); }
+function renderStats(d) {
+  const box = $("stats"); box.replaceChildren();
+  if (!d.stats.length) { box.append(el("div", "empty", "Chưa có lịch sử. Chạy vài lệnh qua jobq là có số liệu.")); return; }
+  const tbl = el("table"), head = el("tr");
+  [["Lệnh", ""], ["Đã chạy", "n"], ["Thường mất", "n"], ["RAM nhiều nhất", "n"], ["CPU nhiều nhất", "n"]].forEach(([h, c]) => head.append(el("th", c, h)));
+  tbl.append(head);
+  for (const s of d.stats) {
+    const tr = el("tr"), c = el("td"); c.append(el("div", "title", niceTitle(s.cmd)), el("div", "cmd", s.cmd));
+    tr.append(c, el("td", "n", s.runs + " lần"), el("td", "n", fmtTime(s.secs)), el("td", "n", fmtMem(s.mem)), el("td", "n", fmtCpu(s.cpu) + " nhân")); tbl.append(tr);
+  }
+  box.append(tbl);
+}
+function render(d) {
+  const p = derive(d); p.used = p.used;
+  renderBanner(d, p); renderTiles(d, p);
+  renderList($("running"), d.running.map((j, i) => jobItem(j, "run", i, d, p)), "Không có lệnh nào đang chạy.");
+  renderList($("waiting"), p.waiting.map((j, i) => jobItem(j, "wait", i, d, p)), "Không có lệnh nào đang chờ.");
+  renderStats(d);
+}
+const level = (pct) => pct >= 90 ? "bad" : pct >= 50 ? "warn" : "";
+// Đếm giây ngay trên trình duyệt giữa hai lần nạp dữ liệu, chỉ sửa chữ và màu nên rất nhẹ.
+function tickTimes() {
+  const now = Date.now() / 1000;
+  document.querySelectorAll("span.time[data-since]").forEach((t) => {
+    const age = now - Number(t.dataset.since), timeout = Number(t.dataset.timeout), run = t.dataset.kind === "run", pct = timeout ? (age / timeout) * 100 : 0;
+    t.textContent = run ? "Đã chạy " + fmtTime(age) + (timeout ? " / tối đa " + fmtTime(timeout) : "") : "Đã chờ " + fmtTime(age);
+    t.className = "time " + (run ? level(pct) : "");
+  });
+  document.querySelectorAll(".track[data-since]").forEach((t) => {
+    const pct = Math.min(100, ((now - Number(t.dataset.since)) / Number(t.dataset.timeout)) * 100);
+    t.firstChild.style.width = pct + "%"; t.firstChild.className = "fill " + level(pct); t.setAttribute("aria-valuenow", Math.round(pct));
+  });
+}
+let last = null;
+function checkFresh() {
+  const age = Date.now() / 1000 - last.ts, old = age > 15 && last.running.length > 0;
+  $("fresh").textContent = "Cập nhật " + fmtTime(age) + " trước"; $("live").className = "live " + (old ? "old" : "fresh");
+  $("stale").style.display = old ? "block" : "none";
+}
+function tick() {
+  const old = document.getElementById("snap"); if (old) old.remove();
+  const s = document.createElement("script"); s.id = "snap"; s.src = "snapshot.js?t=" + Date.now();
+  s.onload = () => { last = window.JOBQ; render(last); tickTimes(); checkFresh(); };
+  s.onerror = () => { $("fresh").textContent = "Chưa có dữ liệu"; $("banner").replaceChildren(el("h1", "", "Chưa có dữ liệu"), el("p", "", "Hãy chạy một lệnh qua jobq, ví dụ jobq run -- sleep 10, rồi trang sẽ tự cập nhật.")); };
+  document.body.append(s);
+}
+// Giao diện: tự động theo hệ thống, hoặc ép sáng/tối; lưu lựa chọn nếu trình duyệt cho phép.
+function applyTheme(mode) {
+  if (mode === "light" || mode === "dark") document.documentElement.dataset.theme = mode; else delete document.documentElement.dataset.theme;
+  document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === (mode || "auto"))));
+}
+let saved = "auto"; try { saved = localStorage.getItem("jobq-theme") || "auto"; } catch (e) { saved = "auto"; }
+applyTheme(saved);
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { applyTheme(b.dataset.theme); try { localStorage.setItem("jobq-theme", b.dataset.theme); } catch (e) { /* trình duyệt chặn lưu thì chỉ mất lựa chọn lần sau */ } }));
+setInterval(tick, 3000); setInterval(() => { if (last) { tickTimes(); checkFresh(); } }, 1000); tick();
+</script>
+</body>
+</html>

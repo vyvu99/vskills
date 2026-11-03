@@ -12,6 +12,7 @@ for f in "$@"; do
   grep -q '^set -euo pipefail' "$f" || err "thiếu 'set -euo pipefail'"
   grep -q -- '--help' "$f" || err "thiếu xử lý --help"
   grep -qE 'SCOPE|--scope|--filter|"\$1"' "$f" || err "thiếu tham số chọn phạm vi (--scope)"
+  grep -q 'jobq}" run -- "\$0"' "$f" || err "thiếu dòng tự xếp hàng: exec jobq run -- \"\$0\""
   grep -q 'trap ' "$f" || err "thiếu trap dọn tiến trình/tệp tạm"
   grep -qE '^echo "(PASS|FAIL)' "$f" || err "thiếu dòng kết quả 'echo \"PASS: ...\"' ở cuối"
   grep -nE 'xargs +(-[a-zA-Z]*P)|[^&]&[[:space:]]*$|parallel ' "$f" | grep -v '^\s*#' | grep -q . && err "không được tự chạy song song (&, xargs -P, parallel) — dùng jobq/stepper"

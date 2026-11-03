@@ -4,6 +4,7 @@
 # Script nặng: tách thành thư mục steps/NN-tên.sh rồi chạy bằng `stepper`, không nhồi vào 1 file.
 set -euo pipefail
 
+ARGS=("$@")
 usage() { sed -n '2p' "$0" | sed 's/^# //'; }
 SCOPE=""
 while [ $# -gt 0 ]; do
@@ -13,6 +14,9 @@ while [ $# -gt 0 ]; do
     *) echo "FAIL: tham số lạ $1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+# Tự xếp hàng: script nào theo khuôn này đều qua jobq dù được gọi thẳng, nên hook không cần nhận ra tên script.
+[ -n "${JOBQ_ACTIVE:-}" ] || exec "${JOBQ_BIN:-jobq}" run -- "$0" ${ARGS[@]+"${ARGS[@]}"}
 
 WORKERS=${JOBQ_WORKERS:-2}   # số worker mặc định, không tự nâng
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT

@@ -3,7 +3,7 @@
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-export JOBQ_DIR="$T/q" JOBQ_SLOTS=2 JOBQ_MAX_LOAD=999 JOBQ_MIN_FREE_MB=0
+export JOBQ_ADAPT=0 JOBQ_MAX_PRESSURE=99 JOBQ_DIR="$T/q" JOBQ_SLOTS=2 JOBQ_MAX_LOAD=999 JOBQ_MIN_FREE_MB=0
 fail() { echo "FAIL: $1"; exit 1; }
 
 bash -n "$HERE/jobq" || fail "cú pháp"
@@ -22,7 +22,7 @@ wait
 
 # 3) timeout giết cả cây lệnh
 "$HERE/jobq" run -t 1 -- bash -c 'sleep 30 & wait' 2>/dev/null; [ $? -eq 124 ] || fail "timeout rc"
-sleep 1; pgrep -f 'sleep 30' >/dev/null && fail "sleep 30 còn sống sau timeout"
+sleep 1; pgrep -f 'sleep 30( |&|$)' >/dev/null && fail "sleep 30 còn sống sau timeout"
 
 # 4) lồng nhau không kẹt
 "$HERE/jobq" run -- "$HERE/jobq" run -- true || fail "lồng nhau"
@@ -70,5 +70,104 @@ rm "$T/s1"; touch "$T/ok"
   [ "$(sort -n "$T/peak3" | tail -1)" -le 1 ]
 ) || fail "điểm nặng không được tính"
 
+# 11) script theo khuôn tự xếp hàng dù gọi thẳng
+sed 's|^echo "PASS: <tên>.*|echo "${JOBQ_ACTIVE:-no}" > '"$T"'/active; echo "PASS: t"|' "$HERE/template.sh" > "$T/self.sh"; chmod +x "$T/self.sh"
+JOBQ_BIN="$HERE/jobq" "$T/self.sh" >/dev/null || fail "script mẫu chạy lỗi"
+[ "$(cat "$T/active")" = 1 ] || fail "script mẫu không tự xếp hàng"
+
+# 12) áp lực RAM chặn lệnh thứ hai (ngưỡng 1 = luôn coi là đang căng)
+( export JOBQ_DIR="$T/q4" JOBQ_MAX_PRESSURE=1
+  "$HERE/jobq" run -- sleep 4 & sleep 1
+  "$HERE/jobq" run -w 2 -- true 2>/dev/null; rc=$?; wait
+  [ "$rc" -eq 75 ] ) || fail "áp lực RAM không chặn lệnh thứ hai"
+
+# 13) chạy lách: lệnh nhẹ vào trước lệnh nặng đang chờ
+( unset JOBQ_SLOTS; export JOBQ_DIR="$T/q5" JOBQ_SLOTS=3; : > "$T/order"
+  "$HERE/jobq" run --cost cpu=3,mem=100 -- bash -c "echo A >> $T/order; sleep 5" & sleep 1.3
+  "$HERE/jobq" run --cost cpu=3,mem=100 -- bash -c "echo B >> $T/order" & sleep 1.3
+  "$HERE/jobq" run --cost cpu=0.5,mem=100 -- bash -c "echo C >> $T/order" & wait
+  [ "$(tr -d '\n' < "$T/order")" = "ACB" ] ) || fail "lệnh nhẹ không chạy lách (thứ tự: $(tr -d '\n' < "$T/order"))"
+
+# 14) tự co giãn: máy "quá tải" thì scale tụt xuống 25% nhưng vẫn có một lệnh chạy
+( export JOBQ_DIR="$T/q6" JOBQ_ADAPT=1 JOBQ_ADAPT_SEC=1 JOBQ_MAX_LOAD=0
+  "$HERE/jobq" run -- sleep 10 & sleep 1
+  "$HERE/jobq" run -w 7 -- true 2>/dev/null; rc=$?; kill %1 2>/dev/null; wait 2>/dev/null
+  [ "$rc" -eq 75 ] && [ "$(cut -d' ' -f1 "$T/q6/scale")" -eq 25 ] ) || fail "tự co giãn không hạ scale"
+
+# 15) trang web tĩnh: snapshot.js hợp lệ, có lệnh đang chạy khi job chạy, rỗng khi xong; script trong trang không lỗi cú pháp
+( export JOBQ_DIR="$T/q7"; "$HERE/jobq" web --no-open >/dev/null
+  "$HERE/jobq" run -- sleep 4 & sleep 2.5
+  sed 's/^window.JOBQ = //; s/;$//' "$JOBQ_DIR/web/snapshot.js" | jq -e '(.running|length)==1 and (.running[0].cmd|test("sleep 4"))' >/dev/null || exit 1
+  wait; sleep 0.5
+  sed 's/^window.JOBQ = //; s/;$//' "$JOBQ_DIR/web/snapshot.js" | jq -e '(.running|length)==0' >/dev/null ) || fail "snapshot.js không phản ánh lệnh đang chạy"
+awk '/<script>/{f=1;next} /<\/script>/{f=0} f' "$HERE/dashboard.html" > "$T/dash.js"
+node --check "$T/dash.js" || fail "script trong dashboard.html lỗi cú pháp"
+
+# 16) hook jobq-guard: chặn đúng lệnh nặng, cho qua lệnh thường
+g() { printf '{"tool_input":{"command":%s}}' "$(jq -Rn --arg c "$2" '$c')" | "$HERE/jobq-guard" 2>/dev/null; r=$?; e=0; [ "$1" = block ] && e=2; [ "$r" -eq "$e" ] || fail "jobq-guard sai ($1): $2"; }
+while IFS='|' read -r exp c; do g "$exp" "$c"; done <<'CASES'
+block|pnpm test
+block|pnpm --filter api check-types
+block|cd x && turbo run build
+block|time pnpm lint
+block|CI=1 pnpm test:unit
+block|bun test
+block|npx eslint src
+block|pnpm exec prettier --check .
+block|bash -c "pnpm test"
+block|sh -c 'turbo run build'
+block|docker compose build api
+block|cargo test
+block|pytest -q
+block|bash scripts/check-x.sh
+block|node scripts/test-foo.mjs
+block|pnpm sdk:generate
+block|pnpm -r exec tsc --noEmit
+block|pnpm --filter api exec vitest run
+block|npm exec -- tsc
+block|npm run-script build
+block|yarn workspaces foreach -A run build
+block|make build
+block|just test
+block|python3 -m pytest
+block|swift build
+block|pod install
+block|magick input.png -resize 50% out.png
+block|sips -Z 512 a.png
+block|lighthouse http://localhost:3003
+block|k6 run load.js
+block|pnpm verify
+block|dotnet test
+block|mvn test
+block|bundle exec rspec
+block|flutter build apk
+block|deno test
+block|ng build
+block|echo ok; pnpm test
+block|echo "x" && vitest run
+pass|jobq run -- pnpm test
+pass|pnpm install
+pass|npm ci
+pass|pnpm dev
+pass|wrangler dev
+pass|git status
+pass|git commit -m "pnpm test fix"
+pass|git commit -m "a|make|b; vitest run"
+pass|echo "pnpm test"
+pass|grep -E 'foo|build|test' src
+pass|jq '.a | test("x")' f.json
+pass|sed -i 's/a|just|b/c/' f
+pass|echo tsc
+pass|just do it
+pass|pnpm db:generate
+pass|tar -czf out.tgz big/
+pass|rsync -a a/ b/
+pass|grep -rn "check-types" .
+pass|ls scripts/check-x.sh
+CASES
+
+# 17) ngưỡng tải đặt được bằng config, không cần biến môi trường
+( unset JOBQ_MAX_LOAD; export JOBQ_DIR="$T/q8"; "$HERE/jobq" max load=10 >/dev/null; "$HERE/jobq" status | head -1 | grep -q 'tải=\|load=[0-9.]*/10 ' ) || fail "max load=10 không có hiệu lực"
+
 [ -z "$(find "$T/q/slots" "$T/q/queue" -mindepth 1 2>/dev/null)" ] || fail "còn rác slot/queue"
-echo "PASS: jobq (hàng đợi, điểm nặng, trần max) + lint-script + stepper"
+echo "PASS: jobq (hàng đợi, điểm nặng, trần max, áp lực RAM, chạy lách, co giãn, trang web) + lint-script + stepper"
