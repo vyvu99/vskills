@@ -107,7 +107,7 @@ vskills/
 ├── claude-md/CLAUDE.md           # starter CLAUDE.md, copied with --with-claude-md
 ├── evals/                        # trigger + behavior evals (run via scripts/run-evals.sh; calls `claude -p`, billable)
 ├── web/                          # local webapp used by vspecs/vreview --fix for visual steps (node web/server.mjs)
-└── scripts/<name>/               # e.g. lint-rules — opt-in, separate from skills/<name>/scripts/
+└── scripts/<name>/               # e.g. lint-rules, job-queue (jobq) — opt-in, separate from skills/<name>/scripts/
 ```
 
 **Add a skill:**

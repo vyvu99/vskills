@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# jobq-guard: hook PreToolUse(Bash) chặn lệnh nặng chạy trực tiếp. Usage: gắn vào settings.json, đọc JSON từ stdin
+# Chặn (exit 2) khi lệnh nặng đứng ở đầu câu lệnh mà không đi qua `jobq run`; lệnh khác để qua.
+set -euo pipefail
+cmd=$(jq -r '.tool_input.command // empty')
+case "$cmd" in *"jobq run"*|*"stepper "*|"") exit 0 ;; esac
+heavy='(^|[;&|(] *)((pnpm|npm|yarn|bun)( --filter[= ][^ ]+| -r| run| exec)* (test|check-types|typecheck|build|e2e|test:[a-z:-]+)|turbo( run)? |(npx |pnpm exec )?(vitest|jest|playwright test|tsc( |$))|next build|docker build)'
+if printf '%s' "$cmd" | grep -qE "$heavy"; then
+  echo "BLOCKED: lệnh nặng phải chạy qua hàng đợi: jobq run -- <lệnh>  (xem jobq status)" >&2
+  exit 2
+fi
+exit 0

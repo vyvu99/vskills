@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# stepper: chạy lần lượt các bước NN-tên.sh trong một thư mục, mỗi bước qua jobq. Usage: stepper <dir> [--from NN] [--reset] [-t SEC] [-- tham số cho bước]
+# Bước đã PASS được ghi vào <dir>/.state; chạy lại sẽ bỏ qua và tiếp từ bước lỗi. Dừng ở bước FAIL đầu tiên.
+set -euo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+DIR=${1:-}; { [ -n "$DIR" ] && [ -d "$DIR" ]; } || { echo "FAIL: thiếu thư mục bước" >&2; sed -n '2p' "$0" >&2; exit 2; }
+shift; FROM=00; RESET=0; TO=${JOBQ_TIMEOUT:-900}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --from) FROM=${2:?}; shift 2 ;; --reset) RESET=1; shift ;; -t) TO=${2:?}; shift 2 ;;
+    --) shift; break ;; *) echo "FAIL: tham số lạ $1" >&2; exit 2 ;;
+  esac
+done
+STATE="$DIR/.state"; [ "$RESET" = 1 ] && rm -f "$STATE"; touch "$STATE"
+n=0
+for step in "$DIR"/[0-9][0-9]-*.sh; do
+  [ -e "$step" ] || { echo "FAIL: $DIR không có bước NN-tên.sh" >&2; exit 2; }
+  name=$(basename "$step" .sh); n=$((n+1))
+  [ "${name%%-*}" \< "$FROM" ] && continue
+  grep -qx "$name" "$STATE" && { echo "SKIP $name (đã PASS)"; continue; }
+  start=$(date +%s)
+  if "$HERE/jobq" run -t "$TO" -- bash "$step" "$@"; then
+    echo "$name" >> "$STATE"; echo "PASS $name ($(( $(date +%s) - start ))s)"
+  else
+    rc=$?; echo "FAIL $name (exit $rc) — sửa rồi chạy lại cùng lệnh để tiếp từ bước này"; exit "$rc"
+  fi
+done
+echo "PASS: $n bước xong"; rm -f "$STATE"

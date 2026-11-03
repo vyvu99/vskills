@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# lint-script: kiểm tra script test/check theo khuôn chung (template.sh). Usage: lint-script <file.sh>...
+# Lỗi in dạng "FAIL <file>: <lý do>", exit 1 nếu có lỗi bất kỳ.
+set -uo pipefail
+[ $# -gt 0 ] || { sed -n '2p' "$0" >&2; exit 2; }
+bad=0
+for f in "$@"; do
+  err() { echo "FAIL $f: $1"; bad=1; }
+  [ -f "$f" ] || { err "không tồn tại"; continue; }
+  [ "$(sed -n 1p "$f")" = '#!/usr/bin/env bash' ] || err "dòng 1 phải là #!/usr/bin/env bash"
+  sed -n 2p "$f" | grep -q 'Usage:' || err "dòng 2 phải là mô tả kèm 'Usage:'"
+  grep -q '^set -euo pipefail' "$f" || err "thiếu 'set -euo pipefail'"
+  grep -q -- '--help' "$f" || err "thiếu xử lý --help"
+  grep -qE 'SCOPE|--scope|--filter|"\$1"' "$f" || err "thiếu tham số chọn phạm vi (--scope)"
+  grep -q 'trap ' "$f" || err "thiếu trap dọn tiến trình/tệp tạm"
+  grep -qE '^echo "(PASS|FAIL)' "$f" || err "thiếu dòng kết quả 'echo \"PASS: ...\"' ở cuối"
+  grep -nE 'xargs +(-[a-zA-Z]*P)|[^&]&[[:space:]]*$|parallel ' "$f" | grep -v '^\s*#' | grep -q . && err "không được tự chạy song song (&, xargs -P, parallel) — dùng jobq/stepper"
+  grep -nE '(workers|concurrency|maxWorkers)[= ]+([3-9]|[1-9][0-9])\b' "$f" | grep -q . && err "worker/concurrency > 2"
+  grep -qE '\b(pnpm|npm|yarn|turbo|vitest|jest|playwright|tsc|next build|docker)\b' "$f" && ! grep -q 'jobq' "$f" && err "gọi lệnh nặng mà không qua 'jobq run --'"
+  [ "$(wc -l < "$f")" -le 120 ] || err "quá 120 dòng — tách thành các bước chạy bằng stepper"
+done
+[ $bad -eq 0 ] && echo "PASS: lint-script ($# file)"
+exit $bad
