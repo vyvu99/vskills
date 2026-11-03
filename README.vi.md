@@ -48,6 +48,7 @@ Skill được symlink chứ không copy — sửa ở đâu cũng là cùng 1 f
 | `vci` | Typecheck, build, lint song song cho cả repo JS/TS; format và test tùy chọn chạy sau. Tự phát hiện package manager/workspace. | `/vci --changed` |
 | `vdesign` | Redesign UI 1 page/component qua quy trình scan → audit → fix → verify. Mỗi lần chạy tự quyết cả 18 tiêu chí style/cấu trúc dựa trên research thiết kế trực tiếp và việc đọc người dùng/task thật — không hỏi trước. | `/vdesign /clients/[id]` |
 | `vsweep` | Chạy 1 đợt rà khối việc mở thuộc bất kỳ loại nào (code, nghiên cứu, viết lách, dữ liệu, vận hành, brainstorm) không cần canh, có giới hạn thời gian: dispatch subagent (mặc định 1 cái mỗi lần), tự làm xong việc rõ ràng kèm verify phù hợp loại việc, ghi nhận cái mơ hồ thành quyết định đang chờ, lưu tiến độ trong state file. Hook stop-guard tuỳ chọn (bật thủ công — xem comment đầu `skills/vsweep/stop-guard.sh`) giữ nó chạy tới deadline. Resume lại sau để triển khai các quyết định đó với cùng mức kỹ lưỡng. | `/vsweep --until 06:00` |
+| `vguide` | Viết hướng dẫn sử dụng trang trọng cho bất kỳ sản phẩm, tính năng hay luồng nào: chia theo vai, bước đánh số, có ảnh khi có màn hình. Xác minh ai làm được gì từ sản phẩm thật và kiểm văn bản không còn nội dung bị cấm. Không phải báo cáo đã làm gì. | `/vguide Tính năng: thanh toán, vai: khách hàng, quản trị` |
 | `vrollback`* | Rollback 1 migration đã chạy trên DB xác nhận là local + xóa tracking record. Từ chối target không rõ local. | `/vrollback 0007_add_status` |
 
 Chi tiết đầy đủ, flag, edge case: `skills/<name>/SKILL.vi.md`.
