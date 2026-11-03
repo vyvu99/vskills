@@ -2,8 +2,10 @@
 # jobq-guard: hook PreToolUse(Bash) chặn lệnh nặng chạy trực tiếp. Usage: gắn vào settings.json, đọc JSON từ stdin
 # Chặn (exit 2) khi lệnh nặng đứng ở đầu câu lệnh mà không đi qua `jobq run`; lệnh khác để qua. Danh sách lệnh nặng sửa ở biến HEAVY bên dưới.
 set -euo pipefail
-cmd=$(jq -r '.tool_input.command // empty')
-case "$cmd" in *"jobq run"*|*"stepper "*|"") exit 0 ;; esac
+input=$(cat)
+cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
+bg=$(printf '%s' "$input" | jq -r '.tool_input.run_in_background // false')
+[ -n "$cmd" ] || exit 0
 
 # Vị trí được coi là "đầu lệnh": đầu chuỗi, sau ; & | (, sau bash -c ', kèm tiền tố time/env/VAR=x/rtk.
 START='(^|[;&|(][[:space:]]*|(bash|sh|zsh)[[:space:]]+-[a-z]*c[[:space:]]+["'"'"'][[:space:]]*)((time|nice|env|rtk|command|exec)[[:space:]]+|[A-Za-z_][A-Za-z0-9_]*=[^ ]*[[:space:]]+)*'
@@ -44,6 +46,21 @@ stripped=$(printf '%s\n' "$body" | awk '
   }
   END { if (q != "") print "\001UNBALANCED" }')
 case "$stripped" in *$'\001UNBALANCED'*) stripped=$body ;; esac
+
+# Xem trạng thái hàng đợi: không chặn, chỉ nhắc Claude rằng tải và độ đầy của hàng không phải lý do để ngừng đẩy lệnh.
+if printf '%s\n' "$stripped" | grep -qE "${START}([^[:space:]]*/)?jobq[[:space:]]+(status|stats)([[:space:]]|$)"; then
+  jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:"Nhắc: hàng đợi jobq không bao giờ đầy và jobq tự lo tải, RAM, thứ tự. Đừng dựa vào trạng thái này để quyết định chờ hay dừng đẩy lệnh: cứ đẩy ngay mọi lệnh độc lập (mỗi lệnh một lần gọi nền) rồi làm việc khác."}}'
+  exit 0
+fi
+
+# Lệnh đã đi qua hàng đợi: bắt buộc chạy nền để Claude không đứng chờ. Cần kết quả ngay thì thêm JOBQ_FG=1 trước lệnh.
+if printf '%s\n' "$stripped" | grep -qE "${START}([^[:space:]]*/)?(jobq[[:space:]]+run|stepper)[[:space:]]"; then
+  if [ "$bg" != true ] && ! printf '%s' "$cmd" | grep -q 'JOBQ_FG=1'; then
+    echo "BLOCKED: lệnh qua jobq phải chạy nền (run_in_background: true). Hãy làm việc độc lập khác trong lúc chờ, kết quả sẽ tự báo khi xong, không poll và không sleep. Bước kế tiếp thật sự cần kết quả ngay thì thêm JOBQ_FG=1 trước lệnh." >&2
+    exit 2
+  fi
+  exit 0
+fi
 
 if printf '%s\n' "$stripped" | grep -qE "$HEAVY"; then
   echo "BLOCKED: lệnh nặng phải chạy qua hàng đợi: jobq run -- <lệnh>  (xem jobq status)" >&2

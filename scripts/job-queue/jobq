@@ -2,44 +2,37 @@
 # jobq — hàng đợi FIFO giới hạn số lệnh nặng chạy cùng lúc (test, build, typecheck, e2e...).
 # Chỉ cần bash + công cụ có sẵn trên macOS/Linux; trạng thái nằm trong $JOBQ_DIR.
 #
-#   jobq run [-s JOBS] [-t TIMEOUT_S] [-w WAIT_S] [--cost cpu=N,mem=MB] -- <lệnh...>
+#   jobq run [-t TIMEOUT_S] [-w WAIT_S] [--cost cpu=N,mem=MB] -- <lệnh...>
+#   jobq split N -- file...   # chia danh sách file thành N lô đều nhau, mỗi dòng một lô (đã escape, dán thẳng vào jobq run)
+#   jobq logs [N|id]   # lịch sử 50 lệnh gần nhất kèm output (N=1 là lệnh mới nhất)
 #   jobq status | stats | clean | web [--no-open]   # web: mở trang theo dõi tĩnh (không server)
-#   jobq budget [jobs=N] [cpu=N] [mem=MB]   # ngân sách hiện tại, chỉnh tay bất cứ lúc nào
-#   jobq max    [jobs=N] [cpu=N] [mem=MB] [load=N]   # TRẦN CỨNG (load = ngưỡng tải CPU chặn lệnh mới)
 set -u
 
 Q_DIR="${JOBQ_DIR:-$HOME/.cache/jobq}"
 TIMEOUT="${JOBQ_TIMEOUT:-900}"           # giết lệnh chạy quá lâu
-WAIT="${JOBQ_WAIT:-1800}"                # bỏ cuộc nếu xếp hàng quá lâu
-MAX_LOAD="${JOBQ_MAX_LOAD:-$(( $(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4) * 3 / 4 ))}"
-MIN_FREE_MB="${JOBQ_MIN_FREE_MB:-1500}"  # RAM trống tối thiểu để bắt đầu lệnh thứ 2 trở đi
-NODE_MB="${JOBQ_NODE_MB:-3072}"          # trần heap cho node con
+WAIT="${JOBQ_WAIT:-7200}"                # bỏ cuộc nếu xếp hàng quá lâu (2 giờ: Claude đẩy nhiều lệnh một lúc nên hàng có thể dài)
 HIST="$Q_DIR/history.tsv"
-MAX_PRESSURE="${JOBQ_MAX_PRESSURE:-2}"   # kern.memorystatus_vm_pressure_level: 1 bình thường, 2 cảnh báo, 4 nguy cấp; >= ngưỡng thì không nhận lệnh mới
-BACKFILL="${JOBQ_BACKFILL_SEC:-120}"     # lệnh nhẹ chỉ được chạy lách khi lệnh đầu hàng chờ chưa quá ngần này giây
-ADAPT="${JOBQ_ADAPT:-1}"                 # 1 = tự co giãn ngân sách theo tải thực tế
-ADAPT_SEC="${JOBQ_ADAPT_SEC:-10}"
 
-# Cấu hình: env > $Q_DIR/config > mặc định. CPU tính bằng "centi-core" (100 = 1 nhân) để bash khỏi cần số thực.
-cfg() { local v; v=$(grep -s "^$1=" "$Q_DIR/config" | tail -1 | cut -d= -f2); echo "${v:-$2}"; }
+# Không có cấu hình tay: giới hạn tự suy ra từ số nhân và RAM của máy, rồi được siết thêm bằng số đo thật (CPU, RAM, swap, áp lực RAM).
+# Các biến JOBQ_* trong khối này chỉ là điểm ghi đè cho kiểm thử, bình thường không cần dùng. CPU tính bằng "centi-core" (100 = 1 nhân).
 cc() { awk -v v="$1" 'BEGIN{printf "%d", v*100}'; }
-min() { [ "$1" -le "$2" ] && echo "$1" || echo "$2"; }
-load_cfg() {
-  local ncpu total
-  ncpu=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
-  if [ -r /proc/meminfo ]; then total=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo); else total=$(( $(sysctl -n hw.memsize) / 1048576 )); fi
-  MAX_LOAD=${JOBQ_MAX_LOAD:-$(cfg max_load $(( ncpu * 3 / 4 )))}
-  MAX_JOBS=${JOBQ_MAX_JOBS:-$(cfg max_jobs 4)}
-  MAX_CPU=$(cc "${JOBQ_MAX_CPU:-$(cfg max_cpu $(( ncpu * 3 / 4 )))}")
-  MAX_MEM=${JOBQ_MAX_MEM:-$(cfg max_mem $(( total * 6 / 10 )))}
-  # ngân sách luôn bị kẹp dưới trần
-  B_JOBS=$(min "${JOBQ_SLOTS:-$(cfg jobs 2)}" "$MAX_JOBS")
-  B_CPU=$(min "$(cc "${JOBQ_BUDGET_CPU:-$(cfg cpu 4)}")" "$MAX_CPU")
-  B_MEM=$(min "${JOBQ_BUDGET_MEM:-$(cfg mem 6000)}" "$MAX_MEM")
-}
-cfg_set() { # $1 key $2 value
-  mkdir -p "$Q_DIR"; { grep -sv "^$1=" "$Q_DIR/config" || true; echo "$1=$2"; } > "$Q_DIR/config.tmp" && mv "$Q_DIR/config.tmp" "$Q_DIR/config"
-}
+NCPU=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+if [ -r /proc/meminfo ]; then TOTAL_MB=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo); else TOTAL_MB=$(( $(sysctl -n hw.memsize) / 1048576 )); fi
+MAX_JOBS=$NCPU                                          # chỗ chạy tối đa: mỗi nhân một lệnh
+B_JOBS=${JOBQ_SLOTS:-$MAX_JOBS}
+B_CPU=$(cc "${JOBQ_BUDGET_CPU:-$(( NCPU * 3 / 2 ))}")   # đặt chỗ CPU tối đa 150% số nhân vì lệnh thường không dùng hết phần ước lượng
+B_MEM=${JOBQ_BUDGET_MEM:-$(( TOTAL_MB * 3 / 4 ))}       # RAM không đặt chỗ vượt thực được: 75% tổng RAM
+MAX_LOAD=${JOBQ_MAX_LOAD:-$(( NCPU * 3 / 2 ))}          # tải CPU từ ngưỡng này thì ngừng nhận lệnh mới
+MAX_PRESSURE=${JOBQ_MAX_PRESSURE:-4}                    # áp lực RAM macOS: 1 bình thường, 2 cảnh báo, 4 nguy cấp; chỉ chặn ở mức nguy cấp
+MIN_FREE_MB=${JOBQ_MIN_FREE_MB:-1500}                   # RAM trống tối thiểu để nhận lệnh thứ 2 trở đi
+COOLDOWN=${JOBQ_COOLDOWN_SEC:-8}                        # sau khi nhận một lệnh, đợi ngần này giây cho nó dùng đủ tài nguyên rồi mới nhận lệnh tiếp
+WARM_SEC=10                                             # lệnh chạy quá ngần này giây thì tính theo số đo thật thay vì ước lượng
+SWAP_GROWTH_MB=${JOBQ_SWAP_GROWTH_MB:-256}              # swap tăng từ ngần này MB giữa hai lần đo thì phanh
+SWAP_BRAKE_SEC=${JOBQ_SWAP_BRAKE_SEC:-30}               # thời gian phanh khi swap tăng nhanh
+BACKFILL=120                                            # lệnh nhẹ chỉ được chạy lách khi lệnh đầu hàng chờ chưa quá ngần này giây
+NODE_MB=3072                                            # trần heap cho node con
+KEEP_RUNS=${JOBQ_KEEP_RUNS:-50}                         # số lệnh gần nhất được lưu cùng output
+LOG_MAX_KB=512                                          # output mỗi lệnh chỉ giữ phần cuối ngần này KB
 
 alive() { kill -0 "$1" 2>/dev/null; }
 now() { date +%s; }
@@ -63,16 +56,35 @@ reap() { # xoá slot/ticket của tiến trình đã chết
     [ -e "$f" ] || continue
     p=${f##*-}; alive "$p" || rm -f "$f"
   done
+  for f in "$Q_DIR"/sample.*; do
+    [ -e "$f" ] || continue
+    p=${f##*.}; alive "$p" || rm -f "$f"
+  done
+  local id st en rc secs cwd cmd
+  for f in "$Q_DIR"/runs/*.meta; do
+    [ -e "$f" ] || continue
+    IFS=$'\t' read -r id st en rc secs cwd cmd < "$f"
+    if [ "$en" = "-" ] && ! alive "${id##*-}"; then meta_write "$id" "$st" "$(now)" 137 "$(( $(now) - st ))" "$cwd" "$cmd"; seal_log "$id"; fi
+  done
+  for f in "$Q_DIR"/runs/*.fifo; do
+    [ -e "$f" ] || continue
+    p=${f##*-}; alive "${p%.fifo}" || rm -f "$f"
+  done
+  prune_runs
 }
 
 held_slots() { find "$Q_DIR/slots" -type l 2>/dev/null | wc -l | tr -d ' '; }
 
-held() { # in "số_lệnh centi-cpu mem_mb" đang giữ slot
-  local f n=0 c=0 m=0 wc wm
+held() { # in "số_lệnh centi-cpu mem_mb": lệnh đã chạy đủ lâu tính theo số đo thật (sampler), lệnh mới chạy tính theo ước lượng để thận trọng
+  local f p n=0 c=0 m=0 wc wm ws am ac
   for f in "$Q_DIR"/slots/*; do
     [ -L "$f" ] || continue
-    n=$((n+1)); wc=200; wm=2000
-    read -r wc wm 2>/dev/null < "$f.w" || true
+    p=$(readlink "$f"); n=$((n+1)); wc=200; wm=2000; ws=$(now)
+    read -r wc wm ws 2>/dev/null < "$f.w" || true
+    if [ $(( $(now) - ${ws:-0} )) -ge "$WARM_SEC" ]; then
+      read -r am ac 2>/dev/null <<< "$(tail -n 1 "$Q_DIR/sample.$p" 2>/dev/null)"
+      case "${am:-x}${ac:-x}" in *[!0-9]*) ;; *) wc=$(( ac < 25 ? 25 : ac )); wm=$(( am < 100 ? 100 : am )) ;; esac
+    fi
     c=$((c+wc)); m=$((m+wm))
   done
   echo "$n $c $m"
@@ -99,9 +111,24 @@ sample() { # $1 pgid $2 tệp ra: mỗi 2s ghi "mem_mb centi_cpu" của cả nh�
 pressure() { sysctl -n kern.memorystatus_vm_pressure_level 2>/dev/null || echo 1; } # Linux không có: coi như bình thường
 
 # Luôn cho phép ít nhất 1 lệnh chạy để máy bận việc khác không làm hàng đợi kẹt vĩnh viễn.
+swap_used_mb() { # MB swap đang dùng; JOBQ_FAKE_SWAP_FILE dùng cho kiểm thử; hệ không có swapusage (Linux) coi như 0 nên không phanh
+  if [ -n "${JOBQ_FAKE_SWAP_FILE:-}" ]; then cat "$JOBQ_FAKE_SWAP_FILE" 2>/dev/null || echo 0; return 0; fi
+  sysctl -n vm.swapusage 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="used"){v=$(i+2); sub(/M$/,"",v); print int(v); exit}}' | grep . || echo 0
+}
+swap_ok() { # swap tăng từ SWAP_GROWTH_MB trở lên giữa hai lần đo cách nhau 5-60 giây thì ngừng nhận lệnh SWAP_BRAKE_SEC giây
+  local t cur pe=0 pu pb=0; t=$(now); cur=$(swap_used_mb); pu=$cur
+  read -r pe pu pb 2>/dev/null < "$Q_DIR/swap" || true
+  [ "$t" -lt "${pb:-0}" ] && return 1
+  if [ "${pe:-0}" -gt 0 ] && [ $((t - pe)) -ge 5 ] && [ $((t - pe)) -le 60 ] && [ $((cur - pu)) -ge "$SWAP_GROWTH_MB" ]; then
+    echo "$t $cur $((t + SWAP_BRAKE_SEC))" > "$Q_DIR/swap"; return 1
+  fi
+  if [ "${pe:-0}" -eq 0 ] || [ $((t - pe)) -ge 10 ]; then echo "$t $cur 0" > "$Q_DIR/swap"; fi
+  return 0
+}
 gate_ok() {
   [ "$(held_slots)" -eq 0 ] && return 0
   [ "$(pressure)" -lt "$MAX_PRESSURE" ] || return 1
+  swap_ok || return 1
   awk -v l="$(load1)" -v m="$MAX_LOAD" 'BEGIN{exit !(l < m)}' || return 1
   [ "$(free_mb)" -ge "$MIN_FREE_MB" ]
 }
@@ -118,38 +145,23 @@ lock() { # khoá ngắn quanh bước "kiểm tra ngân sách + lấy slot" đ�
 }
 unlock() { rm -rf "$Q_DIR/admit.lock"; }
 
-# AIMD: máy quá tải thì thu ngân sách xuống 75%, rảnh thì nới thêm 25 điểm; không bao giờ vượt ngân sách gốc (đã kẹp dưới max).
-scale_pct() { cut -d' ' -f1 "$Q_DIR/scale" 2>/dev/null || echo 100; }
-adapt() {
-  [ "$ADAPT" = 1 ] || return 0
-  local pct last t; pct=$(scale_pct); last=$(cut -d' ' -f2 "$Q_DIR/scale" 2>/dev/null || echo 0); t=$(now)
-  [ $((t - last)) -ge "$ADAPT_SEC" ] || return 0
-  if awk -v l="$(load1)" -v m="$MAX_LOAD" 'BEGIN{exit !(l >= m)}' || [ "$(pressure)" -ge "$MAX_PRESSURE" ]; then
-    pct=$(( pct * 3 / 4 )); [ "$pct" -lt 25 ] && pct=25
-  elif awk -v l="$(load1)" -v m="$MAX_LOAD" 'BEGIN{exit !(l < m / 2)}'; then
-    pct=$(( pct + 25 )); [ "$pct" -gt 100 ] && pct=100
-  fi
-  echo "$pct $t" > "$Q_DIR/scale"
-}
-effective() { # đặt E_JOBS/E_CPU/E_MEM = ngân sách x scale (tối thiểu 1 lệnh)
-  local pct; pct=$(scale_pct)
-  E_JOBS=$(( (B_JOBS * pct + 50) / 100 )); [ "$E_JOBS" -lt 1 ] && E_JOBS=1
-  E_CPU=$(( B_CPU * pct / 100 )); E_MEM=$(( B_MEM * pct / 100 ))
-}
-fits() { # $1 centi-cpu $2 mem_mb; cần hn hc hm từ held() và E_* từ effective()
-  [ "$hn" -eq 0 ] || { [ "$hn" -lt "$E_JOBS" ] && [ $((hc + $1)) -le "$E_CPU" ] && [ $((hm + $2)) -le "$E_MEM" ]; }
+fits() { # $1 centi-cpu $2 mem_mb; cần hn hc hm từ held()
+  [ "$hn" -eq 0 ] || { [ "$hn" -lt "$B_JOBS" ] && [ $((hc + $1)) -le "$B_CPU" ] && [ $((hm + $2)) -le "$B_MEM" ]; }
 }
 
 # --- Trang web tĩnh: jobq tự ghi $Q_DIR/web/snapshot.js khi có thay đổi, dashboard.html nạp lại file đó (chạy được qua file://, không cần server) ---
 snapshot_tsv() {
-  load_cfg; effective
   local f p w wc wm st args
-  printf 'META\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$B_JOBS" "$MAX_JOBS" "$B_CPU" "$MAX_CPU" "$B_MEM" "$MAX_MEM" \
-    "$(scale_pct)" "$(load1)" "$MAX_LOAD" "$(free_mb)" "$MIN_FREE_MB" "$(pressure)" "$MAX_PRESSURE" "$(now)" "$TIMEOUT"
+  printf 'META\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$B_JOBS" "$B_CPU" "$B_MEM" \
+    "$(load1)" "$MAX_LOAD" "$(free_mb)" "$MIN_FREE_MB" "$(pressure)" "$MAX_PRESSURE" "$(now)" "$TIMEOUT" "$TOTAL_MB"
   for f in "$Q_DIR"/slots/*; do
     [ -L "$f" ] || continue; p=$(readlink "$f"); wc=200; wm=2000
     read -r wc wm 2>/dev/null < "$f.w" || true
     st=$(ps -p "$p" -o etime= 2>/dev/null | awk '{n=split($0,a,/[-:]/); s=0; for(i=1;i<=n;i++) s=s*60+a[i]; if ($0 ~ /-/) {split($0,d,"-"); split(d[2],t,":"); s=d[1]*86400+t[1]*3600+t[2]*60+t[3]} print s}')
+    if [ "${st:-0}" -ge "$WARM_SEC" ]; then # đã chạy đủ lâu thì hiện số đo thật thay vì ước lượng
+      read -r am ac 2>/dev/null <<< "$(tail -n 1 "$Q_DIR/sample.$p" 2>/dev/null)"
+      case "${am:-x}${ac:-x}" in *[!0-9]*) ;; *) wc=$ac; wm=$am ;; esac
+    fi
     printf 'RUN\t%s\t%s\t%s\t%s\t%s\n' "$p" "$wc" "$wm" "$(( $(now) - ${st:-0} ))" "$(cmd_of "$p")"
   done
   for f in "$Q_DIR"/queue/*; do
@@ -159,6 +171,7 @@ snapshot_tsv() {
   done
   [ -f "$HIST" ] && awk -F'\t' '{n[$1]++; if($2>c[$1])c[$1]=$2; if($3>m[$1])m[$1]=$3; t[$1]+=$4; cmd[$1]=$5}
     END{for(k in n) printf "STAT\t%d\t%d\t%d\t%d\t%s\n", n[k], c[k], m[k], t[k]/n[k], cmd[k]}' "$HIST" | sort -t"$(printf '\t')" -k4,4 -rn | head -8
+  ls -r "$Q_DIR"/runs/*.meta 2>/dev/null | head -n "$KEEP_RUNS" | while IFS= read -r f; do printf 'HIST\t%s\n' "$(cat "$f")"; done
   return 0
 }
 cmd_of() { # lệnh người dùng gõ, bỏ phần bọc jobq và ký tự điều khiển
@@ -168,14 +181,18 @@ snapshot_js() {
   snapshot_tsv | awk -F'\t' '
     function q(s){gsub(/\\/,"\\\\",s); gsub(/"/,"\\\"",s); return "\"" s "\""}
     function join(a,n,  i,o){for(i=1;i<=n;i++)o=o (i>1?",":"") a[i]; return o}
-    $1=="META"{m=sprintf("\"jobs\":%d,\"maxJobs\":%d,\"cpu\":%d,\"maxCpu\":%d,\"mem\":%d,\"maxMem\":%d,\"scale\":%d,\"load\":%s,\"maxLoad\":%s,\"freeMb\":%d,\"minFreeMb\":%d,\"pressure\":%d,\"maxPressure\":%d,\"ts\":%d,\"timeout\":%d",$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)}
+    $1=="META"{m=sprintf("\"jobs\":%d,\"cpu\":%d,\"mem\":%d,\"load\":%s,\"maxLoad\":%s,\"freeMb\":%d,\"minFreeMb\":%d,\"pressure\":%d,\"maxPressure\":%d,\"ts\":%d,\"timeout\":%d,\"totalMb\":%d",$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)}
     $1=="RUN"{r[++nr]=sprintf("{\"pid\":%d,\"cpu\":%d,\"mem\":%d,\"started\":%d,\"cmd\":%s}",$2,$3,$4,$5,q($6))}
     $1=="WAIT"{w[++nw]=sprintf("{\"pid\":%d,\"cpu\":%d,\"mem\":%d,\"queued\":%d,\"cmd\":%s}",$2,$3,$4,$5,q($6))}
+    function nz(x){return x=="-"?"null":x+0}
+    $1=="HIST"{h[++nh]=sprintf("{\"id\":%s,\"start\":%d,\"end\":%s,\"rc\":%s,\"secs\":%s,\"cwd\":%s,\"cmd\":%s}",q($2),$3,nz($4),nz($5),nz($6),q($7),q($8))}
     $1=="STAT"{s[++ns]=sprintf("{\"runs\":%d,\"cpu\":%d,\"mem\":%d,\"secs\":%d,\"cmd\":%s}",$2,$3,$4,$5,q($6))}
-    END{printf "window.JOBQ = {%s,\"running\":[%s],\"waiting\":[%s],\"stats\":[%s]};\n", m, join(r,nr), join(w,nw), join(s,ns)}'
+    END{printf "window.JOBQ = {%s,\"running\":[%s],\"waiting\":[%s],\"stats\":[%s],\"history\":[%s]};\n", m, join(r,nr), join(w,nw), join(s,ns), join(h,nh)}'
 }
 write_snapshot() { # chỉ ghi khi người dùng đã bật trang web bằng `jobq web`; ghi nguyên tử để trình duyệt không đọc nửa chừng
   [ -d "$Q_DIR/web" ] || return 0
+  local src; src="$(dirname "$(readlink -f "$0")")/dashboard.html"
+  cmp -s "$src" "$Q_DIR/web/index.html" || cp "$src" "$Q_DIR/web/index.html" # so nội dung (không so giờ sửa, chỉ chính xác tới giây) để trang luôn là bản mới nhất
   snapshot_js > "$Q_DIR/web/snapshot.js.$$" 2>/dev/null && mv "$Q_DIR/web/snapshot.js.$$" "$Q_DIR/web/snapshot.js"
   return 0
 }
@@ -189,9 +206,8 @@ cmd_web() { # jobq web [--no-open]
 }
 
 cmd_status() {
-  mkdir -p "$Q_DIR/slots" "$Q_DIR/queue"; reap; load_cfg
-  effective
-  echo "budget jobs=$B_JOBS/$MAX_JOBS cpu=$((B_CPU/100))/$((MAX_CPU/100)) mem=$B_MEM/${MAX_MEM}MB scale=$(scale_pct)% | máy load=$(load1)/$MAX_LOAD free=$(free_mb)MB/$MIN_FREE_MB"
+  mkdir -p "$Q_DIR/slots" "$Q_DIR/queue"; reap
+  echo "tối đa $B_JOBS lệnh, đặt chỗ $((B_CPU/100)) nhân và ${B_MEM}MB | máy load=$(load1)/$MAX_LOAD free=$(free_mb)MB/$MIN_FREE_MB"
   local f p w
   for f in "$Q_DIR"/slots/*; do
     [ -L "$f" ] || continue; p=$(readlink "$f"); w=$(cat "$f.w" 2>/dev/null || echo "?")
@@ -207,23 +223,69 @@ cmd_stats() { # lệnh nào nặng: số lần chạy, CPU/RAM lớn nhất, th�
     END{for(k in n) printf "%3d lần  cpu=%.1f  mem=%5dMB  %4ds  %s\n", n[k], c[k]/100, m[k], t[k]/n[k], cmd[k]}' "$HIST" | sort -k4 -t= -rn
 }
 
-cmd_set() { # $1 = budget|max, còn lại key=value
-  local scope=$1 kv k v pre=""; shift; mkdir -p "$Q_DIR"
-  [ "$scope" = max ] && pre="max_"
-  for kv in "$@"; do
-    k=${kv%%=*}; v=${kv#*=}
-    case "$k" in jobs|cpu|mem) ;; load) [ "$scope" = max ] || { echo "jobq: load chỉ đặt được bằng 'jobq max'" >&2; exit 2; } ;; *) echo "jobq: khoá lạ '$k' (jobs|cpu|mem|load)" >&2; exit 2 ;; esac
-    cfg_set "$pre$k" "$v"
+
+cmd_split() { # chia file thành N lô liền nhau (giữ các file cùng thư mục gần nhau để tận dụng cache), mỗi dòng một lô
+  local n=${1:-}; shift || true; [ "${1:-}" = "--" ] && shift
+  case "$n" in ''|*[!0-9]*|0) echo "jobq: dùng 'jobq split N -- file...' với N là số nguyên dương" >&2; exit 2 ;; esac
+  local files=("$@") l
+  if [ ${#files[@]} -eq 0 ] && [ ! -t 0 ]; then while IFS= read -r l; do [ -n "$l" ] && files+=("$l"); done; fi
+  local total=${#files[@]}
+  [ "$total" -gt 0 ] || { echo "jobq: không có file nào để chia" >&2; exit 2; }
+  [ "$n" -gt "$total" ] && n=$total
+  local size=$(( (total + n - 1) / n )) g f line
+  for (( g = 0; g * size < total; g++ )); do
+    line=""
+    for f in "${files[@]:$((g * size)):$size}"; do line="$line$(printf '%q' "$f") "; done
+    echo "${line% }"
   done
-  load_cfg
-  echo "budget jobs=$B_JOBS cpu=$((B_CPU/100)) mem=$B_MEM | max jobs=$MAX_JOBS cpu=$((MAX_CPU/100)) mem=$MAX_MEM (ngân sách bị kẹp dưới max)"
+}
+
+# --- Lịch sử lệnh: mỗi lệnh có runs/<id>.meta (1 dòng, cách nhau bằng tab, ô trống ghi "-"), runs/<id>.log (output thô), runs/<id>.js (cho trang web) ---
+fmt_time() { date -r "$1" +%H:%M:%S 2>/dev/null || date -d "@$1" +%H:%M:%S; }
+meta_write() { # id start end rc secs cwd cmd
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$@" > "$Q_DIR/runs/$1.meta.tmp" && mv "$Q_DIR/runs/$1.meta.tmp" "$Q_DIR/runs/$1.meta"
+}
+seal_log() { # cắt output quá dài (giữ phần cuối) và tạo bản .js để trang web nạp được qua file://
+  local id=$1 log="$Q_DIR/runs/$1.log" v; [ -f "$log" ] || return 0
+  if [ "$(wc -c < "$log")" -gt $(( LOG_MAX_KB * 1024 )) ]; then tail -c $(( LOG_MAX_KB * 1024 )) "$log" > "$log.tmp" && mv "$log.tmp" "$log"; fi
+  command -v jq >/dev/null || return 0
+  v=$(jq -Rs . < "$log" 2>/dev/null) && [ -n "$v" ] && printf 'window.JOBQ_LOGS=window.JOBQ_LOGS||{};window.JOBQ_LOGS["%s"]=%s;\n' "$id" "$v" > "$Q_DIR/runs/$id.js"
+  return 0
+}
+prune_runs() { # chỉ giữ KEEP_RUNS lệnh gần nhất
+  local f n=0
+  for f in $(ls -r "$Q_DIR"/runs/*.meta 2>/dev/null); do
+    n=$((n + 1)); [ "$n" -gt "$KEEP_RUNS" ] && rm -f "${f%.meta}.meta" "${f%.meta}.log" "${f%.meta}.js"
+  done
+  return 0
+}
+finish_run() { # $1 = mã thoát; chạy một lần duy nhất cho mỗi lệnh
+  [ -n "$runid" ] || return 0
+  local id=$runid end; end=$(now); runid=""
+  meta_write "$id" "$run_start" "$end" "$1" "$(( end - run_start ))" "$run_cwd" "$run_cmd"
+  seal_log "$id"; prune_runs
+}
+cmd_logs() { # jobq logs [N|id]: không đối số thì liệt kê, có thì in output (N=1 là lệnh mới nhất)
+  local sel=${1:-} f i=0 id st en rc secs cwd cmd files
+  files=$(ls -r "$Q_DIR"/runs/*.meta 2>/dev/null)
+  [ -n "$files" ] || { echo "chưa có lịch sử lệnh"; return 0; }
+  for f in $files; do
+    i=$((i + 1)); IFS=$'\t' read -r id st en rc secs cwd cmd < "$f"
+    if [ -z "$sel" ]; then
+      printf '%3d  %s  %-5s %7s  %s\n' "$i" "$(fmt_time "$st")" "$([ "$rc" = "-" ] && echo "chạy" || echo "$rc")" "$([ "$secs" = "-" ] && echo "-" || echo "${secs}s")" "$cmd" | cut -c1-170
+    elif [ "$sel" = "$i" ] || [ "$sel" = "$id" ]; then
+      echo "== $cmd"; echo "== thư mục: $cwd | lúc $(fmt_time "$st") | thoát: $([ "$rc" = "-" ] && echo "đang chạy" || echo "$rc") | $([ "$secs" = "-" ] && echo "-" || echo "${secs}s")"
+      cat "$Q_DIR/runs/$id.log" 2>/dev/null; return 0
+    fi
+  done
+  [ -z "$sel" ] || { echo "jobq: không tìm thấy lệnh '$sel' (dùng 'jobq logs' để xem danh sách)" >&2; return 1; }
 }
 
 cmd_run() {
-  COST=""; load_cfg
+  COST=""
   while [ $# -gt 0 ]; do
     case "$1" in
-      -s) JOBQ_SLOTS=$2; load_cfg; shift 2 ;; --cost) COST=$2; shift 2 ;; -t) TIMEOUT=$2; shift 2 ;; -w) WAIT=$2; shift 2 ;;
+      --cost) COST=$2; shift 2 ;; -t) TIMEOUT=$2; shift 2 ;; -w) WAIT=$2; shift 2 ;;
       --) shift; break ;; *) break ;;
     esac
   done
@@ -233,7 +295,7 @@ cmd_run() {
 
   mkdir -p "$Q_DIR/slots" "$Q_DIR/queue"
   # biến toàn cục có chủ đích: trap EXIT chạy sau khi hàm đã return
-  ticket="$Q_DIR/queue/$(printf '%012d' "$(now)")-$$"; got=""; pid=""; wd=""; sp=""; local i
+  ticket="$Q_DIR/queue/$(printf '%012d' "$(now)")-$$"; got=""; pid=""; wd=""; sp=""; samples=""; runid=""; fifo=""; teepid=""; run_start=0; run_cwd=""; run_cmd=""; local i
   flag=$(mktemp "${TMPDIR:-/tmp}/jobq.XXXXXX"); rm -f "$flag"
   key=$(printf '%s\n%s' "$PWD" "$*" | cksum | cut -d' ' -f1)
   read -r W_CPU W_MEM <<< "$(estimate "$key")"
@@ -246,7 +308,8 @@ cmd_run() {
     [ -n "$wd" ] && kill -- "-$wd" 2>/dev/null
     [ -n "$pid" ] && alive "$pid" && { kill -TERM -- "-$pid" 2>/dev/null; sleep 1; kill -KILL -- "-$pid" 2>/dev/null; }
     [ -n "$got" ] && [ "$(readlink "$Q_DIR/slots/$got" 2>/dev/null)" = "$$" ] && rm -f "$Q_DIR/slots/$got" "$Q_DIR/slots/$got.w"
-    rm -f "$ticket" "$flag"
+    finish_run 130
+    rm -f "$ticket" "$flag" "$samples" ${fifo:+"$fifo"}
     [ "$(cat "$Q_DIR/admit.lock/pid" 2>/dev/null)" = "$$" ] && unlock
     write_snapshot
     return 0
@@ -254,12 +317,11 @@ cmd_run() {
   trap 'release; exit 130' INT TERM
   trap release EXIT
 
-  local deadline=$(( $(now) + WAIT )) first hw_c hw_m age ok
+  local deadline=$(( $(now) + WAIT )) first hw_c hw_m age ok la
   while :; do
     reap
     first=$(ls "$Q_DIR/queue" | sort | head -1)
     lock
-    adapt; effective
     read -r hn hc hm <<< "$(held)"
     ok=0
     if [ "$first" = "${ticket##*/}" ]; then
@@ -271,9 +333,11 @@ cmd_run() {
       age=$(( $(now) - 10#${first%%-*} ))
       if ! fits "$hw_c" "$hw_m" && fits "$W_CPU" "$W_MEM" && [ "$age" -lt "$BACKFILL" ]; then ok=1; fi
     fi
+    # chờ khởi động: lệnh vừa nhận cần vài giây mới dùng đủ CPU/RAM, nhận tiếp ngay thì số đo còn thấp và dễ nhận quá tay
+    if [ "$ok" = 1 ] && [ "$hn" -gt 0 ]; then la=$(cat "$Q_DIR/last_admit" 2>/dev/null || echo 0); [ $(( $(now) - la )) -ge "$COOLDOWN" ] || ok=0; fi
     if [ "$ok" = 1 ] && gate_ok; then
       for i in $(seq 1 "$MAX_JOBS"); do
-        ln -s "$$" "$Q_DIR/slots/$i" 2>/dev/null && { got=$i; echo "$W_CPU $W_MEM" > "$Q_DIR/slots/$i.w"; break; }
+        ln -s "$$" "$Q_DIR/slots/$i" 2>/dev/null && { got=$i; echo "$W_CPU $W_MEM $(now)" > "$Q_DIR/slots/$i.w"; now > "$Q_DIR/last_admit"; break; }
       done
     fi
     unlock
@@ -283,16 +347,29 @@ cmd_run() {
   done
   rm -f "$ticket"; write_snapshot
 
+  # Lưu lịch sử + output: lệnh ghi qua ống tên (fifo) vào tee, tee vừa in ra cho người gọi vừa ghi vào tệp. stdout và stderr được gộp chung.
+  mkdir -p "$Q_DIR/runs"
+  run_start=$(now); runid=$(printf '%012d-%08d' "$run_start" "$$"); run_cwd=$PWD; run_cmd=$(printf '%s' "$*" | tr '\t\r\n' '   ')
+  meta_write "$runid" "$run_start" "-" "-" "-" "$run_cwd" "$run_cmd"
+  fifo="$Q_DIR/runs/$runid.fifo"; mkfifo "$fifo"
+  tee "$Q_DIR/runs/$runid.log" < "$fifo" & teepid=$!; disown "$teepid"
+
   export JOBQ_ACTIVE=1 JOBQ_WORKERS=2 UV_THREADPOOL_SIZE=2
   case "${NODE_OPTIONS:-}" in *max-old-space-size*) ;; *) export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=$NODE_MB" ;; esac
   local pre=(nice -n 10)
   command -v taskpolicy >/dev/null && pre=(taskpolicy -b nice -n 10) # macOS: hạ ưu tiên CPU + IO
 
   set -m # mỗi lệnh 1 process group riêng để giết cả cây khi timeout/ngắt
-  "${pre[@]}" "$@" & pid=$!
+  "${pre[@]}" "$@" > "$fifo" 2>&1 & pid=$!
   samples="$Q_DIR/sample.$$"; : > "$samples"; sample "$pid" "$samples" & sp=$!; disown "$sp"
   started=$(now)
-  ( sleep "$TIMEOUT"; : > "$flag"; kill -TERM -- "-$pid" 2>/dev/null; sleep 5; kill -KILL -- "-$pid" 2>/dev/null ) & wd=$!
+  # Watchdog chạy tiến trình riêng nên sống sót khi jobq bị kill -9: nó dừng lệnh con khi jobq chết hoặc khi quá timeout.
+  ( t=0
+    while [ "$t" -lt "$TIMEOUT" ]; do
+      alive "$$" || { kill -TERM -- "-$pid" 2>/dev/null; sleep 5; kill -KILL -- "-$pid" 2>/dev/null; exit 0; }
+      sleep 2; t=$((t + 2))
+    done
+    : > "$flag"; kill -TERM -- "-$pid" 2>/dev/null; sleep 5; kill -KILL -- "-$pid" 2>/dev/null ) & wd=$!
   disown "$wd"; { wait "$pid"; } 2>/dev/null; local rc=$?
   kill -- "-$sp" 2>/dev/null; sp=""
   if [ "$rc" -ne 124 ] && [ "$rc" -lt 128 ]; then # chỉ ghi lần chạy kết thúc bình thường
@@ -300,7 +377,22 @@ cmd_run() {
     printf '%s\t%s\t%s\t%s\t%s\n' "$key" "${cp:-0}" "${mm:-0}" "$(( $(now) - started ))" "$*" >> "$HIST"
   fi
   rm -f "$samples"
-  [ -e "$flag" ] && { echo "jobq: quá ${TIMEOUT}s, đã dừng lệnh" >&2; rc=124; }
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do kill -0 "$teepid" 2>/dev/null || break; sleep 0.25; done # đợi tee ghi nốt output
+  rm -f "$fifo"
+  if [ -e "$flag" ]; then
+    rc=124
+    local msg="jobq: QUÁ HẠN ${TIMEOUT}s, đã dừng lệnh. Hãy CHIA NHỎ lệnh này thành các lô ngắn hơn rồi đẩy từng lô vào jobq (jobq split N -- <file...>, hoặc --shard=i/N của công cụ); không tăng -t."
+    echo "$msg" >&2; [ -n "$runid" ] && echo "$msg" >> "$Q_DIR/runs/$runid.log" # ghi cả vào lịch sử để người xem trang cũng thấy
+    # Kèm output đã in ra để người gọi biết lệnh chạy tới đâu trước khi quá hạn và chia lô cho đúng.
+    if [ -s "$Q_DIR/runs/$runid.log" ]; then
+      echo "--- Lệnh: $*" >&2
+      echo "--- Output cuối (20 dòng; đầy đủ: jobq logs 1):" >&2
+      tail -n 20 "$Q_DIR/runs/$runid.log" | grep -v 'QUÁ HẠN' | cut -c1-300 >&2
+    else
+      echo "--- Lệnh: $* (chưa in ra gì trước khi quá hạn)" >&2
+    fi
+  fi
+  finish_run "$rc"
   return "$rc"
 }
 
@@ -308,9 +400,10 @@ case "${1:-}" in
   run) shift; cmd_run "$@"; exit $? ;;
   status) cmd_status ;;
   stats) cmd_stats ;;
+  split) shift; cmd_split "$@" ;;
+  logs) shift; cmd_logs "$@" ;;
   web) shift; cmd_web "$@" ;;
   snapshot) snapshot_js ;;
-  budget|max) sub=$1; shift; load_cfg; if [ $# -eq 0 ]; then cmd_status | head -1; else cmd_set "$sub" "$@"; fi ;;
   clean) mkdir -p "$Q_DIR/slots" "$Q_DIR/queue"; reap; [ -f "$HIST" ] && tail -n 2000 "$HIST" > "$HIST.tmp" && mv "$HIST.tmp" "$HIST"; echo "jobq: đã dọn slot/ticket chết, cắt lịch sử còn 2000 dòng" ;;
   *) sed -n '2,8p' "$0" >&2; exit 2 ;;
 esac

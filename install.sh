@@ -143,6 +143,13 @@ if $WITH_SCRIPTS; then
       name="$(basename "$script_dir")"
       link "${script_dir%/}" "$SCRIPTS_DST/$name"
     done
+    # job-queue ships commands meant to be on PATH (the queue, the step runner, the script linter).
+    if [[ -d "$SCRIPTS_SRC/job-queue" ]]; then
+      for bin in jobq stepper lint-script; do
+        link "$SCRIPTS_DST/job-queue/$bin" "$HOME/.local/bin/$bin"
+      done
+      log "job-queue: make sure ~/.local/bin is on PATH, then add the jobq-guard hook to ~/.claude/settings.json (see scripts/job-queue/README.md)"
+    fi
   fi
 else
   log "skipped scripts/ (lint rules) — pass --with-scripts to install"

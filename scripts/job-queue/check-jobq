@@ -3,7 +3,7 @@
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-export JOBQ_ADAPT=0 JOBQ_MAX_PRESSURE=99 JOBQ_DIR="$T/q" JOBQ_SLOTS=2 JOBQ_MAX_LOAD=999 JOBQ_MIN_FREE_MB=0
+export JOBQ_COOLDOWN_SEC=0 JOBQ_SWAP_GROWTH_MB=999999 JOBQ_BUDGET_CPU=4 JOBQ_MAX_PRESSURE=99 JOBQ_DIR="$T/q" JOBQ_SLOTS=2 JOBQ_MAX_LOAD=999 JOBQ_MIN_FREE_MB=0
 fail() { echo "FAIL: $1"; exit 1; }
 
 bash -n "$HERE/jobq" || fail "cú pháp"
@@ -21,7 +21,10 @@ wait
 "$HERE/jobq" run -- bash -c 'exit 7'; [ $? -eq 7 ] || fail "exit code"
 
 # 3) timeout giết cả cây lệnh
-"$HERE/jobq" run -t 1 -- bash -c 'sleep 30 & wait' 2>/dev/null; [ $? -eq 124 ] || fail "timeout rc"
+msg=$("$HERE/jobq" run -t 1 -- bash -c 'echo da-chay-toi-buoc-7; sleep 30 & wait' 2>&1 >/dev/null); [ $? -eq 124 ] || fail "timeout rc"
+echo "$msg" | grep -q "CHIA NHỎ" || fail "quá hạn không nhắc chia nhỏ lệnh"
+echo "$msg" | grep -q "Output cuối" && echo "$msg" | grep -q "da-chay-toi-buoc-7" || fail "báo cáo quá hạn không kèm output đã in ra"
+"$HERE/jobq" logs 1 | grep -q "CHIA NHỎ" || fail "lịch sử không ghi lời nhắc chia nhỏ khi quá hạn"
 sleep 1; pgrep -f 'sleep 30( |&|$)' >/dev/null && fail "sleep 30 còn sống sau timeout"
 
 # 4) lồng nhau không kẹt
@@ -48,17 +51,6 @@ rm "$T/s1"; touch "$T/ok"
 
 # 8) lịch sử đo được ghi lại, stats đọc được
 "$HERE/jobq" stats | grep -q 'lần' || fail "stats trống sau khi đã chạy job"
-
-# 9) trần cứng: ngân sách jobs=3 vẫn bị kẹp xuống max jobs=1
-(
-  unset JOBQ_SLOTS; export JOBQ_DIR="$T/q2"; rm -rf "$T/peak2" "$T/run2"; mkdir -p "$T/run2"
-  "$HERE/jobq" max jobs=1 >/dev/null; "$HERE/jobq" budget jobs=3 >/dev/null
-  for n in 1 2 3; do
-    "$HERE/jobq" run -- bash -c "touch $T/run2/$n; echo \$(ls $T/run2 | wc -l) >> $T/peak2; sleep 1; rm $T/run2/$n" &
-  done
-  wait
-  [ "$(sort -n "$T/peak2" | tail -1)" -le 1 ]
-) || fail "ngân sách vượt trần max"
 
 # 10) --cost lớn: 2 job cpu=3 không chạy cùng lúc dưới ngân sách cpu=4
 (
@@ -88,12 +80,6 @@ JOBQ_BIN="$HERE/jobq" "$T/self.sh" >/dev/null || fail "script mẫu chạy lỗi
   "$HERE/jobq" run --cost cpu=0.5,mem=100 -- bash -c "echo C >> $T/order" & wait
   [ "$(tr -d '\n' < "$T/order")" = "ACB" ] ) || fail "lệnh nhẹ không chạy lách (thứ tự: $(tr -d '\n' < "$T/order"))"
 
-# 14) tự co giãn: máy "quá tải" thì scale tụt xuống 25% nhưng vẫn có một lệnh chạy
-( export JOBQ_DIR="$T/q6" JOBQ_ADAPT=1 JOBQ_ADAPT_SEC=1 JOBQ_MAX_LOAD=0
-  "$HERE/jobq" run -- sleep 10 & sleep 1
-  "$HERE/jobq" run -w 7 -- true 2>/dev/null; rc=$?; kill %1 2>/dev/null; wait 2>/dev/null
-  [ "$rc" -eq 75 ] && [ "$(cut -d' ' -f1 "$T/q6/scale")" -eq 25 ] ) || fail "tự co giãn không hạ scale"
-
 # 15) trang web tĩnh: snapshot.js hợp lệ, có lệnh đang chạy khi job chạy, rỗng khi xong; script trong trang không lỗi cú pháp
 ( export JOBQ_DIR="$T/q7"; "$HERE/jobq" web --no-open >/dev/null
   "$HERE/jobq" run -- sleep 4 & sleep 2.5
@@ -104,7 +90,7 @@ awk '/<script>/{f=1;next} /<\/script>/{f=0} f' "$HERE/dashboard.html" > "$T/dash
 node --check "$T/dash.js" || fail "script trong dashboard.html lỗi cú pháp"
 
 # 16) hook jobq-guard: chặn đúng lệnh nặng, cho qua lệnh thường
-g() { printf '{"tool_input":{"command":%s}}' "$(jq -Rn --arg c "$2" '$c')" | "$HERE/jobq-guard" 2>/dev/null; r=$?; e=0; [ "$1" = block ] && e=2; [ "$r" -eq "$e" ] || fail "jobq-guard sai ($1): $2"; }
+g() { printf '{"tool_input":{"command":%s}}' "$(jq -Rn --arg c "$2" '$c')" | "$HERE/jobq-guard" >/dev/null 2>&1; r=$?; e=0; [ "$1" = block ] && e=2; [ "$r" -eq "$e" ] || fail "jobq-guard sai ($1): $2"; }
 while IFS='|' read -r exp c; do g "$exp" "$c"; done <<'CASES'
 block|pnpm test
 block|pnpm --filter api check-types
@@ -145,7 +131,14 @@ block|deno test
 block|ng build
 block|echo ok; pnpm test
 block|echo "x" && vitest run
-pass|jobq run -- pnpm test
+block|jobq run -- pnpm test
+block|stepper steps
+block|cd x && jobq run -t 900 -- pnpm test
+pass|JOBQ_FG=1 jobq run -- pnpm test
+pass|jobq status
+pass|jobq web --no-open
+pass|jobq logs
+pass|git commit -m "use jobq run"
 pass|pnpm install
 pass|npm ci
 pass|pnpm dev
@@ -166,8 +159,78 @@ pass|grep -rn "check-types" .
 pass|ls scripts/check-x.sh
 CASES
 
-# 17) ngưỡng tải đặt được bằng config, không cần biến môi trường
-( unset JOBQ_MAX_LOAD; export JOBQ_DIR="$T/q8"; "$HERE/jobq" max load=10 >/dev/null; "$HERE/jobq" status | head -1 | grep -q 'tải=\|load=[0-9.]*/10 ' ) || fail "max load=10 không có hiệu lực"
+# 18) dừng bất thường: TERM không để lại file mồ côi; kill -9 jobq thì lệnh con cũng bị dừng; reap dọn file mồ côi
+( export JOBQ_DIR="$T/q9"
+  "$HERE/jobq" run -- sleep 26 & J=$!; sleep 3
+  kill -TERM $J; sleep 3
+  [ -z "$(ls "$JOBQ_DIR" | grep '^sample\.')" ] || exit 1
+  "$HERE/jobq" run -- sleep 27 & J=$!; sleep 3
+  kill -KILL $J; sleep 9
+  ! pgrep -f '^sleep 27$' >/dev/null || { pkill -f '^sleep 27$'; exit 2; }
+  : > "$JOBQ_DIR/sample.99999999"; "$HERE/jobq" clean >/dev/null
+  [ ! -e "$JOBQ_DIR/sample.99999999" ] ) || fail "dừng bất thường để lại file mồ côi hoặc lệnh con mồ côi"
+
+# 19) lệnh qua jobq chạy nền thì được qua
+gb() { printf '{"tool_input":{"command":%s,"run_in_background":true}}' "$(jq -Rn --arg c "$1" '$c')" | "$HERE/jobq-guard" >/dev/null 2>&1 || fail "jobq-guard chặn lệnh nền hợp lệ: $1"; }
+gb 'jobq run -- pnpm test'; gb 'stepper plans/x/steps'; gb 'cd x && jobq run -t 900 -- pnpm --filter api check-types'
+
+# 21) trang trong thư mục web tự cập nhật khi dashboard.html mới hơn
+( export JOBQ_DIR="$T/q11" JOBQ_FG=1; "$HERE/jobq" web --no-open >/dev/null; echo old > "$JOBQ_DIR/web/index.html";
+  "$HERE/jobq" run -- true; cmp -s "$HERE/dashboard.html" "$JOBQ_DIR/web/index.html" ) || fail "trang trong thư mục web không tự cập nhật"
+
+# 22) xem trạng thái hàng đợi: hook không chặn nhưng nhắc đừng dừng đẩy lệnh
+printf '{"tool_input":{"command":"jobq status"}}' | "$HERE/jobq-guard" | jq -e '.hookSpecificOutput.additionalContext | test("cứ đẩy")' >/dev/null || fail "hook không nhắc khi xem jobq status"
+
+# 23) jobq split: chia đều, giữ nguyên tên file có khoảng trắng và ngoặc khi dán lại vào lệnh
+[ "$("$HERE/jobq" split 3 -- a b c d e | tr '\n' '|')" = "a b|c d|e|" ] || fail "jobq split chia sai"
+line=$("$HERE/jobq" split 1 -- "src/(auth)/x y.test.ts" z.ts); eval "set -- $line"
+[ "$#" -eq 2 ] && [ "$1" = "src/(auth)/x y.test.ts" ] || fail "jobq split làm hỏng tên file đặc biệt"
+[ "$(printf 'a\nb\n' | "$HERE/jobq" split 5 | wc -l | tr -d ' ')" -eq 2 ] || fail "jobq split từ stdin hoặc N lớn hơn số file sai"
+"$HERE/jobq" split 0 -- a 2>/dev/null; [ $? -eq 2 ] || fail "jobq split không báo lỗi khi N không hợp lệ"
+
+# 25) lịch sử lệnh: người gọi vẫn thấy output và mã thoát, giữ đúng KEEP_RUNS lệnh, output gồm cả stderr, dọn sạch ống tạm, bản js cho trang hợp lệ
+( export JOBQ_DIR="$T/q13" JOBQ_KEEP_RUNS=3
+  out=$("$HERE/jobq" run -- bash -c 'echo xin-chao; echo loi-nho >&2; exit 3'); rc=$?
+  [ "$rc" -eq 3 ] && echo "$out" | grep -q xin-chao && echo "$out" | grep -q loi-nho || exit 1
+  for n in 1 2 3 4; do "$HERE/jobq" run -- bash -c "echo lan-$n" >/dev/null; done
+  [ "$(ls "$JOBQ_DIR"/runs/*.meta | wc -l | tr -d ' ')" -eq 3 ] || exit 2
+  [ "$(ls "$JOBQ_DIR"/runs/*.log | wc -l | tr -d ' ')" -eq 3 ] || exit 3
+  [ -z "$(ls "$JOBQ_DIR"/runs/*.fifo 2>/dev/null)" ] || exit 4
+  "$HERE/jobq" logs 1 | grep -q lan-4 || exit 5
+  f=$(ls "$JOBQ_DIR"/runs/*.js | head -1); node -e 'global.window={};require(process.argv[1]);const v=Object.values(window.JOBQ_LOGS)[0];process.exit(/lan-/.test(v)?0:1)' "$f" || exit 6
+  "$HERE/jobq" snapshot | sed 's/^window.JOBQ = //; s/;$//' | jq -e '(.history|length)==3 and .history[0].rc==0' >/dev/null || exit 7 ) || fail "lịch sử lệnh hoặc output không đúng (mã $?)"
+
+# 26) lệnh bị kill -9 được chốt là mã 137 khi dọn
+( export JOBQ_DIR="$T/q14"; mkdir -p "$JOBQ_DIR/runs"
+  printf '%s\t%s\t-\t-\t-\t/tmp\tlenh-chet\n' 000000000001-99999999 1 > "$JOBQ_DIR/runs/000000000001-99999999.meta"
+  "$HERE/jobq" clean >/dev/null; grep -q "$(printf '\t')137$(printf '\t')" "$JOBQ_DIR/runs/000000000001-99999999.meta" ) || fail "lệnh dang dở của jobq đã chết không được chốt mã 137"
+
+# 27) chờ khởi động: lệnh thứ hai không được nhận ngay sau lệnh đầu mà phải đợi hết thời gian chờ
+( export JOBQ_DIR="$T/q15" JOBQ_COOLDOWN_SEC=4 JOBQ_SLOTS=3
+  "$HERE/jobq" run -- bash -c "date +%s > $T/a.t; sleep 8" & sleep 1.2
+  "$HERE/jobq" run -- bash -c "date +%s > $T/b.t" & wait
+  [ $(( $(cat "$T/b.t") - $(cat "$T/a.t") )) -ge 3 ] ) || fail "chờ khởi động không có tác dụng"
+
+# 28) phanh theo swap: swap đứng yên thì lệnh thứ hai được vào; swap tăng nhanh giữa hai lần đo thì bị giữ lại
+( export JOBQ_DIR="$T/q16" JOBQ_FAKE_SWAP_FILE="$T/swap.mb" JOBQ_SWAP_GROWTH_MB=100 JOBQ_SWAP_BRAKE_SEC=20
+  echo 1000 > "$T/swap.mb"
+  "$HERE/jobq" run -- sleep 16 & A=$!; sleep 1.5
+  "$HERE/jobq" run -w 4 -- true 2>/dev/null; ok_rc=$?
+  sleep 5.5; echo 1300 > "$T/swap.mb"
+  "$HERE/jobq" run -w 4 -- true 2>/dev/null; brake_rc=$?
+  kill $A 2>/dev/null; wait 2>/dev/null
+  [ "$ok_rc" -eq 0 ] && [ "$brake_rc" -eq 75 ] ) || fail "phanh theo swap sai (swap đứng yên phải chạy, swap tăng nhanh phải bị giữ)"
+
+# 29) nhận lệnh theo chỗ trống thật: lệnh đang chạy dùng nhiều hơn ước lượng thì lệnh mới phải chờ
+( export JOBQ_DIR="$T/q17" JOBQ_BUDGET_CPU=8 JOBQ_SLOTS=3; mkdir -p "$JOBQ_DIR/slots" "$JOBQ_DIR/queue"
+  sleep 30 & P=$!
+  ln -s "$P" "$JOBQ_DIR/slots/1"; echo "200 2000 $(( $(date +%s) - 60 ))" > "$JOBQ_DIR/slots/1.w"
+  printf '100 700\n' > "$JOBQ_DIR/sample.$P"
+  "$HERE/jobq" run --cost cpu=2,mem=100 -w 3 -- true 2>/dev/null; heavy_rc=$?
+  rm -f "$JOBQ_DIR/sample.$P"
+  "$HERE/jobq" run --cost cpu=2,mem=100 -w 3 -- true 2>/dev/null; est_rc=$?
+  kill $P 2>/dev/null
+  [ "$heavy_rc" -eq 75 ] && [ "$est_rc" -eq 0 ] ) || fail "nhận lệnh theo số đo thật sai (đo 7 nhân phải chặn, chỉ ước 2 nhân phải cho qua)"
 
 [ -z "$(find "$T/q/slots" "$T/q/queue" -mindepth 1 2>/dev/null)" ] || fail "còn rác slot/queue"
-echo "PASS: jobq (hàng đợi, điểm nặng, trần max, áp lực RAM, chạy lách, co giãn, trang web) + lint-script + stepper"
+echo "PASS: jobq (hàng đợi, điểm nặng, áp lực RAM, chạy lách, đo thật, chờ khởi động, phanh swap, trang web) + lint-script + stepper"

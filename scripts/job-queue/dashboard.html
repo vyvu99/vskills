@@ -4,232 +4,416 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>jobq · Theo dõi các lệnh nặng</title>
+<title>jobq</title>
+<link id="icon" rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' fill='%23999'/%3E%3C/svg%3E">
 <style>
 :root{color-scheme:light dark;
-  --bg:light-dark(#f4f5f7,#0d1017);--card:light-dark(#fff,#161b24);--soft:light-dark(#f8f9fb,#121720);
-  --text:light-dark(#111827,#eceff4);--muted:light-dark(#5b6472,#a3adbb);--faint:light-dark(#8b94a3,#6f7a8a);--line:light-dark(#e3e6eb,#252c38);
-  --blue:light-dark(#2557d6,#7ea3ff);--blue-bg:light-dark(#e8efff,#18233f);
-  --green:light-dark(#0f7a4f,#4ccb8d);--green-bg:light-dark(#e3f5ec,#10281f);
-  --amber:light-dark(#a15c07,#f2b35a);--amber-bg:light-dark(#fdf1de,#2c2210);
-  --red:light-dark(#b4234b,#ff8aa8);--red-bg:light-dark(#fce8ee,#2e1520);
-  --track:light-dark(#e6e9ee,#262d39);--shadow:light-dark(0 1px 2px rgba(17,24,39,.06),none)}
+  --bg:light-dark(#f2f0ea,#0e1012);--panel:light-dark(#faf8f3,#14171a);
+  --text:light-dark(#1f1d19,#d9dee3);--muted:light-dark(#5d5a51,#99a2ab);--faint:light-dark(#86827a,#6b747d);
+  --line:light-dark(#cbc6ba,#2a2f35);--track:light-dark(#e2ded3,#232a30);
+  --accent:light-dark(#17794f,#4fd18b);--warn:light-dark(#96560a,#f0b055);--bad:light-dark(#ae2140,#ff7a8a);
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 :root[data-theme="light"]{color-scheme:light}
 :root[data-theme="dark"]{color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
-.wrap{max-width:880px;margin:0 auto;padding:28px 18px 56px;display:grid;gap:22px}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.app{max-width:1600px;margin:0 auto;padding:12px 20px 16px;display:flex;flex-direction:column;gap:12px;height:100dvh;min-height:520px}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.brand{font-weight:700;letter-spacing:.02em}.brand small{display:block;font-weight:400;color:var(--muted);font-size:13px}
-.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
-.seg button{font:inherit;font-size:13px;padding:6px 12px;border:0;background:transparent;color:var(--muted);cursor:pointer}
-.seg button+button{border-left:1px solid var(--line)}
-.seg button[aria-pressed="true"]{background:var(--blue-bg);color:var(--blue);font-weight:600}
-.seg button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
-.live{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
-.live.fresh .dot{background:var(--green)}.live.old .dot{background:var(--amber)}
-.banner{border-radius:16px;padding:22px 24px;border:1px solid transparent;display:grid;gap:6px}
-.banner.ok{background:var(--green-bg);border-color:color-mix(in srgb,var(--green) 28%,transparent)}
-.banner.busy{background:var(--blue-bg);border-color:color-mix(in srgb,var(--blue) 28%,transparent)}
-.banner.warn{background:var(--amber-bg);border-color:color-mix(in srgb,var(--amber) 32%,transparent)}
-.banner h1{margin:0;font-size:22px;line-height:1.3}
-.banner.ok h1{color:var(--green)}.banner.busy h1{color:var(--blue)}.banner.warn h1{color:var(--amber)}
-.banner p{margin:0;color:var(--text)}.banner .sub{color:var(--muted);font-size:14px}
-.notice{display:none;padding:12px 16px;border-radius:12px;background:var(--amber-bg);color:var(--amber)}
-h2{margin:0 0 4px;font-size:17px}.lead.flush{margin:0}.lead{margin:0 0 14px;color:var(--muted);font-size:14px}
-.tiles{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
-.tile{padding:16px 18px;display:grid;gap:4px}
-.tile .name{color:var(--muted);font-size:13px}
-.tile .big{font-size:26px;font-weight:700;line-height:1.2}
-.tile .of{font-size:15px;font-weight:400;color:var(--muted)}
-.tile .state{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600}
-.tile .state i{width:9px;height:9px;border-radius:50%;background:currentColor}
-.tile .hint{color:var(--muted);font-size:13px}
-.good{color:var(--green)}.mid{color:var(--amber)}.bad{color:var(--red)}
-.list{display:grid}
-.item{padding:16px 18px;border-top:1px solid var(--line);display:grid;gap:8px}
-.item:first-child{border-top:0}
-.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
-.title{font-weight:650;font-size:16px}
-.pos{display:inline-grid;place-items:center;min-width:26px;height:26px;border-radius:8px;background:var(--blue-bg);color:var(--blue);font-weight:700;font-size:13px;margin-right:8px}
-.cmd{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.meta{color:var(--muted);font-size:13px;display:flex;gap:14px;flex-wrap:wrap}
-.time{font-weight:600;color:var(--text)}.time.warn{color:var(--amber)}.time.bad{color:var(--red)}
-.track{height:6px;border-radius:3px;background:var(--track);overflow:hidden}
-.fill{height:100%;background:var(--blue);border-radius:3px}.fill.warn{background:var(--amber)}.fill.bad{background:var(--red)}
-.why{font-size:14px;color:var(--amber);background:var(--amber-bg);border-radius:8px;padding:6px 10px;width:fit-content;max-width:100%}
-.empty{padding:26px 18px;color:var(--faint);text-align:center}
+.brand{font:700 16px var(--mono);letter-spacing:.04em}
+.tools{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.live{display:inline-flex;align-items:center;gap:8px;font:12px var(--mono);color:var(--muted)}
+.live i{width:8px;height:8px;background:var(--faint)}
+.live.fresh i{background:var(--accent);animation:beat 2s ease-in-out infinite}.live.old i{background:var(--warn)}
+@keyframes beat{50%{opacity:.35}}
+.seg2{display:inline-flex;border:1px solid var(--line)}
+button{font:inherit}
+.seg2 button{font:12px var(--mono);min-height:28px;padding:0 10px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.seg2 button+button{border-left:1px solid var(--line)}
+.seg2 button:hover{color:var(--text)}.seg2 button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.notice{display:none;padding:8px 12px;border-left:3px solid var(--warn);color:var(--warn);font-size:14px}
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr) minmax(0,1.15fr);gap:20px;padding-top:10px}
+.left{display:grid;grid-template-rows:auto minmax(0,1fr);gap:20px;min-height:0}
+.mid{display:grid;grid-template-rows:fit-content(60%) minmax(120px,1fr);gap:20px;min-height:0}
+.p-stats-panel .hide{display:none}.t-stats{display:none}
+.panel{position:relative;border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.panel>h2,.panel>.tabs{position:absolute;top:-10px;left:10px;margin:0;padding:0 6px;background:var(--bg);height:20px;font:600 12px/20px var(--mono);color:var(--muted);max-width:calc(100% - 20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel>.tabs{display:flex;gap:2px;padding:0 4px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:600 12px/20px var(--mono);padding:0 6px;cursor:pointer}
+.tabs button:focus-visible{outline-offset:-2px}
+.tabs button:hover{color:var(--text)}.tabs button[aria-selected="true"]{color:var(--text);box-shadow:inset 0 -1px 0 var(--text)}
+.body{flex:1;min-height:0;overflow:auto;padding:16px 12px 8px}
+.m{margin-bottom:16px}.m:last-child{margin-bottom:4px}
+.m .row{display:flex;justify-content:space-between;align-items:baseline;font:12px var(--mono);color:var(--muted)}
+.m .val{font:600 20px/1.2 var(--mono);color:var(--text)}.m .val small{font-size:12px;font-weight:400;color:var(--muted)}
+.m .val.bad{color:var(--bad)}
+.meter{display:block;height:10px;margin:6px 0 4px;background:repeating-linear-gradient(90deg,var(--track) 0 5px,transparent 5px 7px)}
+.meter i{display:block;height:100%;width:0;background:repeating-linear-gradient(90deg,var(--c,var(--accent)) 0 5px,transparent 5px 7px)}
+.meter.bad{--c:var(--bad)}
+.m .note{font-size:12px;color:var(--muted);line-height:1.4}
+.spark{display:block;width:100%;height:28px;margin-top:6px;color:var(--text)}
+.spark .ref{stroke:var(--faint);stroke-dasharray:3 3}.spark .ln{stroke:currentColor}
+.glyph{width:10px;height:10px;display:inline-block;flex:none}
+.g-run{background:var(--accent)}.g-ok{border:1.5px solid var(--faint)}.g-fail{background:var(--bad)}
+.g-open{border:1.5px solid var(--accent)}
+.g-lock{border:1px solid var(--faint);background:repeating-linear-gradient(135deg,var(--faint) 0 1px,transparent 1px 4px)}
+.lane{padding:10px 0;border-bottom:1px solid var(--line)}.lane:last-child{border-bottom:0}
+.head{display:grid;grid-template-columns:12px auto minmax(0,1fr) auto;gap:4px 8px;align-items:center}
+.no{font:12px var(--mono);color:var(--muted)}
+.title{font-weight:650;min-width:0;overflow-wrap:anywhere}
+.run summary .title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.time{font:12px var(--mono);color:var(--text);white-space:nowrap}.time.warn{color:var(--warn)}.time.bad{color:var(--bad)}
+.bar{height:4px;background:var(--track);margin:8px 0 6px;overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:var(--accent);transform-origin:left;transform:scaleX(0);transition:transform 1s linear}
+.bar.warn i{background:var(--warn)}.bar.bad i{background:var(--bad)}
+.meta{font-size:12px;color:var(--muted)}
+.cmd{font:12px/1.4 var(--mono);color:var(--muted);min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+button.cmd{display:-webkit-box;background:none;border:0;padding:0;text-align:left;cursor:pointer;width:100%}
+button.cmd:hover{color:var(--text)}
+.cmd.open{display:block;-webkit-line-clamp:unset;max-height:12em;overflow:auto}
+.lane.open .title,.lane.lock .title{font-weight:400;color:var(--muted)}
+.lane.lock{background:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--faint) 14%,transparent) 6px 7px)}
+.why{margin-top:2px;font-size:12px;color:var(--muted)}.why.warn{color:var(--warn)}
+ol{margin:0;padding:0;list-style:none}
+.q{display:grid;grid-template-columns:20px minmax(0,1fr);gap:0 8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.qn{font:600 14px/1.4 var(--mono);color:var(--muted)}
+.qt{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.empty{padding:12px 0;color:var(--muted);font-size:14px}
+.tools2{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.chip{white-space:nowrap;border:1px solid var(--line);background:transparent;color:var(--muted);font:12px var(--mono);min-height:24px;padding:0 8px;cursor:pointer}
+.chip:hover{color:var(--text)}.chip[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+details.run{border-bottom:1px solid var(--line)}
+.run summary{display:grid;grid-template-columns:12px 88px minmax(0,1fr) auto;gap:8px;align-items:center;min-height:30px;padding:4px 0;cursor:pointer;list-style:none;color:var(--text)}
+.run summary::-webkit-details-marker{display:none}.run summary:hover{background:color-mix(in srgb,var(--faint) 10%,transparent)}
+.run .tm,.run .dur{font:12px var(--mono);color:var(--muted);white-space:nowrap}.run .dur.bad{color:var(--bad)}
+details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.run .cmd{margin-left:20px;display:block;-webkit-line-clamp:unset;max-height:8em;overflow:auto}
+.only-fail details.run:not(.fail){display:none}
+.empty-fail{display:none}.only-fail:not(:has(.fail)) .empty-fail{display:block}
+.out{margin:4px 0 12px 20px;padding:8px 10px;background:var(--bg);font:12px/1.5 var(--mono);max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);border:1px solid var(--line)}
 table{width:100%;border-collapse:collapse}
-th{padding:10px 18px;text-align:left;font-size:13px;color:var(--muted);font-weight:600;background:var(--soft);border-bottom:1px solid var(--line)}
-td{padding:12px 18px;border-top:1px solid var(--line);vertical-align:top}tr:first-child td{border-top:0}
-.n{text-align:right;white-space:nowrap}
-details{padding:4px 18px}summary{cursor:pointer;padding:14px 0;font-weight:650}
-dl{margin:0 0 14px;display:grid;gap:10px}dt{font-weight:650}dd{margin:0;color:var(--muted);font-size:14px}
-@media (max-width:620px){.wrap{padding:18px 12px 40px}.banner{padding:18px}.banner h1{font-size:19px}th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}}
+th{padding:6px 0;text-align:left;font:12px var(--mono);color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.r{text-align:right;white-space:nowrap;padding-left:12px}td.r{font:12px var(--mono)}
+td:first-child{width:100%;max-width:0}td .title{display:block}
+[role="tabpanel"][hidden]{display:none}
+dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;color:var(--muted);font-size:14px}
+@media (pointer:coarse){.run summary{min-height:44px}.tabs button,.seg2 button,.chip{min-height:44px}}
+@media (prefers-reduced-motion:reduce){.live.fresh i{animation:none}.bar i{transition:none}}
+@media (max-width:1099px){
+  .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .left{display:contents}.p-stats-panel{display:none}.t-stats{display:inline-block}
+  .p-machine{grid-column:1/-1}.p-machine .body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.p-machine .m{margin:0}
+}
+@media (max-width:899px){
+  .app{display:block;height:auto}.top{margin-bottom:12px}
+  .grid{display:block;padding-top:10px}.left,.mid{display:block}.panel{margin-bottom:24px}
+  .body{overflow:visible}.p-info .body{max-height:70dvh;overflow:auto}
+  .p-machine .body{grid-template-columns:1fr}
+  .panel>.tabs{position:static;height:auto;max-width:none;overflow:visible;padding:0;background:transparent;border-bottom:1px solid var(--line);flex-wrap:wrap}
+}
+@media (max-width:560px){
+  .app{padding:12px 16px 16px}.seg2 button{min-height:44px;padding:0 14px}.tabs button{min-height:44px}.chip{min-height:44px}
+  .head{grid-template-columns:12px minmax(0,1fr)}.head .no{display:none}.head .time{grid-column:2;white-space:normal}
+  .qt{flex-wrap:wrap}
+  .run summary{grid-template-columns:12px minmax(0,1fr) auto;min-height:44px}.run .tm{display:none}
+  .r.hide{display:none}td:first-child{max-width:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="app">
   <div class="top">
-    <div class="brand">jobq<small>Theo dõi các lệnh nặng của máy</small></div>
+    <div class="brand">jobq</div>
     <div class="tools">
-      <span id="live" class="live" role="status"><span class="dot"></span><span id="fresh">Đang tải dữ liệu</span></span>
-      <div class="seg" role="group" aria-label="Giao diện"><button type="button" data-theme="auto">Tự động</button><button type="button" data-theme="light">Sáng</button><button type="button" data-theme="dark">Tối</button></div>
+      <span id="live" class="live"><i></i><span id="fresh">Đang tải dữ liệu</span></span>
+      <div class="seg2" role="group" aria-label="Giao diện"><button type="button" data-theme="auto">tự động</button><button type="button" data-theme="light">sáng</button><button type="button" data-theme="dark">tối</button></div>
     </div>
   </div>
   <div id="stale" class="notice" role="alert">Trang chưa nhận được dữ liệu mới. Nếu các lệnh vẫn đang chạy thì có thể jobq đã dừng đột ngột.</div>
-  <section id="banner" class="banner busy" role="status"><h1>Đang tải…</h1></section>
-  <section>
-    <h2>Tình trạng máy</h2><p class="lead">jobq chỉ cho thêm lệnh chạy khi cả ba mục dưới đây đều ổn.</p>
-    <div class="tiles" id="tiles"></div>
-  </section>
-  <section class="card"><div class="item"><h2>Đang chạy</h2><p class="lead flush">Những lệnh đã được cho phép chạy.</p></div><div class="list" id="running"></div></section>
-  <section class="card"><div class="item"><h2>Đang chờ tới lượt</h2><p class="lead flush">Những lệnh đã gửi nhưng chưa được chạy, kèm lý do.</p></div><div class="list" id="waiting"></div></section>
-  <section class="card"><div class="item"><h2>Những lệnh tốn tài nguyên nhất</h2><p class="lead flush">Số đo từ các lần chạy trước. jobq dựa vào đây để biết còn chỗ cho lệnh khác hay không.</p></div><div id="stats"></div></section>
-  <section class="card"><details><summary>Giải thích các từ trong trang này</summary><dl>
-    <dt>Lệnh nặng</dt><dd>Các lệnh tốn nhiều CPU hoặc RAM như chạy test, kiểm tra kiểu, build, xử lý ảnh. Claude gửi chúng vào hàng đợi thay vì chạy cùng lúc để máy không bị đơ.</dd>
-    <dt>Nhân CPU</dt><dd>Máy có 8 nhân. Một lệnh dùng "1,5 nhân" nghĩa là nó chiếm khoảng một rưỡi trên tổng 8 nhân đó.</dd>
-    <dt>Tải CPU</dt><dd>Số tiến trình trung bình đang cần CPU. Tải càng gần hoặc vượt số nhân thì máy càng chậm.</dd>
-    <dt>Áp lực bộ nhớ</dt><dd>Mức macOS đánh giá về việc thiếu RAM. Bình thường thì ổn; cảnh báo hoặc nguy cấp nghĩa là máy đang phải nén hoặc đẩy dữ liệu ra ổ đĩa nên rất chậm.</dd>
-    <dt>Mức cho phép</dt><dd>Số lệnh tối đa được chạy cùng lúc. jobq tự giảm mức này khi máy bận và tăng lại khi máy rảnh.</dd>
-    <dt>Vì sao chỉ chạy một lệnh?</dt><dd>Thường do máy đang bận (tải CPU cao hoặc thiếu RAM) nên jobq giảm mức cho phép xuống còn 1 lệnh. Lệnh đầu tiên luôn được chạy để hàng đợi không bị kẹt.</dd>
-  </dl></details></section>
+  <div class="grid">
+    <div class="left">
+      <section class="panel p-machine" aria-labelledby="h-machine"><h2 id="h-machine">máy</h2><div class="body" id="readouts"></div></section>
+      <section class="panel p-stats-panel" aria-labelledby="h-stats"><h2 id="h-stats">tốn máy</h2><div class="body" id="history"></div></section>
+    </div>
+    <div class="mid">
+      <section class="panel" aria-labelledby="h-lanes"><h2 id="h-lanes">chỗ chạy</h2><div class="body" id="lanes"></div></section>
+      <section class="panel" aria-labelledby="h-queue"><h2 id="h-queue">đang chờ</h2><div class="body"><ol id="queue"></ol></div></section>
+    </div>
+    <section class="panel p-info" aria-label="Thông tin thêm">
+      <div class="tabs" role="tablist" aria-label="Thông tin thêm">
+        <button type="button" role="tab" id="t-runs" aria-controls="p-runs" aria-selected="true">lịch sử</button>
+        <button type="button" role="tab" id="t-stats" class="t-stats" aria-controls="p-stats" aria-selected="false">tốn máy</button>
+        <button type="button" role="tab" id="t-help" aria-controls="p-help" aria-selected="false">giải thích</button>
+      </div>
+      <div class="body">
+        <div id="p-runs" role="tabpanel" aria-labelledby="t-runs" tabindex="0">
+          <div class="tools2"><span>50 lệnh gần nhất. Bấm vào một dòng để xem kết quả in ra.</span><button type="button" class="chip" id="onlyFail" aria-pressed="false">chỉ lệnh lỗi</button></div>
+          <div id="runs"></div>
+        </div>
+        <div id="p-stats" role="tabpanel" aria-labelledby="t-stats" tabindex="0" hidden><div class="tools2"><span>Số đo từ các lần chạy trước, dùng để biết còn chỗ cho lệnh khác hay không.</span></div><div id="history2"></div></div>
+        <div id="p-help" role="tabpanel" aria-labelledby="t-help" tabindex="0" hidden><dl>
+          <dt>Lệnh nặng</dt><dd>Lệnh tốn nhiều CPU hoặc RAM như chạy test, kiểm tra kiểu, build, xử lý ảnh. Claude gửi chúng vào hàng đợi để máy không bị đơ.</dd>
+          <dt>Chỗ chạy</dt><dd>Số lệnh được chạy cùng một lúc. Khi máy bận, jobq tự giảm số chỗ rồi tăng lại khi máy rảnh.</dd>
+          <dt>CPU</dt><dd>Số tiến trình trung bình đang cần bộ xử lý. Càng gần hoặc vượt mức tối đa ghi bên cạnh thì máy càng chậm.</dd>
+          <dt>Nhân</dt><dd>Một lệnh dùng "1,5 nhân" nghĩa là nó chiếm khoảng một rưỡi trong tổng số nhân của máy.</dd>
+          <dt>Áp lực RAM</dt><dd>Khi "đang căng", macOS đánh giá máy sắp hết RAM, phải đẩy dữ liệu ra ổ đĩa nên rất chậm. Lúc này jobq ngừng nhận lệnh mới.</dd>
+        </dl></div>
+      </div>
+    </section>
+  </div>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const svg = (tag, attrs) => { const e = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
 const fmtTime = (s) => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60); return m >= 60 ? Math.floor(m / 60) + " giờ " + (m % 60) + " phút" : m > 0 ? m + " phút" + (s % 60 ? " " + (s % 60) + " giây" : "") : s + " giây"; };
 const fmtMem = (mb) => mb >= 1024 ? (mb / 1024).toFixed(1).replace(".", ",") + "GB" : Math.round(mb) + "MB";
 const fmtCpu = (c) => (c / 100).toFixed(1).replace(".", ",");
-// Chuỗi lệnh luôn đi qua textContent nên ký tự đặc biệt trong lệnh không bị hiểu thành HTML.
+const fmtNum = (n) => String(n).replace(".", ",");
+const fmtStamp = (sec) => { const t = new Date(sec * 1000), now = new Date(); return t.toDateString() === now.toDateString() ? t.toLocaleTimeString("vi-VN") : t.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }) + " " + t.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }); };
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Mọi chuỗi từ lệnh đi qua textContent nên ký tự đặc biệt trong lệnh không bị hiểu thành HTML.
 function niceTitle(cmd) {
   const t = (cmd || "").trim().split(/\s+/); let scope = ""; const rest = [];
   if (/^(sh|bash|zsh)$/.test(t[0]) && t[1] === "-c") t.splice(0, 2); // lệnh bọc trong sh -c: lấy tên lệnh thật bên trong
+  if (t[0] === "cd" && t[2] === "&&") { scope = t[1]; t.splice(0, 3); } // "cd thư-mục && lệnh": lấy thư mục làm phạm vi
   for (let i = 0; i < t.length; i++) {
     if ((t[i] === "--filter" || t[i] === "-F") && t[i + 1]) { scope = t[++i]; continue; }
     if (/^(pnpm|npm|yarn|bun|npx|bunx|exec|run|dlx|-r|--recursive)$/.test(t[i]) && !rest.length) continue;
     rest.push(t[i]);
   }
-  const head = rest.slice(0, 2).join(" ") || cmd || "(không đọc được lệnh)";
+  // bash/node/python + đường dẫn tệp: tên tệp mới là thứ phân biệt các lệnh, đường dẫn thường dài và giống nhau
+  if (/^(bash|sh|zsh|node|bun|python3?|tsx)$/.test(rest[0]) && rest[1] && rest[1].includes("/")) rest.splice(0, 2, rest[1].split("/").pop());
+  const cut = []; // dừng ở chữ có dấu nháy, $ hoặc toán tử nối lệnh để tên không bị cắt giữa chừng
+  for (const x of rest) { if (/["'`$]/.test(x) || x === "&&" || x === "|" || x === ";") break; cut.push(x.replace(/;$/, "")); if (x.endsWith(";") || cut.length === 2) break; }
+  let head = cut.join(" ") || rest[0] || cmd || "(không đọc được lệnh)";
+  if (head.length > 70) head = head.slice(0, 70) + "…"; // tên chỉ để nhận ra lệnh; lệnh đầy đủ nằm ngay bên dưới
   return scope ? scope + " · " + head : head;
 }
 function derive(d) {
   const waiting = [...d.waiting].sort((a, b) => a.queued - b.queued);
   const used = d.running.reduce((a, j) => ({ cpu: a.cpu + j.cpu, mem: a.mem + j.mem }), { cpu: 0, mem: 0 });
-  const allow = Math.max(1, Math.round(d.jobs * d.scale / 100));
-  return { waiting, used, allow, eCpu: d.cpu * d.scale / 100, eMem: d.mem * d.scale / 100,
-    cpuHigh: d.load >= d.maxLoad, ramLow: d.freeMb < d.minFreeMb, pressure: d.pressure >= d.maxPressure };
-}
-function machineProblem(p) {
-  if (p.pressure) return "Máy đang thiếu RAM nên jobq tạm không nhận thêm lệnh.";
-  if (p.cpuHigh) return "CPU của máy đang bận nên jobq tạm không nhận thêm lệnh.";
-  if (p.ramLow) return "RAM trống còn ít nên jobq tạm không nhận thêm lệnh.";
-  return "";
+  const allow = d.jobs;
+  const cause = d.pressure >= d.maxPressure ? "máy đang thiếu RAM" : d.load >= d.maxLoad ? "CPU của máy đang bận" : d.freeMb < d.minFreeMb ? "RAM trống còn ít" : "";
+  return { waiting, used, allow, cause, eCpu: d.cpu, eMem: d.mem };
 }
 function waitReason(job, idx, d, p) {
-  if (idx > 0) return "Đang xếp sau " + idx + " lệnh khác.";
-  if (d.running.length >= p.allow) return "Đang có " + d.running.length + " lệnh chạy, mức cho phép hiện là " + p.allow + " lệnh cùng lúc.";
-  if (p.used.cpu + job.cpu > p.eCpu) return "Lệnh này cần khoảng " + fmtCpu(job.cpu) + " nhân CPU nhưng chỉ còn " + fmtCpu(Math.max(0, p.eCpu - p.used.cpu)) + " nhân trống.";
-  if (p.used.mem + job.mem > p.eMem) return "Lệnh này cần khoảng " + fmtMem(job.mem) + " RAM nhưng chỉ còn " + fmtMem(Math.max(0, p.eMem - p.used.mem)) + " trống trong mức cho phép.";
-  return machineProblem(p) || "Sắp tới lượt, đang kiểm tra lại mỗi giây.";
+  if (idx > 0) return { text: "Xếp sau " + idx + " lệnh khác.", breach: false };
+  if (d.running.length >= p.allow) return { text: "Đang có " + d.running.length + " lệnh chạy, đã đủ " + p.allow + " lệnh được phép chạy cùng lúc.", breach: false };
+  if (p.used.cpu + job.cpu > p.eCpu) return { text: "Cần khoảng " + fmtCpu(job.cpu) + " nhân CPU nhưng chỉ còn " + fmtCpu(Math.max(0, p.eCpu - p.used.cpu)) + " nhân trống.", breach: false };
+  if (p.used.mem + job.mem > p.eMem) return { text: "Cần khoảng " + fmtMem(job.mem) + " RAM nhưng chỉ còn " + fmtMem(Math.max(0, p.eMem - p.used.mem)) + " trống.", breach: false };
+  if (p.cause) return { text: "Chờ vì " + p.cause + ".", breach: true };
+  return { text: "Sắp tới lượt.", breach: false };
 }
-function renderBanner(d, p) {
-  const b = $("banner"); b.replaceChildren();
-  const busyMachine = p.cpuHigh || p.ramLow || p.pressure;
-  let cls, title;
-  if (!d.running.length && !d.waiting.length) { cls = "ok"; title = "Máy đang rảnh, lệnh mới sẽ chạy ngay"; }
-  else if (d.waiting.length) { cls = busyMachine ? "warn" : "busy"; title = "Đang chạy " + d.running.length + " lệnh, " + d.waiting.length + " lệnh đang xếp hàng chờ"; }
-  else { cls = busyMachine ? "warn" : "busy"; title = "Đang chạy " + d.running.length + " lệnh"; }
-  b.className = "banner " + cls; b.append(el("h1", "", title));
-  const prob = machineProblem(p);
-  if (prob) b.append(el("p", "", prob));
-  else if (d.waiting.length) b.append(el("p", "", "Các lệnh chờ sẽ tự chạy khi có chỗ trống."));
-  b.append(el("p", "sub", "Mức cho phép hiện tại: tối đa " + p.allow + " lệnh chạy cùng lúc" + (d.scale < 100 ? ", đã tự giảm vì máy đang bận." : ".")));
+const loads = []; let lastTs = 0;
+function spark(max) {
+  const w = 240, h = 28, s = svg("svg", { class: "spark", viewBox: "0 0 " + w + " " + h, preserveAspectRatio: "none", "aria-hidden": "true" });
+  const top = Math.max(max * 1.25, ...loads, 1), y = (v) => h - 2 - (Math.min(v, top) / top) * (h - 4);
+  s.append(svg("line", { class: "ref", x1: 0, x2: w, y1: y(max), y2: y(max), "stroke-width": 1, "vector-effect": "non-scaling-stroke" }));
+  if (loads.length > 1) s.append(svg("polyline", { class: "ln", fill: "none", "stroke-width": 1.5, "vector-effect": "non-scaling-stroke", points: loads.map((v, i) => ((i / (loads.length - 1)) * w).toFixed(1) + "," + y(v).toFixed(1)).join(" ") }));
+  return s;
 }
-function tile(name, big, of, stateText, cls, hint) {
-  const t = el("div", "card tile"), s = el("div", "state " + cls), b = el("div", "big", big);
-  if (of) b.append(el("span", "of", " " + of));
-  s.append(el("i"), el("span", "", stateText));
-  t.append(el("div", "name", name), b, s, el("div", "hint", hint)); return t;
+// Thanh đo khối: các ô vuông nhỏ lấp từ trái sang; màu chỉ đổi khi vượt ngưỡng.
+function meter(label, big, unit, pct, cls, note, aria) {
+  const m = el("div", "m"), row = el("div", "row"), v = el("div", "val" + (cls ? " " + cls : ""), big);
+  if (unit) v.append(el("small", "", " " + unit));
+  row.append(el("span", "", label)); m.append(row, v);
+  const bar = el("span", "meter" + (cls ? " " + cls : "")), fill = el("i"); fill.style.width = Math.max(0, Math.min(100, pct)) + "%"; bar.append(fill);
+  bar.setAttribute("role", "img"); bar.setAttribute("aria-label", aria + " " + Math.round(Math.max(0, Math.min(100, pct))) + "%");
+  if (pct !== null) m.append(bar); if (note) m.append(el("div", "note", note)); return m;
 }
-function renderTiles(d, p) {
-  const cpuCls = p.cpuHigh ? "bad" : d.load >= d.maxLoad * 0.75 ? "mid" : "good";
-  const ramCls = p.ramLow ? "bad" : d.freeMb < d.minFreeMb * 2 ? "mid" : "good";
-  $("tiles").replaceChildren(
-    tile("CPU của máy", String(d.load).replace(".", ","), "trên " + d.maxLoad, cpuCls === "good" ? "Còn rảnh" : cpuCls === "mid" ? "Khá bận" : "Quá bận", cpuCls, "Mức tối đa cho phép là " + d.maxLoad + ". Cao hơn thì lệnh mới phải chờ."),
-    tile("RAM còn trống", fmtMem(d.freeMb), "", ramCls === "good" ? "Đủ dùng" : ramCls === "mid" ? "Hơi ít" : "Quá ít", ramCls, "Cần ít nhất " + fmtMem(d.minFreeMb) + " để chạy thêm lệnh."),
-    tile("Áp lực bộ nhớ", p.pressure ? "Cao" : "Bình thường", "", p.pressure ? "Máy đang chậm vì thiếu RAM" : "Ổn", p.pressure ? "bad" : "good", "Do macOS đánh giá. Cao nghĩa là máy đang phải đẩy dữ liệu ra ổ đĩa."));
+function renderMachine(d, p) {
+  const cpuPct = (d.load / d.maxLoad) * 100, cpuCls = cpuPct >= 100 ? "bad" : "";
+  const cpu = meter("CPU", fmtNum(Number(d.load).toFixed(1)), "trên " + d.maxLoad, cpuPct, cpuCls, cpuCls === "bad" ? "Quá bận, lệnh mới phải chờ." : cpuPct >= 75 ? "Khá bận." : "Còn rảnh.", "CPU so với mức tối đa");
+  cpu.append(spark(d.maxLoad));
+  const total = d.totalMb || 0, usedPct = total ? ((total - d.freeMb) / total) * 100 : 0, ramCls = d.freeMb < d.minFreeMb ? "bad" : "";
+  const ram = meter("RAM", fmtMem(d.freeMb), "còn trống" + (total ? " / " + fmtMem(total) : ""), total ? usedPct : null, ramCls, "Cần ít nhất " + fmtMem(d.minFreeMb) + " trống mới nhận thêm lệnh.", "RAM đã dùng");
+  const levels = { 1: 1, 2: 2, 4: 3 }, press = d.pressure >= d.maxPressure, lvl = levels[d.pressure] || 1;
+  const pr = meter("Áp lực RAM", press ? "Đang căng" : d.pressure >= 2 ? "Hơi căng" : "Bình thường", "", (lvl / 3) * 100, press ? "bad" : "", press ? "macOS đang phải đẩy dữ liệu ra ổ đĩa nên máy chậm." : "Máy chưa bị thiếu RAM đến mức phải chặn lệnh.", "Áp lực RAM mức");
+  $("readouts").replaceChildren(cpu, ram, pr);
 }
-function jobItem(j, kind, idx, d, p) {
-  const it = el("div", "item"), r1 = el("div", "row"), tt = el("div", "title");
-  if (kind === "wait") tt.append(el("span", "pos", String(idx + 1)));
-  tt.append(document.createTextNode(niceTitle(j.cmd)));
-  const t = el("span", "time"); t.dataset.since = j[kind === "run" ? "started" : "queued"]; t.dataset.kind = kind; t.dataset.timeout = kind === "run" ? d.timeout : 0;
-  r1.append(tt, t); it.append(r1);
-  if (kind === "run") { const tr = el("div", "track"), f = el("div", "fill"); tr.dataset.since = j.started; tr.dataset.timeout = d.timeout; tr.setAttribute("role", "progressbar"); tr.setAttribute("aria-label", "Thời gian đã dùng so với giới hạn"); tr.setAttribute("aria-valuemin", "0"); tr.setAttribute("aria-valuemax", "100"); tr.append(f); it.append(tr); }
-  else it.append(el("div", "why", waitReason(j, idx, d, p)));
-  const cmd = el("div", "cmd", j.cmd || ""); cmd.title = j.cmd || "";
-  it.append(cmd, el("div", "meta", "Dự kiến dùng khoảng " + fmtCpu(j.cpu) + " nhân CPU và " + fmtMem(j.mem) + " RAM"));
-  return it;
+// Lệnh dài tự thu gọn 3 dòng; bấm vào để mở hết (nút thật nên dùng được bằng bàn phím). plain = luôn hiện đủ, dùng trong dòng lịch sử đã mở.
+function cmdLine(cmd, plain) {
+  if (plain || !cmd || cmd.length <= 90) return el("div", "cmd", cmd || "");
+  const c = el("button", "cmd", cmd); c.type = "button"; c.title = "Bấm để xem hết lệnh"; c.setAttribute("aria-expanded", "false");
+  c.addEventListener("click", () => { const on = c.classList.toggle("open"); c.setAttribute("aria-expanded", String(on)); });
+  return c;
 }
-function renderList(box, items, empty) { box.replaceChildren(); if (!items.length) box.append(el("div", "empty", empty)); else items.forEach((i) => box.append(i)); }
-function renderStats(d) {
-  const box = $("stats"); box.replaceChildren();
+function timeSpan(since, kind, timeout) { const t = el("span", "time"); t.dataset.since = since; t.dataset.kind = kind; t.dataset.timeout = timeout; return t; }
+function laneRun(j, i, d) {
+  const l = el("div", "lane run"), h = el("div", "head");
+  h.append(el("span", "glyph g-run"), el("span", "no", "#" + (i + 1)), el("span", "title", niceTitle(j.cmd)), timeSpan(j.started, "run", d.timeout));
+  const b = el("div", "bar"); b.dataset.since = j.started; b.dataset.timeout = d.timeout; b.append(el("i"));
+  const m = el("div", "meta"); m.append(el("span", "", "Dùng khoảng " + fmtCpu(j.cpu) + " nhân CPU và " + fmtMem(j.mem) + " RAM · tối đa " + fmtTime(d.timeout)));
+  l.append(h, b, m, cmdLine(j.cmd)); return l;
+}
+function laneEmpty(label, kind, title, why, warn) {
+  const l = el("div", "lane " + kind), h = el("div", "head");
+  h.append(el("span", "glyph " + (kind === "open" ? "g-open" : "g-lock")), el("span", "no", label), el("span", "title", title));
+  l.append(h); if (why) l.append(el("div", "why" + (warn ? " warn" : ""), why));
+  return l;
+}
+// Chỗ trống chỉ được gọi là "sẵn sàng" khi không có lệnh nào đang chờ; nếu có lệnh chờ mà chỗ vẫn trống thì phải nói lý do jobq đang giữ lại.
+function renderLanes(d, p) {
+  const box = $("lanes"); box.replaceChildren();
+  const total = Math.max(d.jobs, d.running.length), head = p.waiting[0], groups = [];
+  $("h-lanes").textContent = "chỗ chạy " + d.running.length + "/" + p.allow;
+  for (let i = 0; i < d.running.length; i++) box.append(laneRun(d.running[i], i, d));
+  // Các chỗ trống cùng trạng thái gộp thành một dòng để không lặp lại cùng một câu.
+  for (let i = d.running.length; i < total; i++) {
+    let kind, title, why = "", warn = false;
+    if (head) { const r = waitReason(head, 0, d, p); kind = "lock"; title = "còn trống nhưng lệnh đang chờ chưa vào được"; why = r.text; warn = r.breach; }
+    else { kind = "open"; title = "trống, sẵn sàng nhận lệnh"; }
+    const g = groups[groups.length - 1];
+    if (g && g.title === title && g.why === why) g.to = i; else groups.push({ kind, title, why, warn, from: i, to: i });
+  }
+  for (const g of groups) {
+    const n = g.to - g.from + 1, label = n === 1 ? "#" + (g.from + 1) : "#" + (g.from + 1) + "–" + (g.to + 1);
+    box.append(laneEmpty(label, g.kind, (n > 1 ? n + " chỗ " : "Chỗ ") + g.title, g.why, g.warn));
+  }
+}
+const openRuns = new Set(), logCache = new Map(); let runsSig = "";
+function loadLog(id, pre) {
+  if (!/^[\w.-]+$/.test(id) || pre.dataset.loading === "1") return;
+  if (logCache.has(id)) { pre.textContent = logCache.get(id) || "(lệnh không in ra gì)"; return; }
+  pre.textContent = "Đang nạp kết quả in ra…"; pre.dataset.loading = "1";
+  const s = document.createElement("script"); s.src = "../runs/" + id + ".js?t=" + Date.now();
+  s.onload = () => { const v = window.JOBQ_LOGS && window.JOBQ_LOGS[id]; if (typeof v === "string") { logCache.set(id, v); pre.textContent = v || "(lệnh không in ra gì)"; } else pre.textContent = "Không đọc được kết quả in ra."; pre.dataset.loading = ""; s.remove(); };
+  s.onerror = () => { pre.textContent = "Chưa có kết quả in ra: lệnh còn đang chạy hoặc đã bị dọn. Trong terminal có thể xem bằng: jobq logs"; pre.dataset.loading = ""; s.remove(); };
+  document.body.append(s);
+}
+// Chỉ dựng lại danh sách khi có lệnh mới hoặc đổi trạng thái, để không làm mất chỗ đang cuộn và các dòng đang mở.
+function renderRuns(d) {
+  const sig = d.history.map((r) => r.id + ":" + r.rc).join(",");
+  if (sig === runsSig) return; runsSig = sig;
+  const box = $("runs"); box.replaceChildren();
+  if (!d.history.length) { box.append(el("div", "empty", "Chưa có lệnh nào. Chạy một lệnh qua jobq là có lịch sử.")); return; }
+  for (const r of d.history) {
+    const fail = r.rc != null && r.rc !== 0, det = el("details", "run" + (fail ? " fail" : "")), sum = el("summary");
+    const gl = el("span", "glyph " + (r.rc == null ? "g-run" : fail ? "g-fail" : "g-ok"));
+    const dur = el("span", "dur" + (fail ? " bad" : ""), r.rc == null ? "đang chạy" : (fail ? (r.rc === 124 ? "quá hạn, chia nhỏ lệnh · " : "lỗi " + r.rc + " · ") : "") + fmtTime(r.secs));
+    sum.append(gl, el("span", "tm", fmtStamp(r.start)), el("span", "title", niceTitle(r.cmd)), dur);
+    const info = el("div", "info", "Thư mục: " + r.cwd), cmd = cmdLine(r.cmd, true), pre = el("pre", "out");
+    det.append(sum, info, cmd, pre); det.dataset.id = r.id;
+    det.addEventListener("toggle", () => { if (det.open) { openRuns.add(r.id); loadLog(r.id, pre); } else openRuns.delete(r.id); });
+    if (openRuns.has(r.id)) { det.open = true; loadLog(r.id, pre); }
+    box.append(det);
+  }
+  box.append(el("div", "empty empty-fail", "Không có lệnh lỗi trong 50 lệnh gần nhất."));
+}
+let rendered = false;
+function renderQueue(d, p) {
+  const box = $("queue"), prev = new Map();
+  $("h-queue").textContent = "đang chờ " + p.waiting.length;
+  box.querySelectorAll("[data-pid]").forEach((n) => prev.set(n.dataset.pid, n.getBoundingClientRect().top));
+  box.replaceChildren();
+  if (!p.waiting.length) { const e = el("li", "empty", "Không có lệnh nào đang chờ."); box.append(e); return; }
+  p.waiting.forEach((j, i) => {
+    const li = el("li", "q"), r = waitReason(j, i, d, p), body = el("div"), top = el("div", "qt");
+    li.dataset.pid = j.pid; top.append(el("span", "title", niceTitle(j.cmd)), timeSpan(j.queued, "wait", 0));
+    body.append(top, el("div", "why" + (r.breach ? " warn" : ""), r.text), cmdLine(j.cmd));
+    li.append(el("span", "qn", String(i + 1)), body); box.append(li);
+  });
+  if (!rendered || reduceMotion()) return;
+  // Dòng cũ trượt về vị trí mới, dòng mới mờ vào; chỉ dùng transform và opacity.
+  box.querySelectorAll("[data-pid]").forEach((n) => {
+    const old = prev.get(n.dataset.pid);
+    if (old === undefined) n.animate([{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], { duration: 250, easing: "ease-out" });
+    else { const dy = old - n.getBoundingClientRect().top; if (Math.abs(dy) > 1) n.animate([{ transform: "translateY(" + dy + "px)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(0,0,0.32,1)" }); }
+  });
+}
+function renderHistory(d, box) {
+  box.replaceChildren();
   if (!d.stats.length) { box.append(el("div", "empty", "Chưa có lịch sử. Chạy vài lệnh qua jobq là có số liệu.")); return; }
   const tbl = el("table"), head = el("tr");
-  [["Lệnh", ""], ["Đã chạy", "n"], ["Thường mất", "n"], ["RAM nhiều nhất", "n"], ["CPU nhiều nhất", "n"]].forEach(([h, c]) => head.append(el("th", c, h)));
+  [["Lệnh", ""], ["Số lần", "r"], ["Thường mất", "r hide"], ["RAM", "r"], ["CPU", "r hide"]].forEach(([t, c]) => head.append(el("th", c, t)));
   tbl.append(head);
   for (const s of d.stats) {
-    const tr = el("tr"), c = el("td"); c.append(el("div", "title", niceTitle(s.cmd)), el("div", "cmd", s.cmd));
-    tr.append(c, el("td", "n", s.runs + " lần"), el("td", "n", fmtTime(s.secs)), el("td", "n", fmtMem(s.mem)), el("td", "n", fmtCpu(s.cpu) + " nhân")); tbl.append(tr);
+    const tr = el("tr"), c = el("td"); c.append(el("span", "title", niceTitle(s.cmd)), cmdLine(s.cmd));
+    tr.append(c, el("td", "r", String(s.runs)), el("td", "r hide", fmtTime(s.secs)), el("td", "r", fmtMem(s.mem)), el("td", "r hide", fmtCpu(s.cpu) + " nhân")); tbl.append(tr);
   }
   box.append(tbl);
 }
-function render(d) {
-  const p = derive(d); p.used = p.used;
-  renderBanner(d, p); renderTiles(d, p);
-  renderList($("running"), d.running.map((j, i) => jobItem(j, "run", i, d, p)), "Không có lệnh nào đang chạy.");
-  renderList($("waiting"), p.waiting.map((j, i) => jobItem(j, "wait", i, d, p)), "Không có lệnh nào đang chờ.");
-  renderStats(d);
+const COLORS = { idle: "%238a867c", run: "%2317794f", warn: "%23c77700" };
+let lastIcon = "";
+function renderTab(d) {
+  const state = (d.pressure >= d.maxPressure || d.load >= d.maxLoad) ? "warn" : d.running.length ? "run" : "idle";
+  // Tiêu đề tab Chrome: số quan trọng nằm đầu để khi nhiều tab bị cắt vẫn đọc được, tên "jobq" đã có biểu tượng tab nhận ra.
+  const parts = []; if (d.running.length) parts.push(d.running.length + " chạy"); if (d.waiting.length) parts.push(d.waiting.length + " chờ");
+  document.title = parts.length ? parts.join(" ") + " · jobq" : "jobq · rảnh";
+  if (lastIcon === state) return; lastIcon = state;
+  $("icon").href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' fill='" + COLORS[state] + "'/%3E%3C/svg%3E";
 }
-const level = (pct) => pct >= 90 ? "bad" : pct >= 50 ? "warn" : "";
-// Đếm giây ngay trên trình duyệt giữa hai lần nạp dữ liệu, chỉ sửa chữ và màu nên rất nhẹ.
+function render(d) {
+  if (d.ts !== lastTs) { lastTs = d.ts; loads.push(d.load); if (loads.length > 60) loads.shift(); }
+  const p = derive(d);
+  renderMachine(d, p); renderLanes(d, p); renderQueue(d, p); renderRuns(d); renderHistory(d, $("history")); renderHistory(d, $("history2")); renderTab(d); rendered = true;
+}
+const level = (pct) => pct >= 95 ? "bad" : pct >= 80 ? "warn" : "";
+// Đếm giây ngay trên trình duyệt giữa hai lần nạp dữ liệu, chỉ sửa chữ và transform nên rất nhẹ.
 function tickTimes() {
   const now = Date.now() / 1000;
-  document.querySelectorAll("span.time[data-since]").forEach((t) => {
+  document.querySelectorAll(".time[data-since]").forEach((t) => {
     const age = now - Number(t.dataset.since), timeout = Number(t.dataset.timeout), run = t.dataset.kind === "run", pct = timeout ? (age / timeout) * 100 : 0;
-    t.textContent = run ? "Đã chạy " + fmtTime(age) + (timeout ? " / tối đa " + fmtTime(timeout) : "") : "Đã chờ " + fmtTime(age);
+    t.textContent = run ? fmtTime(age) : "chờ " + fmtTime(age);
     t.className = "time " + (run ? level(pct) : "");
   });
-  document.querySelectorAll(".track[data-since]").forEach((t) => {
-    const pct = Math.min(100, ((now - Number(t.dataset.since)) / Number(t.dataset.timeout)) * 100);
-    t.firstChild.style.width = pct + "%"; t.firstChild.className = "fill " + level(pct); t.setAttribute("aria-valuenow", Math.round(pct));
+  document.querySelectorAll(".bar[data-since]").forEach((b) => {
+    const pct = Math.min(100, ((now - Number(b.dataset.since)) / Number(b.dataset.timeout)) * 100);
+    b.firstChild.style.transform = "scaleX(" + pct / 100 + ")"; b.className = "bar " + level(pct);
   });
 }
-let last = null;
+let last = null, loadFailed = false;
+// jobq chỉ ghi dữ liệu khi có lệnh, nên lúc rảnh dữ liệu "cũ" là bình thường; chỉ cảnh báo khi đang có lệnh mà dữ liệu đứng yên.
 function checkFresh() {
-  const age = Date.now() / 1000 - last.ts, old = age > 15 && last.running.length > 0;
-  $("fresh").textContent = "Cập nhật " + fmtTime(age) + " trước"; $("live").className = "live " + (old ? "old" : "fresh");
+  const age = Date.now() / 1000 - last.ts, busy = last.running.length + last.waiting.length > 0, old = busy && age > 15;
+  $("fresh").textContent = loadFailed ? "Không nạp được dữ liệu mới" : busy ? "Cập nhật " + fmtTime(age) + " trước" : "Lần cuối có lệnh lúc " + new Date(last.ts * 1000).toLocaleTimeString("vi-VN");
+  $("live").className = "live " + (loadFailed || old ? "old" : busy ? "fresh" : "");
   $("stale").style.display = old ? "block" : "none";
+}
+function showNoData() {
+  $("fresh").textContent = "Chưa có dữ liệu";
+  $("lanes").replaceChildren(el("div", "empty", "Chưa có dữ liệu. Hãy chạy một lệnh qua jobq, ví dụ jobq run -- sleep 10, rồi trang sẽ tự cập nhật."));
 }
 function tick() {
   const old = document.getElementById("snap"); if (old) old.remove();
   const s = document.createElement("script"); s.id = "snap"; s.src = "snapshot.js?t=" + Date.now();
-  s.onload = () => { last = window.JOBQ; render(last); tickTimes(); checkFresh(); };
-  s.onerror = () => { $("fresh").textContent = "Chưa có dữ liệu"; $("banner").replaceChildren(el("h1", "", "Chưa có dữ liệu"), el("p", "", "Hãy chạy một lệnh qua jobq, ví dụ jobq run -- sleep 10, rồi trang sẽ tự cập nhật.")); };
+  s.onload = () => {
+    if (!window.JOBQ) { loadFailed = true; if (!last) showNoData(); return; }
+    last = Object.assign({ running: [], waiting: [], stats: [], history: [] }, window.JOBQ); loadFailed = false;
+    try { render(last); } catch (e) { console.error("jobq: không vẽ được trang", e); loadFailed = true; return; }
+    tickTimes(); checkFresh();
+  };
+  s.onerror = () => { loadFailed = true; if (!last) showNoData(); }; // đã có dữ liệu cũ thì giữ nguyên và chỉ báo ở dòng trạng thái
   document.body.append(s);
 }
+// Tab: chỉ đổi phần hiển thị, không dựng lại nội dung nên không mất chỗ đang cuộn hay dòng đang mở. Hỗ trợ mũi tên, Home, End.
+const tabs = [...document.querySelectorAll(".tabs button")];
+function selectTab(b, focus) {
+  tabs.forEach((x) => { const on = x === b; x.setAttribute("aria-selected", String(on)); x.tabIndex = on ? 0 : -1; $(x.getAttribute("aria-controls")).hidden = !on; });
+  if (focus) b.focus();
+}
+tabs.forEach((b, i) => {
+  b.tabIndex = i === 0 ? 0 : -1;
+  b.addEventListener("click", () => selectTab(b, false));
+  b.addEventListener("keydown", (e) => {
+    const vis = tabs.filter((x) => x.offsetParent !== null), at = vis.indexOf(b); let to = -1;
+    if (e.key === "ArrowRight") to = (at + 1) % vis.length; else if (e.key === "ArrowLeft") to = (at - 1 + vis.length) % vis.length; else if (e.key === "Home") to = 0; else if (e.key === "End") to = vis.length - 1;
+    if (to >= 0) { e.preventDefault(); selectTab(vis[to], true); }
+  });
+});
+// Từ 1100px bảng "lệnh tốn máy" nằm riêng ở cột trái nên tab của nó biến mất; nếu đang chọn thì quay về tab đầu.
+matchMedia("(min-width:1100px)").addEventListener("change", (e) => { if (e.matches && !$("p-stats").hidden) selectTab(tabs[0], false); });
+$("onlyFail").addEventListener("click", (e) => { const on = e.currentTarget.getAttribute("aria-pressed") !== "true"; e.currentTarget.setAttribute("aria-pressed", String(on)); $("runs").classList.toggle("only-fail", on); });
 // Giao diện: tự động theo hệ thống, hoặc ép sáng/tối; lưu lựa chọn nếu trình duyệt cho phép.
 function applyTheme(mode) {
   if (mode === "light" || mode === "dark") document.documentElement.dataset.theme = mode; else delete document.documentElement.dataset.theme;
-  document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === (mode || "auto"))));
+  document.querySelectorAll(".seg2 button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === (mode || "auto"))));
 }
 let saved = "auto"; try { saved = localStorage.getItem("jobq-theme") || "auto"; } catch (e) { saved = "auto"; }
+if (!["auto", "light", "dark"].includes(saved)) saved = "auto";
 applyTheme(saved);
-document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { applyTheme(b.dataset.theme); try { localStorage.setItem("jobq-theme", b.dataset.theme); } catch (e) { /* trình duyệt chặn lưu thì chỉ mất lựa chọn lần sau */ } }));
+document.querySelectorAll(".seg2 button").forEach((b) => b.addEventListener("click", () => { applyTheme(b.dataset.theme); try { localStorage.setItem("jobq-theme", b.dataset.theme); } catch (e) { /* trình duyệt chặn lưu thì chỉ mất lựa chọn lần sau */ } }));
 setInterval(tick, 3000); setInterval(() => { if (last) { tickTimes(); checkFresh(); } }, 1000); tick();
 </script>
 </body>

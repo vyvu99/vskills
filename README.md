@@ -15,7 +15,7 @@ git clone git@github.com:vyvu99/vskills.git
 cd vskills
 ./install.sh                       # symlink skills/ → ~/.claude/skills (English)
 ./install.sh --lang=vi             # Vietnamese variant
-./install.sh --with-scripts        # + personal lint rules (opt-in)
+./install.sh --with-scripts        # + personal lint rules and the jobq job queue (opt-in, see scripts/job-queue/README.md)
 ./install.sh --with-claude-md      # + generic starter ~/.claude/CLAUDE.md (opt-in, skipped if one exists)
 ./install.sh --dry-run             # preview only
 ```

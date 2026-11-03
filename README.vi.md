@@ -15,7 +15,7 @@ git clone git@github.com:vyvu99/vskills.git
 cd vskills
 ./install.sh                       # symlink skills/ → ~/.claude/skills (bản English)
 ./install.sh --lang=vi             # bản tiếng Việt
-./install.sh --with-scripts        # + lint rule cá nhân (opt-in)
+./install.sh --with-scripts        # + lint rule cá nhân và hàng đợi lệnh jobq (opt-in, xem scripts/job-queue/README.md)
 ./install.sh --with-claude-md      # + starter ~/.claude/CLAUDE.md tổng quát (opt-in, bỏ qua nếu đã có)
 ./install.sh --dry-run             # chỉ xem trước
 ```
@@ -109,7 +109,7 @@ vskills/
 ├── claude-md/CLAUDE.md           # CLAUDE.md starter, được copy khi dùng --with-claude-md
 ├── evals/                        # eval trigger + behavior (chạy bằng scripts/run-evals.sh; gọi `claude -p`, tốn phí)
 ├── web/                          # webapp local cho vspecs/vreview --fix ở các bước cần UI (node web/server.mjs)
-└── scripts/<name>/               # vd lint-rules — opt-in, khác với skills/<name>/scripts/
+└── scripts/<name>/               # vd lint-rules, job-queue (jobq) — opt-in, khác với skills/<name>/scripts/
 ```
 
 **Thêm skill mới:**
