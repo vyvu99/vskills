@@ -1,43 +1,45 @@
 # job-queue
 
-Hàng đợi cho các lệnh nặng (test, typecheck, build, e2e, xử lý ảnh...) để máy không bị quá tải khi Claude chạy nhiều việc cùng lúc. Chỉ cần bash, không có tiến trình nền, không có server.
+🌐 English | [Tiếng Việt](README.vi.md)
 
-| Thành phần | Việc làm |
+A queue for heavy commands (test, typecheck, build, e2e, image processing...) so the machine does not get overloaded when Claude runs many jobs at once. Pure bash: no background process, no server.
+
+| Component | Purpose |
 |---|---|
-| `jobq` | Xếp hàng, giới hạn CPU/RAM/số lệnh, timeout, đo mức nặng, ghi dữ liệu cho trang web |
-| `jobq-guard` | Hook của Claude Code, chặn lệnh nặng chạy thẳng không qua `jobq` |
-| `template.sh` + `lint-script` | Khuôn chung cho mọi script test/check và bộ kiểm tra khuôn |
-| `stepper` | Chạy script nặng theo từng bước, lỗi thì dừng và chạy lại tiếp từ bước lỗi |
-| `dashboard.html` | Trang tĩnh theo dõi hàng đợi, mở bằng `jobq web` |
-| `check-jobq` | Tự kiểm tra cả bộ, ra một dòng `PASS`/`FAIL` (khoảng 1 phút khi máy bận) |
+| `jobq` | Queues commands, limits CPU/RAM/concurrency, enforces timeouts, measures weight, writes data for the web page |
+| `jobq-guard` | Claude Code hook that blocks heavy commands run directly instead of through `jobq` |
+| `template.sh` + `lint-script` | Shared template for every test/check script, plus the template linter |
+| `stepper` | Runs heavy scripts step by step; on failure it stops, and a rerun resumes from the failed step |
+| `dashboard.html` | Static page for monitoring the queue, opened with `jobq web` |
+| `check-jobq` | Self-test for the whole toolkit, prints a single `PASS`/`FAIL` line (about 1 minute on a busy machine) |
 
-## Cài đặt
+## Installation
 
 ```bash
-./install.sh --with-scripts   # link thư mục này vào ~/.claude/scripts/job-queue và jobq, stepper, lint-script vào ~/.local/bin
+./install.sh --with-scripts   # link this folder into ~/.claude/scripts/job-queue and jobq, stepper, lint-script into ~/.local/bin
 ```
 
-Cần `~/.local/bin` có trong `PATH`. Bước cuối chưa tự động (vì sẽ sửa `settings.json` của bạn): gắn hook vào `~/.claude/settings.json`, thêm vào mảng `hooks.PreToolUse`:
+`~/.local/bin` must be in `PATH`. The last step is not automated (it would edit your `settings.json`): attach the hook in `~/.claude/settings.json` by adding to the `hooks.PreToolUse` array:
 
 ```json
 { "matcher": "Bash", "hooks": [{ "type": "command", "command": "$HOME/.claude/scripts/job-queue/jobq-guard", "timeout": 5 }] }
 ```
 
-## Dùng nhanh
+## Quick start
 
 ```bash
-jobq run -- pnpm --filter api test        # xếp hàng rồi chạy
-jobq run -t 1800 -- pnpm test:e2e         # nới timeout lên 30 phút
-jobq run --cost cpu=3,mem=2000 -- <lệnh>  # khai sẵn mức nặng cho lệnh chưa có lịch sử
-jobq status                               # ai đang chạy, ai đang chờ, giới hạn đang áp dụng, tải máy
-jobq stats                                # lệnh nào nặng nhất: số lần, CPU/RAM lớn nhất, thời gian
-jobq web                                  # mở trang theo dõi
-jobq clean                                # dọn chỗ của tiến trình đã chết, cắt lịch sử còn 2000 dòng
+jobq run -- pnpm --filter api test        # queue, then run
+jobq run -t 1800 -- pnpm test:e2e         # raise the timeout to 30 minutes
+jobq run --cost cpu=3,mem=2000 -- <lệnh>  # declare the weight up front for a command with no history
+jobq status                               # who is running, who is waiting, active limits, machine load
+jobq stats                                # which commands are heaviest: run count, peak CPU/RAM, duration
+jobq web                                  # open the monitoring page
+jobq clean                                # clean up slots of dead processes, trim history to 2000 lines
 ```
 
-Mã thoát: của chính lệnh, trừ `124` (quá hạn, đã dừng cả cây tiến trình và báo phải chia nhỏ lệnh), `75` (chờ trong hàng quá lâu) và `130` (bị ngắt bằng Ctrl-C).
+Exit codes: the command's own, except `124` (timed out, the whole process tree was stopped and you are told to split the command), `75` (waited in the queue too long) and `130` (interrupted with Ctrl-C).
 
-## Cách hoạt động
+## How it works
 
 ```mermaid
 flowchart LR
@@ -51,69 +53,69 @@ flowchart LR
     E --> F[Đo CPU/RAM mỗi 2 giây, ghi lịch sử]
 ```
 
-- **Điểm nặng.** Mỗi lệnh có điểm CPU và RAM bằng số đo lớn nhất trong 5 lần chạy gần nhất của cùng lệnh ở cùng thư mục. Chưa có lịch sử thì tính mặc định 2 nhân và 2000MB.
-- **Giới hạn tự suy ra.** Không có gì để chỉnh tay: tối đa mỗi nhân một lệnh, đặt chỗ CPU tối đa 150% số nhân, RAM tối đa 75% tổng RAM. Lệnh được chạy khi tổng điểm đang chạy cộng điểm của nó chưa vượt giới hạn; lệnh nặng hơn cả giới hạn vẫn chạy khi hàng trống, để hàng đợi không kẹt.
-- **Điều kiện máy.** Khi đã có lệnh chạy, lệnh tiếp theo chờ nếu tải CPU từ 150% số nhân trở lên, RAM trống dưới 1500MB, hoặc áp lực bộ nhớ macOS ở mức nguy cấp (mức 4).
-- **Chạy lách.** Lệnh nhẹ được vào trước nếu lệnh đầu hàng chưa vừa chỗ. Đầu hàng chờ quá 120 giây thì dừng cho lách, để lệnh nặng không bị bỏ đói.
-- **Điều tiết theo số đo thật.** Lệnh đã chạy quá 10 giây được tính theo CPU và RAM đo thật (không dùng ước lượng nữa), nên lệnh nhẹ hơn dự đoán thì nhường chỗ cho lệnh khác, lệnh nặng hơn dự đoán thì chặn bớt. Lệnh mới chạy vẫn tính theo ước lượng cho thận trọng.
-- **Chờ khởi động.** Sau khi nhận một lệnh, `jobq` đợi 8 giây (`JOBQ_COOLDOWN_SEC`) rồi mới nhận lệnh tiếp, để lệnh kia kịp dùng đủ tài nguyên, tránh nhận một loạt lệnh cùng lúc rồi cùng nghẽn.
-- **Phanh theo swap.** Swap tăng từ 256MB (`JOBQ_SWAP_GROWTH_MB`) giữa hai lần đo cách nhau 5 đến 60 giây thì ngừng nhận lệnh mới 30 giây (`JOBQ_SWAP_BRAKE_SEC`).
-- **Môi trường của lệnh con.** `nice 10` và `taskpolicy -b` (macOS), `NODE_OPTIONS` giới hạn heap 3GB, `UV_THREADPOOL_SIZE=2`, `JOBQ_WORKERS=2` để script con lấy làm số worker mặc định.
-- **Gọi lồng nhau.** Lệnh con gọi `jobq` lần nữa thì chạy thẳng, vì đã giữ chỗ.
+- **Weight score.** Each command gets a CPU and RAM score equal to the peak measured over the last 5 runs of the same command in the same directory. With no history, the default is 2 cores and 2000MB.
+- **Self-derived limits.** Nothing to tune by hand: at most one command per core, CPU reservation up to 150% of the core count, RAM up to 75% of total RAM. A command runs when the running total plus its own score stays within the limit; a command heavier than the whole limit still runs when the queue is empty, so the queue never gets stuck.
+- **Machine conditions.** Once something is running, the next command waits if CPU load is at or above 150% of the core count, free RAM is below 1500MB, or macOS memory pressure is critical (level 4).
+- **Queue jumping.** A light command may go first if the head of the queue does not fit yet. Once the head has waited more than 120 seconds, jumping stops so heavy commands are not starved.
+- **Throttling by real measurements.** A command that has run for more than 10 seconds is counted by its measured CPU and RAM (no more estimates), so a command lighter than predicted frees room for others, and a heavier one tightens the limit. Newly started commands still use the estimate to be conservative.
+- **Startup cooldown.** After admitting a command, `jobq` waits 8 seconds (`JOBQ_COOLDOWN_SEC`) before admitting the next, so the first one has time to reach its full resource usage and a burst of commands does not all jam up together.
+- **Swap brake.** If swap grows by 256MB (`JOBQ_SWAP_GROWTH_MB`) between two samples taken 5 to 60 seconds apart, `jobq` stops admitting new commands for 30 seconds (`JOBQ_SWAP_BRAKE_SEC`).
+- **Child environment.** `nice 10` and `taskpolicy -b` (macOS), `NODE_OPTIONS` capping the heap at 3GB, `UV_THREADPOOL_SIZE=2`, and `JOBQ_WORKERS=2` for child scripts to use as their default worker count.
+- **Nested calls.** If a child command calls `jobq` again, it runs directly, since the slot is already held.
 
-## Cấu hình
+## Configuration
 
-Không có tệp cấu hình hay lệnh chỉnh số: mọi giới hạn tự suy ra từ số nhân và RAM của máy rồi được siết thêm bằng số đo thật. Chỉ còn hai thứ chỉnh theo từng lệnh: `-t` (giây tối đa cho lệnh, mặc định 900) và `-w` (giây chờ tối đa trong hàng, mặc định 7200), cùng `--cost cpu=N,mem=MB` để khai trước mức nặng cho lệnh chưa có lịch sử. Các biến `JOBQ_*` trong đầu tệp `jobq` chỉ là điểm ghi đè cho kiểm thử.
+There is no config file or command for changing numbers: every limit is derived from the machine's core count and RAM, then tightened by real measurements. Only two things are tunable per command: `-t` (maximum seconds for the command, default 900) and `-w` (maximum seconds to wait in the queue, default 7200), plus `--cost cpu=N,mem=MB` to declare the weight in advance for a command with no history. The `JOBQ_*` variables at the top of the `jobq` file are only override points for tests.
 
-## Lịch sử lệnh và output
+## Command history and output
 
-Mỗi lệnh chạy qua `jobq run` được lưu vào `~/.cache/jobq/runs/` (50 lệnh gần nhất, cũ hơn bị xoá): thông tin (`.meta`), output thô (`.log`) và bản cho trang web (`.js`). Output đi qua `tee` nên người gọi vẫn thấy ngay như cũ, nhưng stdout và stderr được gộp chung. Mỗi lệnh chỉ giữ 512KB cuối của output. Xem trong terminal bằng `jobq logs`, hoặc bấm vào dòng trong mục "Lịch sử lệnh" của trang theo dõi. Lệnh bị `kill -9` được chốt mã 137 khi `jobq` dọn.
+Every command run through `jobq run` is saved in `~/.cache/jobq/runs/` (the 50 most recent, older ones are deleted): metadata (`.meta`), raw output (`.log`) and the web page copy (`.js`). Output goes through `tee`, so the caller still sees it immediately as before, but stdout and stderr are merged. Only the last 512KB of output is kept per command. View it in the terminal with `jobq logs`, or click a row in the "Lịch sử lệnh" (command history) section of the monitoring page. A command killed with `kill -9` is finalized with exit code 137 when `jobq` cleans up.
 
-## Trang theo dõi
+## Monitoring page
 
-`jobq web` copy `dashboard.html` vào `~/.cache/jobq/web/` rồi mở bằng trình duyệt. Từ đó `jobq` tự ghi `snapshot.js` khi có lệnh vào hàng, bắt đầu hoặc kết thúc, và mỗi 5 giây khi có lệnh đang chạy. Trang nạp lại file này mỗi 3 giây, còn thời gian "Đã chạy" và "Đã chờ" tự đếm mỗi giây ngay trên trình duyệt. Chạy được qua `file://`.
+`jobq web` copies `dashboard.html` to `~/.cache/jobq/web/` and opens it in the browser. From then on `jobq` writes `snapshot.js` itself whenever a command is queued, starts or finishes, and every 5 seconds while a command is running. The page reloads this file every 3 seconds, while the "Đã chạy" (elapsed) and "Đã chờ" (waited) timers count up every second in the browser. It works over `file://`.
 
-Trang vừa một màn hình, không phải cuộn. Các ô có tiêu đề nằm ngay dưới thanh trên cùng (không còn câu kết luận riêng để chừa chiều cao cho nội dung; lý do chờ nằm ở từng lệnh và từng chỗ chạy), gồm ô chỉ số máy (CPU kèm biểu đồ nhỏ, RAM còn trống, áp lực RAM; chỉ tô vàng hoặc đỏ khi vượt ngưỡng thật). Bên dưới chia hai cột: cột trái là các "chỗ chạy" (chỗ có lệnh kèm thanh thời gian, chỗ trống sẵn sàng nhận lệnh, chỗ bị khoá nền gạch chéo khi máy bận) và hàng chờ kèm lý do; cột phải có ba tab: Lịch sử lệnh (50 lệnh gần nhất, bấm vào dòng để xem output), Lệnh hay tốn máy và Giải thích từ, mỗi cột cuộn riêng. Dưới 900px chiều rộng thì xếp một cột và trang cuộn bình thường. Tiêu đề tab Chrome ngắn và đặt số quan trọng lên đầu (`2 chạy 3 chờ · jobq`, hoặc `jobq · rảnh` khi không có lệnh), biểu tượng tab đổi màu theo trạng thái, nên liếc thanh tab là biết. Có nút chọn Tự động, Sáng, Tối, nhớ lựa chọn trong trình duyệt. Tôn trọng chế độ giảm chuyển động của hệ điều hành. jobq chỉ ghi dữ liệu khi có lệnh, nên lúc rảnh trang hiện "Lần cuối có lệnh lúc ..."; còn lệnh đang chạy mà dữ liệu đứng yên hơn 15 giây thì có cảnh báo (xảy ra khi `jobq` bị `kill -9`). Cần trình duyệt hỗ trợ CSS `light-dark()` (Chrome 123, Safari 17.5, Firefox 120 trở lên).
+The page fits one screen with no scrolling. Titled cards sit right under the top bar (there is no separate conclusion sentence, to leave height for content; the reason for waiting is shown per command and per slot), including the machine metrics card (CPU with a small chart, free RAM, RAM pressure; highlighted yellow or red only when a real threshold is exceeded). Below it, two columns: the left column holds the "run slots" (slots with a command and a time bar, empty slots ready to accept a command, slots locked with a diagonal-stripe background when the machine is busy) and the queue with reasons; the right column has three tabs: Command history (50 most recent commands, click a row to see output), Heaviest commands and Glossary, each column scrolling on its own. Below 900px width it stacks into one column and the page scrolls normally. The Chrome tab title is short and puts the key numbers first (`2 chạy 3 chờ · jobq`, or `jobq · rảnh` when nothing is running), and the tab icon changes color with the state, so a glance at the tab bar is enough. There is an Auto, Light, Dark toggle that remembers the choice in the browser. It respects the operating system's reduced-motion setting. `jobq` only writes data when there is a command, so when idle the page shows "Lần cuối có lệnh lúc ..." (last command at ...); and if a command is running but the data has been stale for more than 15 seconds, a warning appears (this happens when `jobq` is killed with `kill -9`). Requires a browser that supports CSS `light-dark()` (Chrome 123, Safari 17.5, Firefox 120 or later).
 
-## Hook `jobq-guard`
+## The `jobq-guard` hook
 
-Chặn lệnh nặng khi không đi qua `jobq run`, kể cả dạng bọc: `time`, `VAR=1`, `npx`, `pnpm -r exec`, `bash -c "..."`, lệnh nối `a && b`.
+Blocks heavy commands that do not go through `jobq run`, including wrapped forms: `time`, `VAR=1`, `npx`, `pnpm -r exec`, `bash -c "..."`, chained commands `a && b`.
 
-- **Script của gói:** `pnpm|npm|yarn|bun` với `test`, `check`, `typecheck`, `build`, `lint`, `format`, `e2e`, `verify`, `generate`, `sdk:generate`, `test:*`, `build:*`...
-- **Công cụ JS/TS:** `tsc`, `vitest`, `jest`, `playwright`, `cypress`, `eslint`, `prettier`, `turbo`, `nx`, `webpack`, `esbuild`, `next|ng|astro|nuxt build`, `wrangler deploy`...
-- **Ngôn ngữ khác:** `cargo`, `go`, `pytest`, `mvn`, `gradle`, `dotnet`, `swift`, `flutter`, `pod install`, `xcodebuild`.
-- **Hệ thống và media:** `make`, `just test`, `docker build`, `ffmpeg`, `magick`, `sips`, `lighthouse`, `k6`.
-- **Script tự viết:** tên `check-*`, `test-*`, `e2e-*`, `bench-*` gọi bằng interpreter hoặc đường dẫn.
+- **Package scripts:** `pnpm|npm|yarn|bun` with `test`, `check`, `typecheck`, `build`, `lint`, `format`, `e2e`, `verify`, `generate`, `sdk:generate`, `test:*`, `build:*`...
+- **JS/TS tools:** `tsc`, `vitest`, `jest`, `playwright`, `cypress`, `eslint`, `prettier`, `turbo`, `nx`, `webpack`, `esbuild`, `next|ng|astro|nuxt build`, `wrangler deploy`...
+- **Other languages:** `cargo`, `go`, `pytest`, `mvn`, `gradle`, `dotnet`, `swift`, `flutter`, `pod install`, `xcodebuild`.
+- **System and media:** `make`, `just test`, `docker build`, `ffmpeg`, `magick`, `sips`, `lighthouse`, `k6`.
+- **Custom scripts:** names `check-*`, `test-*`, `e2e-*`, `bench-*` invoked via an interpreter or a path.
 
-Hàng đợi không bao giờ "đầy": Claude cứ đẩy mọi lệnh độc lập vào, `jobq` tự xếp theo tải và RAM; khi Claude xem `jobq status` hoặc `jobq stats`, hook nhắc đừng dựa vào đó để ngừng đẩy lệnh. Lệnh đã có `jobq run` hoặc `stepper` thì bắt buộc chạy nền (`run_in_background: true`), nếu không hook chặn kèm lời nhắc làm việc khác trong lúc chờ; cần kết quả ngay thì thêm `JOBQ_FG=1` trước lệnh. Cho qua: `pnpm install`, `npm ci`, `pnpm dev`, `wrangler dev`, `git`, `echo`, `grep`, `tar`, `rsync` và mọi lệnh đã có `jobq run`. Chữ nằm trong dấu nháy và nội dung heredoc được bỏ qua; nháy lẻ không đóng thì dùng nguyên văn, thà chặn thừa còn hơn để lọt.
+The queue is never "full": Claude just pushes every independent command in and `jobq` orders them by load and RAM; when Claude looks at `jobq status` or `jobq stats`, the hook reminds it not to use them as a reason to stop pushing commands. A command that already has `jobq run` or `stepper` must run in the background (`run_in_background: true`); otherwise the hook blocks it with a reminder to do other work while waiting; if you need the result right away, put `JOBQ_FG=1` before the command. Allowed through: `pnpm install`, `npm ci`, `pnpm dev`, `wrangler dev`, `git`, `echo`, `grep`, `tar`, `rsync` and every command already wrapped in `jobq run`. Text inside quotes and heredoc bodies is ignored; an unclosed single quote is taken literally, since a false block beats a miss.
 
-Thêm lệnh nặng mới: sửa `NAMES`, `SCRIPTS` hoặc `SCRIPTFILES` trong `jobq-guard`, rồi thêm một dòng vào bảng ca thử trong `check-jobq`. Gỡ hook: xoá mục cuối của `hooks.PreToolUse`.
+To add a new heavy command: edit `NAMES`, `SCRIPTS` or `SCRIPTFILES` in `jobq-guard`, then add a line to the test-case table in `check-jobq`. To remove the hook: delete the last entry of `hooks.PreToolUse`.
 
-## Viết script test/check mới
+## Writing a new test/check script
 
-Mọi script mới bắt đầu từ `template.sh` rồi qua `lint-script`:
+Every new script starts from `template.sh` and then goes through `lint-script`:
 
 ```bash
 cp template.sh check-foo.sh && lint-script check-foo.sh
 ```
 
-Khuôn bắt buộc: shebang `#!/usr/bin/env bash`, dòng 2 có `Usage:`, `set -euo pipefail`, `--help`, `--scope`, `trap` dọn tệp tạm, dòng cuối `echo "PASS: ..."`, và dòng tự xếp hàng `exec jobq run -- "$0"` nên script vào hàng dù gọi thẳng. `lint-script` còn chặn tự chạy song song (`&`, `xargs -P`), worker/concurrency lớn hơn 2, gọi lệnh nặng không qua `jobq`, và script dài hơn 120 dòng.
+Required template: shebang `#!/usr/bin/env bash`, `Usage:` on line 2, `set -euo pipefail`, `--help`, `--scope`, a `trap` that cleans temp files, a final `echo "PASS: ..."` line, and the self-queuing line `exec jobq run -- "$0"` so the script enters the queue even when called directly. `lint-script` also rejects self-parallelism (`&`, `xargs -P`), worker/concurrency above 2, heavy commands not going through `jobq`, and scripts longer than 120 lines.
 
-Script nặng (quá 120 dòng, chạy quá 2 phút, hoặc nhiều pha) tách thành thư mục `NN-tên.sh` rồi chạy bằng `stepper`:
+A heavy script (over 120 lines, running over 2 minutes, or with multiple phases) is split into a folder of `NN-name.sh` files and run with `stepper`:
 
 ```bash
-stepper plans/scripts/x/steps             # chạy lần lượt, mỗi bước qua jobq
-stepper <dir> --from 03                   # bắt đầu từ bước 03
-stepper <dir> --reset                     # xoá trạng thái, chạy lại từ đầu
+stepper plans/scripts/x/steps             # run in order, each step through jobq
+stepper <dir> --from 03                   # start from step 03
+stepper <dir> --reset                     # clear state, start over from the beginning
 ```
 
-Bước nào lỗi thì dừng tại đó; sửa xong chạy lại cùng lệnh để tiếp từ bước lỗi, bước đã `PASS` không chạy lại.
+A failing step stops there; after fixing, rerun the same command to resume from the failed step; steps that already `PASS` are not rerun.
 
-## Lỗi hay gặp
+## Common problems
 
-- **Exit `75`:** chờ quá `JOBQ_WAIT`. Chạy `jobq status`; nếu có chỗ treo mà tiến trình đã chết thì `jobq clean`.
-- **Exit `124`:** lệnh quá hạn. `jobq` in "QUÁ HẠN ... hãy CHIA NHỎ lệnh" và ghi dòng đó vào lịch sử, kèm tên lệnh và 20 dòng output cuối để biết lệnh chạy tới đâu. Chia lệnh thành các lô ngắn hơn (`jobq split N -- <file...>` hoặc `--shard=i/N`) rồi đẩy từng lô, đừng tăng `-t`.
-- **Chỉ một lệnh chạy dù giới hạn cao hơn:** máy đang quá tải, thiếu RAM, swap tăng nhanh, hoặc lệnh vừa được nhận còn trong 8 giây chờ khởi động. `jobq status` hiện tải máy và RAM trống.
-- **Lệnh con tự sinh nhiều worker:** `jobq` không giới hạn được, vẫn phải truyền `--concurrency=2`, `--maxWorkers=2`, `--workers=2` cho turbo/vitest/jest/playwright.
-- **Số đo CPU/RAM chỉ gần đúng:** lấy từ `ps` mỗi 2 giây, RAM cộng dồn nên có thể thừa với tiến trình dùng chung bộ nhớ, và tiến trình tự tách nhóm (như Chrome) có thể không được tính.
-- **Dev server của bạn (api, web) không đi qua `jobq`:** chúng làm tải máy tăng nên lệnh trong hàng có thể chờ lâu hơn.
+- **Exit `75`:** waited longer than `JOBQ_WAIT`. Run `jobq status`; if a slot is stuck but its process is dead, run `jobq clean`.
+- **Exit `124`:** the command timed out. `jobq` prints "QUÁ HẠN ... hãy CHIA NHỎ lệnh" (timed out ... split the command) and records that line in the history, along with the command name and the last 20 output lines so you can see how far it got. Split the command into shorter batches (`jobq split N -- <file...>` or `--shard=i/N`) and push each batch; do not raise `-t`.
+- **Only one command runs even though the limit is higher:** the machine is overloaded, low on RAM, swap is growing fast, or the command just admitted is still in its 8-second startup cooldown. `jobq status` shows machine load and free RAM.
+- **A child command spawns many workers on its own:** `jobq` cannot limit that, so you must still pass `--concurrency=2`, `--maxWorkers=2`, `--workers=2` to turbo/vitest/jest/playwright.
+- **CPU/RAM measurements are only approximate:** they come from `ps` every 2 seconds, RAM is summed so it may overcount for processes sharing memory, and processes that detach into their own group (like Chrome) may not be counted.
+- **Your dev servers (api, web) do not go through `jobq`:** they raise machine load, so commands in the queue may wait longer.
