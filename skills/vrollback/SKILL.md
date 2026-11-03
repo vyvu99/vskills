@@ -23,14 +23,14 @@ If `$ARGUMENTS` is empty, ask for the migration name or version.
 ## Step 1 — Detect the environment
 
 1. Framework: check `package.json` for `drizzle-orm`/`drizzle-kit`, `@prisma/client`/`prisma`, `knex`, `typeorm`, or a custom script under `scripts/migrate*`. Find its config: `drizzle.config.ts`, `prisma/schema.prisma` and `prisma.config.ts`, `knexfile.*`, `ormconfig.json`/`data-source.ts`.
-2. Target database: read the connection string from `.env` or the config and extract the host. The host must be `localhost`, `127.0.0.1` or a local container. Anything else, or a connection string you cannot read: stop and warn the user. This refusal is absolute because a rollback on a shared database is not recoverable by this skill.
+2. Target database: read the connection string from `.env` or the config and extract the host. The host must be `localhost`, `127.0.0.1` or a local container. Anything else, or a connection string you cannot read: stop and warn the user. Read the host from the value the migration command will really use (the loaded `.env` variable or the running container's published address), not from an example or commented-out line. This refusal is absolute because a rollback on a shared database is not recoverable by this skill.
 3. Docker: `docker ps` for a container matching the database type. Several matches: ask which. None: the database runs natively or is a SQLite file, so run commands directly without `docker exec`.
 
 ## Step 2 — Find the migration and confirm it was applied
 
 1. Locate the migration file in the project's migrations directory.
 2. Query the tracking table through `docker exec <container> psql -U <user> -d <db> -c "..."` (or `mysql -e`, `sqlite3 <file>`): Drizzle `drizzle.__drizzle_migrations` (the `drizzle` schema, not `public`), Prisma `_prisma_migrations`, Knex `knex_migrations`, TypeORM `migrations`, raw SQL tools usually `schema_migrations`.
-3. Not in the tracking table: tell the user there is nothing to roll back and stop.
+3. Not in the tracking table: tell the user there is nothing to roll back and stop. Later migrations already applied (they may depend on this one): list them and ask before continuing.
 
 ## Step 3 — Confirm with the user (always, even if they ask to skip it)
 

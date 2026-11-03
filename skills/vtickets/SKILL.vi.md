@@ -59,7 +59,7 @@ Dùng kết quả đầu tiên của chuỗi sau, check rẻ nhất trước:
    ```bash
    gh issue list --search "<planned title>" --state all --json number,title,url
    ```
-4. Đã có: cập nhật bằng `gh issue edit <number> --body-file <temp-file>`. Mới: `gh issue create --title "<title, English>" --body-file <temp-file>`.
+4. Đã có: đọc nội dung hiện tại trước; nếu khác nội dung dự kiến của lượt này thì hỏi một lần (`AskUserQuestion`) trước khi ghi đè, vì người dùng hay sửa tay nội dung issue, rồi cập nhật bằng `gh issue edit <number> --body-file <temp-file>`. Mới: `gh issue create --title "<title, English>" --body-file <temp-file>`.
 5. Link từng sub-issue (có sẵn hoặc mới tạo):
    - Lấy `id` dạng số (không phải number, không phải node ID): `gh api repos/<owner>/<repo>/issues/<sub_issue_number> --jq .id`.
    - Id đã nằm trong danh sách cache: đã link, bỏ qua im lặng. Đây là kết quả bình thường khi chạy lại.

@@ -91,7 +91,7 @@ if [[ -d "$SKILLS_DST" ]]; then
   for dst_skill_dir in "$SKILLS_DST"/*/; do
     dst_skill_dir="${dst_skill_dir%/}"
     skill_name="$(basename "$dst_skill_dir")"
-    [[ "$skill_name" == _* ]] && continue
+    [[ "$skill_name" == _* || "$skill_name" == *.bak.* ]] && continue
     if [[ -L "$dst_skill_dir" ]]; then
       target="$(readlink "$dst_skill_dir")"
     elif [[ -L "$dst_skill_dir/SKILL.md" ]]; then
@@ -111,6 +111,9 @@ fi
 
 # ── Shared reference docs (always installed — skills read these at runtime) ──
 [[ -d "$SKILLS_SRC/_vskills-shared" ]] && link "$SKILLS_SRC/_vskills-shared" "$SKILLS_DST/_vskills-shared"
+
+# ── Webapp (always installed — vspecs and vreview --fix start it from here) ──
+[[ -d "$REPO_DIR/web" ]] && link "$REPO_DIR/web" "$HOME/.claude/vskills-web"
 
 # ── Post-install health-check summary ───────────────────────────────────────
 # Quick sanity table over what actually landed in ~/.claude/skills — no lint,
@@ -166,6 +169,7 @@ if $WITH_CLAUDE_MD; then
     log "WARNING: $CLAUDE_MD_DST already exists — not touching it. Skipping --with-claude-md."
   elif [[ -f "$CLAUDE_MD_SRC" ]]; then
     run "cp '$CLAUDE_MD_SRC' '$CLAUDE_MD_DST'"
+    $WITH_SCRIPTS || log "NOTE: the starter CLAUDE.md tells Claude to use jobq; also pass --with-scripts and add the jobq-guard hook, or delete those rules"
     log "copied starter CLAUDE.md → $CLAUDE_MD_DST (edit freely, not synced with this repo)"
   fi
 else

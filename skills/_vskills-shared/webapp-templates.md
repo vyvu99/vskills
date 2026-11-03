@@ -2,7 +2,7 @@
 
 Dùng khi 1 skill (`vreview --fix`/`vspecs`...) cần hỏi user bằng UI trực quan
 (màu/font/motion, hoặc duyệt hàng loạt diff) thay vì `AskUserQuestion` text-only.
-Server + frontend nằm ở `web/` (xem `web/README.md` để chạy thủ công/debug).
+Server + frontend nằm ở `~/.claude/vskills-web/` (do `install.sh` liên kết từ `web/` của repo vskills; xem `README.md` trong đó để chạy thủ công/debug).
 
 ## (a) 3 field type + JSON mẫu
 
@@ -119,7 +119,7 @@ Value trả về = mảng `{ id, action, freeText? }` theo **đúng thứ tự**
 
 ## (b) 1 port cố định + health-check + start nền + mở browser
 
-`web/` là 1 script Node thuần (`node:http`, 0 dependency, 0 `npm install`) —
+`vskills-web/` là 1 script Node thuần (`node:http`, 0 dependency, 0 `npm install`) —
 1 process, 1 port, phục vụ cả frontend lẫn API.
 
 - Webapp: `http://localhost:4270` (override bằng env `VSKILLS_WEBAPP_PORT`)
@@ -134,10 +134,10 @@ curl -s localhost:4270/api/health
 - Nhận đúng field `service: "vskills-webapp"` → server đã chạy, dùng luôn,
   KHÔNG start lại.
 - Không có response, lỗi kết nối, hoặc `service` khác/thiếu (port bị service
-  khác chiếm) → start nền (từ repo root):
+  khác chiếm) → start nền:
 
 ```bash
-node web/server.mjs &     # Bash run_in_background: true
+node ~/.claude/vskills-web/server.mjs &     # Bash run_in_background: true
 ```
 
 - Đợi health-check pass rồi mở tab: `open http://localhost:4270` (macOS).

@@ -23,14 +23,14 @@ Nếu `$ARGUMENTS` rỗng, hỏi tên hoặc version của migration.
 ## Bước 1 — Nhận diện môi trường
 
 1. Framework: xem `package.json` có `drizzle-orm`/`drizzle-kit`, `@prisma/client`/`prisma`, `knex`, `typeorm`, hoặc script tự viết dưới `scripts/migrate*`. Tìm config: `drizzle.config.ts`, `prisma/schema.prisma` và `prisma.config.ts`, `knexfile.*`, `ormconfig.json`/`data-source.ts`.
-2. Database đích: đọc connection string từ `.env` hoặc config và lấy host. Host phải là `localhost`, `127.0.0.1` hoặc container local. Khác đi, hoặc không đọc được connection string: dừng và cảnh báo user. Lệnh từ chối này là tuyệt đối vì rollback trên database dùng chung thì skill này không khôi phục được.
+2. Database đích: đọc connection string từ `.env` hoặc config và lấy host. Host phải là `localhost`, `127.0.0.1` hoặc container local. Khác đi, hoặc không đọc được connection string: dừng và cảnh báo user. Lấy host từ giá trị lệnh migration thật sự dùng (biến `.env` đang nạp hoặc địa chỉ container đang publish), không lấy từ dòng ví dụ hay dòng đã comment. Lệnh từ chối này là tuyệt đối vì rollback trên database dùng chung thì skill này không khôi phục được.
 3. Docker: `docker ps` tìm container khớp loại database. Nhiều kết quả: hỏi chọn cái nào. Không có: database chạy native hoặc là file SQLite, chạy lệnh trực tiếp, không dùng `docker exec`.
 
 ## Bước 2 — Tìm migration và xác nhận đã được apply
 
 1. Tìm file migration trong thư mục migrations của project.
 2. Query bảng tracking qua `docker exec <container> psql -U <user> -d <db> -c "..."` (hoặc `mysql -e`, `sqlite3 <file>`): Drizzle `drizzle.__drizzle_migrations` (schema `drizzle`, không phải `public`), Prisma `_prisma_migrations`, Knex `knex_migrations`, TypeORM `migrations`, tool raw SQL thường là `schema_migrations`.
-3. Không có trong bảng tracking: báo user là không có gì để rollback rồi dừng.
+3. Không có trong bảng tracking: báo user là không có gì để rollback rồi dừng. Đã có migration mới hơn được apply (có thể phụ thuộc migration này): liệt kê chúng và hỏi trước khi tiếp tục.
 
 ## Bước 3 — Xác nhận với user (luôn luôn, kể cả khi họ bảo bỏ qua)
 

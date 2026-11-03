@@ -59,7 +59,7 @@ Use the first hit of this chain, cheapest check first:
    ```bash
    gh issue list --search "<planned title>" --state all --json number,title,url
    ```
-4. Existing: update it with `gh issue edit <number> --body-file <temp-file>`. New: `gh issue create --title "<title, English>" --body-file <temp-file>`.
+4. Existing: read its current body first; if it differs from the body planned this run, ask once (`AskUserQuestion`) before overwriting, since people edit issue bodies by hand, then update with `gh issue edit <number> --body-file <temp-file>`. New: `gh issue create --title "<title, English>" --body-file <temp-file>`.
 5. Link each sub-issue (found or new):
    - Get its numeric `id` (not the number, not the node ID): `gh api repos/<owner>/<repo>/issues/<sub_issue_number> --jq .id`.
    - Id already in the cached list: already linked, skip silently. This is the normal outcome on a re-run.
