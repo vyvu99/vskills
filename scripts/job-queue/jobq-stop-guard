@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# jobq-stop-guard: hook Stop gồm 2 chốt chặn, mỗi lần dừng chặn tối đa 1 lần. Usage: gắn vào settings.json, đọc JSON từ stdin
+# (1) còn job jobq nền trong thư mục phiên → bắt làm việc độc lập; (2) dừng hẳn (không còn job) sau lượt làm nhiều việc mà tin nhắn cuối thiếu tóm tắt và không đang chờ user quyết (hộp IMPORTANT) → bắt thêm danh sách ngắn: còn mở, bước tiếp.
+set -euo pipefail
+input=$(cat)
+[ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" = true ] && exit 0
+cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
+[ -n "$cwd" ] || exit 0
+Q_DIR="${JOBQ_DIR:-$HOME/.cache/jobq}"
+MIN_TOOLS="${RECAP_MIN_TOOLS:-3}" # lượt ít hơn ngần này lệnh coi là trả lời ngắn, không cần tóm tắt
+"$(dirname "$0")/jobq" status >/dev/null 2>&1 || true # status dọn các lệnh đã chết, tránh đếm nhầm
+running=0
+for f in "$Q_DIR"/runs/*.meta; do
+  [ -f "$f" ] || continue
+  IFS=$'\t' read -r _ _ en _ _ jcwd _ < "$f"
+  # cwd của job nằm trong thư mục phiên mới tính là của phiên này
+  [ "$en" = "-" ] && case "$jcwd/" in "$cwd"/*) running=$((running + 1)) ;; esac
+done
+if [ "$running" -gt 0 ]; then
+  jq -n --arg n "$running" '{decision:"block",reason:("\($n) background jobq job(s) still running. Before stopping, list every remaining task that does not depend on the job result (docs, manual-test prep, edits to other files, restarting an app already confirmed green) and do them all now. If everything left needs the job result, say so and stop.")}'
+  exit 0
+fi
+# Dừng hẳn: đọc lượt hiện tại (từ tin nhắn người dùng cuối) trong transcript
+tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
+[ -f "$tp" ] || exit 0
+turn=$(jq -rs '
+  [.[] | select(.type == "user" or .type == "assistant")] as $m
+  | ([$m | to_entries[] | select(.value.type == "user" and ((.value.message.content | type) == "string" or (.value.message.content | map(select(.type == "text")) | length > 0))) | .key] | last // -1) as $i
+  | $m[($i + 1):] as $t
+  | {tools: ([$t[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use")] | length),
+     text: ([$t[] | select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text] | last // "")}' "$tp" 2>/dev/null) || exit 0
+[ "$(printf '%s' "$turn" | jq -r .tools)" -ge "$MIN_TOOLS" ] || exit 0
+# tin nhắn cuối đã nêu bước tiếp theo / việc còn lại / kết luận thì thôi
+printf '%s' "$turn" | jq -r .text | grep -qiE 'kết luận|còn lại|tiếp theo|bước tiếp|còn tồn|cần bạn quyết|\[!important\]|nhắn `|recap|next steps' && exit 0
+jq -n '{decision:"block",reason:"Before stopping, add a short bullet list: still open, next step. Do not repeat what is done. Use the language of the conversation, one language only."}'
