@@ -52,7 +52,7 @@ trap 'rm -f "$SCOPE_MAP_FILE"' EXIT
 node -e "
   const r = require('$SCRIPT_DIR/config/rule-registry.json');
   for (const id of Object.keys(r)) {
-    process.stdout.write(id + '\t' + (r[id].scope || '') + '\n');
+    process.stdout.write(id + '\t' + (r[id].scope || '') + '\t' + (r[id].confidence || '') + '\n');
   }
 " > "$SCOPE_MAP_FILE"
 
@@ -79,6 +79,10 @@ filter_files_by_scope() {
   for script in "$RULES_DIR"/*.sh; do
     [[ -x "$script" ]] || continue
     rule_id="$(basename "$script" .sh)"
+    # LINT_MIN_CONFIDENCE=high: hook tự động chỉ chạy rule độ tin cậy cao để nhẹ máy và ít báo nhầm
+    if [[ -n "${LINT_MIN_CONFIDENCE:-}" ]] && [[ "$(awk -F'\t' -v id="$rule_id" '$1 == id { print $3 }' "$SCOPE_MAP_FILE")" != "$LINT_MIN_CONFIDENCE" ]]; then
+      continue
+    fi
     # Lấy subset files phù hợp scope của rule (hoặc toàn bộ nếu không có scope)
     scoped_files=()
     while IFS= read -r line; do
