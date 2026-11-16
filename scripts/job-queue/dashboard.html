@@ -559,7 +559,7 @@ function drawMeadow(g, t) { // bãi chăn dưới ruộng: suối uốn lượn 
   if (ST()) for (const fx of [0.12, 0.3, 0.72, 0.9]) { const x = Math.round(W * fx), y = ry(x) - rw / 2; R(x, y - 12, 3, 14, "#3f7f3a"); R(x - 1, y - 17, 5, 7, "#6b4528"); }
   if (LV()) for (let k = 0; k < 2; k++) { const x = (t * 9 + k * 260) % W, y = ry(x) + k * 6 - 4; R(x - 6, y - 4, 12, 6, "#f4f1e8"); R(x + 6 - 3, y - 9, 6, 6, "#2f7f4a"); R(x + 10, y - 7, 3, 2, "#ff9f1c"); }
   const upY = y0 + Math.max(28, Math.round((cy - rw / 2 - y0) * 0.92)), loY = Math.min(y1 - 4, cy + rw / 2 + 40);
-  if (LV()) { drawCow(Math.round(W * 0.4), upY, t, 0); drawCow(Math.round(W * 0.2), loY, t, 1); }
+  if (LV()) { drawCow(Math.round(W * 0.4 + Math.sin(t * 0.07) * 70), upY, t, Math.cos(t * 0.07) > 0 ? 0 : 1); drawCow(Math.round(W * 0.2 + Math.sin(t * 0.05 + 2) * 60), loY, t, Math.cos(t * 0.05 + 2) > 0 ? 0 : 1); }
   if (ST()) for (let k = 0; k < 3; k++) drawAppleTree(Math.round(W * 0.76) + k * 74, loY - (k % 2) * 8);
 }
 function drawDog(g, t) { // chó chạy theo nông dân đang làm việc, rảnh thì về nằm ngủ cạnh kho hạt
@@ -613,6 +613,25 @@ function drawGrass(g) { // cỏ tự nhiên: mảng màu, bụi cỏ, hoa, đá;
   sim.lx.save(); sim.lx.setTransform(1, 0, 0, 1, 0, 0); sim.lx.drawImage(sim.grassCv, 0, 0); sim.lx.restore();
 }
 function drawFarmland(g) { const x0 = g.mx - 4, y0 = g.fieldTop - 18, w = g.W - g.mx * 2 + 8, h = g.fieldBot - g.fieldTop + 24; R(x0, y0, w, h, mixHex(SEA.g3, SEA.snow ? "#b9c4c8" : "#7a5a35", 0.3)); for (let y = y0 + 6; y < y0 + h - 4; y += 12) R(x0 + 4, y, w - 8, PX, mixHex(SEA.g3, "#5e4128", 0.25)); }
+function drawVillagers(g, t, add) { // dân làng làm việc nhà, không gắn với lệnh nào: gánh nước từ giếng, chẻ củi, chăn cừu
+  const l = sim.lx, mid = Math.round((g.shed.x + g.shed.w + g.barn.x) / 2), well = [mid + 100, g.feet + 18], door = [g.door[0] + 26, g.door[1] + 20];
+  const cyc = (t % 26) / 26, seg = cyc < 0.12 ? 0 : cyc < 0.5 ? 1 : cyc < 0.62 ? 2 : 3, u = seg === 1 ? (cyc - 0.12) / 0.38 : seg === 3 ? (cyc - 0.62) / 0.38 : 0;
+  const wx = seg === 0 ? well[0] : seg === 1 ? well[0] + (door[0] - well[0]) * u : seg === 2 ? door[0] : door[0] + (well[0] - door[0]) * u, wy = seg === 0 ? well[1] : seg === 1 ? well[1] + (door[1] - well[1]) * u : seg === 2 ? door[1] : door[1] + (well[1] - door[1]) * u, wfc = seg === 1 ? -1 : 1, walking = seg === 1 || seg === 3;
+  add(wy, () => { shade(wx, wy, 30); blit(l, farmerSpr(walking ? Math.floor(t * 4) % 2 : 0, 2), wx, wy, wfc < 0); const full = seg === 1 || seg === 2; R(wx - 18, wy - 38, 36, 3, "#6b4528"); for (const dx of [-17, 15]) { R(wx + dx, wy - 34, 2, 8, "#6b4528"); R(wx + dx - 3, wy - 27 + (walking ? Math.round(Math.sin(t * 8)) * PX : 0), 8, 7, "#8a5a33"); if (full) R(wx + dx - 2, wy - 28, 6, 2, "#6fb7ff"); } });
+  const cx0 = g.shed.x + g.shed.w + 12, cy0 = g.feet + 36, swing = Math.sin(t * 5);
+  add(cy0, () => { shade(cx0, cy0, 30); blit(l, farmerSpr(swing > 0.3 ? 1 : 0, 3), cx0, cy0, false); farmTool(cx0 + 9, cy0 - 22, 1, -0.5 + swing * 0.9, "cut"); R(cx0 + 22, cy0 - 6, 14, 6, "#8a5a33"); R(cx0 + 24, cy0 - 12, 14, 6, "#a37040"); R(cx0 + 22, cy0 - 3, 4, 3, "#e0c08a"); });
+  const sx = Math.round(g.mx + (g.fx - 40 - g.mx) / 2) + 22, sy = g.fieldTop + 56;
+  if (g.fx - 40 - g.mx >= 90) add(sy, () => { shade(sx, sy, 30); blit(l, farmerSpr(0, 1), sx, sy, true); R(sx + 12, sy - 40, 2, 42, "#6b4528"); R(sx + 9, sy - 44, 8, 3, "#6b4528"); });
+}
+function drawCat(g, t) { // mèo cuộn tròn ngủ trên mái kho hạt, đuôi khẽ động
+  const x = g.shed.x + 34, y = g.feet - 82, tw = Math.floor(t * 1.2) % 2 ? PX : 0; R(x, y - 8, 16, 8, "#e0903a"); R(x + 12, y - 11, 8, 7, "#e0903a"); R(x + 13, y - 14, 2, 3, "#e0903a"); R(x + 18, y - 14, 2, 3, "#e0903a"); R(x - 6, y - 4 - tw, 7, 3, "#c97a2a"); R(x + 4, y - 6, 2, 2, "#f3d9a8");
+}
+function drawBonfire(g, t, night) { // đống lửa trại ban đêm cạnh đường, tàn lửa bay lên
+  if (night < 0.4) return; const x = g.laneX0 - 40, y = g.yard + 34, fl = Math.floor(t * 8) % 3;
+  disc(x, y - 10, 34, "rgba(255,170,60," + (0.16 * night).toFixed(2) + ")"); R(x - 12, y - 4, 24, 4, "#5a3a22"); R(x - 8, y - 8, 16, 4, "#6b4528");
+  R(x - 8, y - 18 - fl * PX, 16, 12, "#ff7a1a"); R(x - 5, y - 24 - fl * PX, 10, 10, "#ffb02e"); R(x - 3, y - 28 - fl * PX, 6, 8, "#ffe066");
+  for (let k = 0; k < 4; k++) { const age = (t * 0.7 + k * 0.25) % 1; R(x + Math.sin(t * 3 + k * 2) * 8, y - 28 - age * 40, PX, PX, "rgba(255,200,90," + (1 - age).toFixed(2) + ")"); }
+}
 function drawPlot(cx, yb, wet, blocked, open, locked) {
   const x0 = cx - 30, y0 = yb - 24;
   if (locked) { R(x0 - 3, y0 - 3, 66, 30, "#7b6a4c"); R(x0, y0, 60, 24, "#9a865e"); for (const dy of [6, 15]) R(x0 + 3, y0 + dy, 54, 3, "#8a7650"); for (const [dx, dy] of [[8, 4], [22, 14], [40, 6], [50, 17], [30, 3]]) { R(x0 + dx, y0 + dy, 3, PX * 2, "#5f8f3c"); R(x0 + dx - PX, y0 + dy + PX, PX, PX, "#5f8f3c"); R(x0 + dx + PX, y0 + dy + PX, PX, PX, "#5f8f3c"); } R(cx - 1, y0 + 2, 2, 16, "#5a3a22"); R(cx - 6, y0 + 4, 12, 3, "#5a3a22"); R(cx - 5, y0 + 7, 10, 5, "#e8dcc0"); return; }
@@ -650,7 +669,7 @@ function paintScene(g, t, night, wet, heat, blocked, hr, d) { // cảnh gồm l�
     if (LV()) for (const [dx, dy, s] of [[-30, 14, 0], [26, 26, 1]]) { const sx = mx2 + dx + (Math.sin(t * 0.3 + s) * 6), sy = by + dy; R(sx - 12, sy - 14, 24, 12, "#f4f1e8"); R(sx - 14, sy - 12, 28, 8, "#f4f1e8"); R(sx + (s ? -18 : 12), sy - 12, 8, 8, "#3a3a40"); R(sx - 9, sy - 2, 3, 6, "#3a3a40"); R(sx + 6, sy - 2, 3, 6, "#3a3a40"); }
     if (ST()) for (const [dx, dy, c] of [[-36, 6, "#ff6b8a"], [36, 8, "#ffd34e"], [-8, 28, "#ffffff"], [14, 30, "#ff6b8a"]]) { R(mx2 + dx, by + dy, 3, 3, c); R(mx2 + dx, by + dy + 3, 3, 3, "#3f8f3a"); } };
   pasture(g.mx, g.fx - 40); pasture(g.fx + g.per * g.cw + 40, W - g.mx); drawMeadow(g, t);
-  if (lv) { drawHens(g, t); drawCrows(g, t); drawDog(g, t); }
+  if (lv) { drawHens(g, t); drawCrows(g, t); drawDog(g, t); drawCat(g, t); drawBonfire(g, t, night); }
   if (st) {
   for (let i = 0; i < g.nv; i++) { const pt = g.plot(i), occ = sim.used && sim.used.has(i); drawPlot(pt[0], pt[1], wet, blocked && i < g.allow, !occ, i >= g.allow); }
   }
@@ -702,9 +721,11 @@ function simDraw(t) {
       put(e.p[1], () => { const b = sblit(46, lx, crateSpr(e.crop, e.fail, e.timeout), e.p[0], e.p[1], false); e.sb = b; e.hits.push(b); reg(e.key, "thùng thu hoạch", "crate", b); });
     }
   }
-  items.sort((a, b) => a.z - b.z); for (const it of items) it.fn();
+  drawVillagers(g, t, add); items.sort((a, b) => a.z - b.z); for (const it of items) it.fn();
   for (const q of sim.parts) { const f = q.life / q.max; lx.fillStyle = q.c; lx.globalAlpha = Math.max(0, f); lx.fillRect(snap(q.p[0]), snap(q.p[1]), q.s, q.s); lx.globalAlpha = 1; }
   drawNightLife(g, t, night);
+  const fogA = (hr >= 5 && hr < 8.5 ? 0.3 * (1 - (hr - 5) / 3.5) : 0) + wet * 0.1;
+  if (fogA > 0.02) { R(0, g.skyH + 6, W, 26, "rgba(240,244,248," + (fogA * 0.9).toFixed(2) + ")"); for (let k = 0; k < 6; k++) { const x = (t * (4 + k) + k * W / 6) % (W + 200) - 100; R(x, g.skyH + 16 + (k % 3) * 40, 180, 10, "rgba(240,244,248," + (fogA * 0.6).toFixed(2) + ")"); } }
   if (night > 0) R(0, 0, W, H, "rgba(16,24,64," + (0.36 * night).toFixed(2) + ")");
   if (wet) { for (let k = 0; k < 6; k++) { const px = g.laneX0 + k * Math.max(40, (g.crateX0 - g.laneX0) / 6) + 10; R(px, g.yard + 8, 26, 4, "#7fa9c6"); R(px + 4 + Math.sin(t * 3 + k) * 4, g.yard + 9, 8, PX, "rgba(255,255,255,0.45)"); } }
   for (const r of sim.rain) { if (wet) { lx.fillStyle = "#cfe6ff"; lx.fillRect(snap(r[0]), snap(r[1]), PX, PX * 3); } else if (SEA.snow) { lx.fillStyle = "#ffffff"; lx.fillRect(snap(r[0]), snap(r[1]), PX, PX); } else if (SEA.leaf) { lx.fillStyle = "#d9822b"; lx.fillRect(snap(r[0]), snap(r[1]), PX * 2, PX); } }
