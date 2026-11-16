@@ -238,5 +238,9 @@ line=$("$HERE/jobq" split 1 -- "src/(auth)/x y.test.ts" z.ts); eval "set -- $lin
   kill $P 2>/dev/null
   [ "$heavy_rc" -eq 75 ] && [ "$est_rc" -eq 0 ] ) || fail "nhận lệnh theo số đo thật sai (đo 7 nhân phải chặn, chỉ ước 2 nhân phải cho qua)"
 
+# 30) timeout cũng dừng tiến trình con đã tự tách phiên (như trình duyệt do test mở), kill theo nhóm không với tới chúng
+"$HERE/jobq" run -t 2 -- python3 -c "import subprocess,time;subprocess.Popen(['sleep','77'],start_new_session=True);time.sleep(60)" >/dev/null 2>&1
+sleep 1; pgrep -f 'sleep 77( |$)' >/dev/null && { pkill -f 'sleep 77( |$)'; fail "tiến trình con tự tách phiên còn sống sau timeout"; }
+
 [ -z "$(find "$T/q/slots" "$T/q/queue" -mindepth 1 2>/dev/null)" ] || fail "còn rác slot/queue"
-echo "PASS: jobq (hàng đợi, điểm nặng, áp lực RAM, chạy lách, đo thật, chờ khởi động, phanh swap, trang web) + lint-script + stepper"
+echo "PASS: jobq (hàng đợi, điểm nặng, áp lực RAM, chạy lách, đo thật, chờ khởi động, phanh swap, trang web, dọn tiến trình con) + lint-script + stepper"

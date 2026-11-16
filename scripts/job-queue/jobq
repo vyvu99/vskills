@@ -36,6 +36,9 @@ KEEP_RUNS=${JOBQ_KEEP_RUNS:-50}                         # số lệnh gần nh�
 LOG_MAX_KB=512                                          # output mỗi lệnh chỉ giữ phần cuối ngần này KB
 
 alive() { kill -0 "$1" 2>/dev/null; }
+tree_pids() { # mọi tiến trình con cháu của $1 (không gồm $1); kill theo nhóm không với tới con đã tự tách phiên như trình duyệt do test mở, nên phải lấy danh sách trước khi giết
+  ps -axo pid=,ppid= | awk -v r="$1" '{p[$1]=$2; n[++c]=$1} END{d[r]=1; do { ch=0; for(j=1;j<=c;j++) if(!(n[j] in d) && (p[n[j]] in d)){ d[n[j]]=1; ch=1 } } while(ch); for(k in d) if(k!=r) print k}'
+}
 now() { date +%s; }
 
 free_mb() {
@@ -334,7 +337,7 @@ cmd_run() {
   release() {
     [ -n "$sp" ] && kill -- "-$sp" 2>/dev/null
     [ -n "$wd" ] && kill -- "-$wd" 2>/dev/null
-    [ -n "$pid" ] && alive "$pid" && { kill -TERM -- "-$pid" 2>/dev/null; sleep 1; kill -KILL -- "-$pid" 2>/dev/null; }
+    [ -n "$pid" ] && alive "$pid" && { kids=$(tree_pids "$pid"); kill -TERM -- "-$pid" $kids 2>/dev/null; sleep 1; kill -KILL -- "-$pid" $kids 2>/dev/null; }
     [ -n "$got" ] && [ "$(readlink "$Q_DIR/slots/$got" 2>/dev/null)" = "$$" ] && rm -f "$Q_DIR/slots/$got" "$Q_DIR/slots/$got.w"
     finish_run 130
     rm -f "$ticket" "$flag" "$samples" ${fifo:+"$fifo"}
@@ -394,10 +397,10 @@ cmd_run() {
   # Watchdog chạy tiến trình riêng nên sống sót khi jobq bị kill -9: nó dừng lệnh con khi jobq chết hoặc khi quá timeout.
   ( t=0
     while [ "$t" -lt "$TIMEOUT" ]; do
-      alive "$$" || { kill -TERM -- "-$pid" 2>/dev/null; sleep 5; kill -KILL -- "-$pid" 2>/dev/null; exit 0; }
+      alive "$$" || { kids=$(tree_pids "$pid"); kill -TERM -- "-$pid" $kids 2>/dev/null; sleep 5; kill -KILL -- "-$pid" $kids 2>/dev/null; exit 0; }
       sleep 2; t=$((t + 2))
     done
-    : > "$flag"; kill -TERM -- "-$pid" 2>/dev/null; sleep 5; kill -KILL -- "-$pid" 2>/dev/null ) & wd=$!
+    : > "$flag"; kids=$(tree_pids "$pid"); kill -TERM -- "-$pid" $kids 2>/dev/null; sleep 5; kill -KILL -- "-$pid" $kids 2>/dev/null ) & wd=$!
   disown "$wd"; { wait "$pid"; } 2>/dev/null; local rc=$?
   kill -- "-$sp" 2>/dev/null; sp=""
   if [ "$rc" -ne 124 ] && [ "$rc" -lt 128 ]; then # chỉ ghi lần chạy kết thúc bình thường
