@@ -33,7 +33,7 @@ jobq run -t 1800 -- pnpm test:e2e         # nới timeout lên 30 phút
 jobq run --cost cpu=3,mem=2000 -- <lệnh>  # khai sẵn mức nặng cho lệnh chưa có lịch sử
 jobq status                               # lệnh đang chạy và đang chờ (lệnh chờ giống nhau gộp một dòng), giới hạn đang áp dụng, tải máy
 jobq stats                                # lệnh nào nặng nhất: số lần, CPU/RAM lớn nhất, thời gian
-jobq web                                  # mở trang theo dõi (xem dạng danh sách hoặc mô phỏng chuyển động hàng chờ, máy chạy, lệnh đã xong)
+jobq web                                  # mở trang theo dõi (xem dạng danh sách hoặc mô phỏng bãi đỗ xe thông minh chuyển động: lệnh là xe (lệnh nặng là xe tải), xe chờ trước rào chắn, chỗ đỗ mở hoặc đóng theo hạn mức động, trời mưa khi RAM căng)
 jobq clean                                # dọn chỗ của tiến trình đã chết, cắt lịch sử còn 2000 dòng
 ```
 
@@ -55,7 +55,7 @@ flowchart LR
 
 - **Điểm nặng.** Mỗi lệnh có điểm CPU và RAM bằng số đo lớn nhất trong 5 lần chạy gần nhất của cùng lệnh ở cùng thư mục. Chưa có lịch sử thì tính mặc định 2 nhân và 2000MB.
 - **Giới hạn tự suy ra.** Không có gì để chỉnh tay: số chỗ và mức đặt chỗ rất rộng (ba lệnh mỗi nhân, CPU tới ba lần số nhân, RAM tới 150% tổng RAM, vì điểm ước lượng thường cao hơn mức dùng thật); giới hạn thật là các số đo sống bên dưới. Lệnh được chạy khi tổng điểm đang chạy cộng điểm của nó chưa vượt giới hạn; lệnh nặng hơn cả giới hạn vẫn chạy khi hàng trống, để hàng đợi không kẹt.
-- **Điều kiện máy.** Khi đã có lệnh chạy, lệnh tiếp theo chỉ chờ nếu CPU đang dùng thật (user cộng system, đo bằng `top`, không dùng load average) từ 92% trở lên (`JOBQ_MAX_CPU`), máy đang đẩy RAM ra đĩa nhiều (1500 trang trong một lần đo, `JOBQ_MAX_PAGEOUT`), RAM trống dưới 1500MB, hoặc áp lực bộ nhớ macOS ở mức nguy cấp (mức 4). Ngoài ra `jobq` cứ nhồi lệnh cho đầy máy, vì lệnh chạy ở ưu tiên nền nên nhường cho ứng dụng bạn đang dùng. Một tiến trình đo mỗi 3 giây, mọi lệnh đang chờ đọc kết quả đó.
+- **Điều kiện máy.** Khi đã có lệnh chạy, lệnh tiếp theo chỉ chờ nếu CPU đang dùng thật (user cộng system, đo bằng `top`, không dùng load average) từ 92% trở lên (`JOBQ_MAX_CPU`), máy đang đẩy RAM ra đĩa nhiều (1500 trang trong một lần đo, `JOBQ_MAX_PAGEOUT`), RAM trống dưới 1500MB, hoặc áp lực bộ nhớ macOS ở mức nguy cấp (mức 4). Ngoài ra `jobq` cứ nhồi lệnh cho đầy máy, vì lệnh chạy ở ưu tiên nền nên nhường cho ứng dụng bạn đang dùng. Hạn mức đổi theo từng thời điểm: khi bạn không đụng phím hay chuột 120 giây (`JOBQ_IDLE_SEC`), CPU tối đa nới lên 98% (`JOBQ_MAX_CPU_IDLE`) và mức RAM trống tối thiểu giảm một nửa vì không có thao tác nào để làm giật; bạn quay lại là siết về 92% và 1500MB. Mỗi lệnh còn cần chỗ trống bằng nửa độ nặng của chính nó (CPU và RAM) mới được nhận, nên lệnh nặng chờ nhiều chỗ trống hơn lệnh nhẹ. Một tiến trình đo mỗi 3 giây, mọi lệnh đang chờ đọc kết quả đó.
 - **Chạy lách.** Lệnh nhẹ được vào trước nếu lệnh đầu hàng chưa vừa chỗ. Đầu hàng chờ quá 120 giây thì dừng cho lách, để lệnh nặng không bị bỏ đói.
 - **Điều tiết theo số đo thật.** Lệnh đã chạy quá 10 giây được tính theo CPU và RAM đo thật (không dùng ước lượng nữa), nên lệnh nhẹ hơn dự đoán thì nhường chỗ cho lệnh khác, lệnh nặng hơn dự đoán thì chặn bớt. Lệnh mới chạy vẫn tính theo ước lượng cho thận trọng.
 - **Chờ khởi động.** Sau khi nhận một lệnh, `jobq` đợi 3 giây (`JOBQ_COOLDOWN_SEC`) rồi mới nhận lệnh tiếp, để lệnh kia kịp dùng đủ tài nguyên, tránh nhận một loạt lệnh cùng lúc rồi cùng nghẽn.
@@ -115,7 +115,7 @@ Bước nào lỗi thì dừng tại đó; sửa xong chạy lại cùng lệnh 
 
 - **Exit `75`:** chờ quá `JOBQ_WAIT`. Chạy `jobq status`; nếu có chỗ treo mà tiến trình đã chết thì `jobq clean`.
 - **Exit `124`:** lệnh quá hạn. `jobq` in "QUÁ HẠN ... hãy CHIA NHỎ lệnh" và ghi dòng đó vào lịch sử, kèm tên lệnh và 20 dòng output cuối để biết lệnh chạy tới đâu. Chia lệnh thành các lô ngắn hơn (`jobq split N -- <file...>` hoặc `--shard=i/N`) rồi đẩy từng lô, đừng tăng `-t`.
-- **Chỉ một lệnh chạy dù giới hạn cao hơn:** máy đang quá tải, thiếu RAM, swap tăng nhanh, hoặc lệnh vừa được nhận còn trong 3 giây chờ khởi động. `jobq status` hiện CPU đang dùng và RAM trống.
+- **Chỉ một lệnh chạy dù giới hạn cao hơn:** máy đang quá tải, thiếu RAM, swap tăng nhanh, hoặc lệnh vừa được nhận còn trong 3 giây chờ khởi động. `jobq status` hiện CPU đang dùng, RAM trống và số lệnh còn nhận thêm được ngay lúc này (tính sống từ CPU, RAM trống và độ nặng của lệnh chờ tiếp theo nên đổi theo máy).
 - **Lệnh con tự sinh nhiều worker:** `jobq` không giới hạn được, vẫn phải truyền `--concurrency=2`, `--maxWorkers=2`, `--workers=2` cho turbo/vitest/jest/playwright.
 - **Số đo CPU/RAM chỉ gần đúng:** lấy từ `ps` mỗi 2 giây, RAM cộng dồn nên có thể thừa với tiến trình dùng chung bộ nhớ, và tiến trình tự tách nhóm (như Chrome) có thể không được tính.
 - **Dev server của bạn (api, web) không đi qua `jobq`:** chúng làm tải máy tăng nên lệnh trong hàng có thể chờ lâu hơn.

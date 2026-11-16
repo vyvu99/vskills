@@ -26,6 +26,8 @@ MAX_CPU=${JOBQ_MAX_CPU:-92}                             # % CPU đang dùng (use
 MAX_PAGEOUT=${JOBQ_MAX_PAGEOUT:-1500}                      # số trang RAM bị đẩy ra đĩa trong một lần đo (khoảng 1-2 giây) từ ngưỡng này thì máy đang giật nên ngừng nhận lệnh mới
 MAX_PRESSURE=${JOBQ_MAX_PRESSURE:-4}                    # áp lực RAM macOS: 1 bình thường, 2 cảnh báo, 4 nguy cấp; chỉ chặn ở mức nguy cấp
 MIN_FREE_MB=${JOBQ_MIN_FREE_MB:-1500}                   # RAM trống tối thiểu để nhận lệnh thứ 2 trở đi
+MAX_CPU_IDLE=${JOBQ_MAX_CPU_IDLE:-98}                      # khi bạn không đụng tới máy từ IDLE_SEC giây thì nới CPU tối đa lên mức này và hạ nửa mức RAM trống tối thiểu, vì không có thao tác nào để làm giật
+IDLE_SEC=${JOBQ_IDLE_SEC:-120}
 COOLDOWN=${JOBQ_COOLDOWN_SEC:-3}                        # sau khi nhận một lệnh, đợi ngần này giây cho nó dùng đủ tài nguyên rồi mới nhận lệnh tiếp
 WARM_SEC=10                                             # lệnh chạy quá ngần này giây thì tính theo số đo thật thay vì ước lượng
 SWAP_GROWTH_MB=${JOBQ_SWAP_GROWTH_MB:-256}              # swap tăng từ ngần này MB giữa hai lần đo thì phanh
@@ -111,14 +113,20 @@ sample() { # $1 pgid $2 tệp ra: mỗi 2s ghi "mem_mb centi_cpu" của cả nh�
 pressure() { sysctl -n kern.memorystatus_vm_pressure_level 2>/dev/null || echo 1; } # Linux không có: coi như bình thường
 
 pageouts() { vm_stat 2>/dev/null | awk '/^Pageouts/{gsub(/\./,"",$2); print $2+0}'; }
-measure_machine() { # in "cpu_% trang_bị_đẩy_ra_đĩa": đo khoảng 1 giây
-  if [ -r /proc/stat ]; then
-    local a b; a=$(awk '/^cpu /{print $2+$3+$4+$5+$6+$7+$8, $5}' /proc/stat); sleep 1; b=$(awk '/^cpu /{print $2+$3+$4+$5+$6+$7+$8, $5}' /proc/stat)
-    awk -v a="$a" -v b="$b" 'BEGIN{split(a,x," "); split(b,y," "); d=y[1]-x[1]; v=0; if(d>0) v=100*(d-(y[2]-x[2]))/d; printf "%d 0\n", v}'
-  else
-    local p1 p2 c; p1=$(pageouts); c=$(top -l 2 -n 0 -s 1 2>/dev/null | awk '/CPU usage/{u=$3+0; s=$5+0} END{printf "%d", u+s}'); p2=$(pageouts)
-    echo "${c:-0} $(( ${p2:-0} - ${p1:-0} ))"
+measure_machine() { # in "cpu_% pageouts giây_không_đụng_máy" từ số đo mới nhất; chỉ một tiến trình đo mỗi 3 giây, các lệnh đang chờ đọc kết quả đó nên hàng chờ dài không gọi top liên tục
+  local f="$Q_DIR/machine" ts=0 cpu=0 po=0 idle=0 t; t=$(now)
+  read -r ts cpu po idle 2>/dev/null < "$f" || true
+  if [ $(( t - ${ts:-0} )) -ge 3 ]; then
+    [ -d "$Q_DIR/machine.lock" ] && [ $(( t - ${ts:-0} )) -ge 20 ] && rm -rf "$Q_DIR/machine.lock" # khoá mồ côi do tiến trình đo bị giết giữa chừng
+    if mkdir "$Q_DIR/machine.lock" 2>/dev/null; then
+      read -r cpu po idle <<< "$(measure_machine)"; echo "$(now) ${cpu:-0} ${po:-0} ${idle:-0}" > "$f.tmp" && mv "$f.tmp" "$f"; rmdir "$Q_DIR/machine.lock"
+    fi
   fi
+  echo "${cpu:-0} ${po:-0} ${idle:-0}"
+}
+limits() { # in "cpu_tối_đa% ram_trống_tối_thiểu_MB giây_không_đụng_máy": hạn mức đổi theo từng thời điểm, nới khi bạn không dùng máy (không có gì để làm giật), siết lại khi bạn đang gõ phím hoặc dùng chuột
+  local cpu po idle; read -r cpu po idle <<< "$(machine)"
+  if [ "${idle:-0}" -ge "$IDLE_SEC" ]; then echo "$MAX_CPU_IDLE $(( MIN_FREE_MB / 2 )) $idle"; else echo "$MAX_CPU $MIN_FREE_MB ${idle:-0}"; fi
 }
 machine() { # in "cpu_% pageouts" từ số đo mới nhất; chỉ một tiến trình đo mỗi 3 giây, các lệnh đang chờ đọc kết quả đó nên hàng chờ dài không gọi top liên tục
   local f="$Q_DIR/machine" ts=0 cpu=0 po=0 t; t=$(now)
@@ -146,14 +154,15 @@ swap_ok() { # swap tăng từ SWAP_GROWTH_MB trở lên giữa hai lần đo cá
   if [ "${pe:-0}" -eq 0 ] || [ $((t - pe)) -ge 10 ]; then echo "$t $cur 0" > "$Q_DIR/swap"; fi
   return 0
 }
-gate_ok() {
+gate_ok() { # $1 $2 = điểm nặng CPU (centi-nhân) và RAM (MB) của lệnh sắp vào; chỉ cần chỗ trống bằng nửa điểm đó vì điểm lấy theo mức cao nhất từng đo và CPU chia sẻ được
+  local c=${1:-0} m=${2:-0} cpu po idle mcpu mfree _i
   [ "$(held_slots)" -eq 0 ] && return 0
   [ "$(pressure)" -lt "$MAX_PRESSURE" ] || return 1
   swap_ok || return 1
-  local cpu po; read -r cpu po <<< "$(machine)"
-  [ "${cpu:-0}" -lt "$MAX_CPU" ] || return 1
+  read -r cpu po idle <<< "$(machine)"; read -r mcpu mfree _i <<< "$(limits)"
   [ "${po:-0}" -lt "$MAX_PAGEOUT" ] || return 1
-  [ "$(free_mb)" -ge "$MIN_FREE_MB" ]
+  [ $(( (mcpu - cpu) * NCPU )) -ge $(( c / 2 )) ] || return 1
+  [ "$(free_mb)" -ge $(( mfree + m / 2 )) ]
 }
 
 lock() { # khoá ngắn quanh bước "kiểm tra ngân sách + lấy slot" để hai lệnh không cùng lọt vào
@@ -173,10 +182,17 @@ fits() { # $1 centi-cpu $2 mem_mb; cần hn hc hm từ held()
 }
 
 # --- Trang web tĩnh: jobq tự ghi $Q_DIR/web/snapshot.js khi có thay đổi, dashboard.html nạp lại file đó (chạy được qua file://, không cần server) ---
+headroom() { # số lệnh nữa có thể nhận ngay lúc này, tính từ CPU và RAM trống theo hạn mức hiện tại chia cho nửa độ nặng của lệnh đầu hàng chờ (chưa có lệnh chờ thì lấy 1 nhân, 1GB); máy đang giật hoặc thiếu RAM thì bằng 0
+  local cpu po idle mcpu mfree _i wc=100 wm=1000 first n_cpu n_mem n; read -r cpu po idle <<< "$(machine)"; read -r mcpu mfree _i <<< "$(limits)"
+  if [ "$(pressure)" -ge "$MAX_PRESSURE" ] || [ "${cpu:-0}" -ge "$mcpu" ] || [ "${po:-0}" -ge "$MAX_PAGEOUT" ]; then echo 0; return; fi
+  first=$(ls "$Q_DIR/queue" 2>/dev/null | sort | head -1); [ -n "$first" ] && read -r wc wm 2>/dev/null < "$Q_DIR/queue/$first"
+  wc=$(( wc / 2 )); wm=$(( wm / 2 )); [ "$wc" -lt 25 ] && wc=25; [ "$wm" -lt 100 ] && wm=100
+  n_cpu=$(( (mcpu - cpu) * NCPU / wc )); n_mem=$(( ($(free_mb) - mfree) / wm )); n=$n_cpu; [ "$n_mem" -lt "$n" ] && n=$n_mem; [ "$n" -lt 0 ] && n=0; echo "$n"
+}
 snapshot_tsv() {
-  local f p w wc wm st args
-  printf 'META\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$B_JOBS" "$B_CPU" "$B_MEM" \
-    "$(machine | cut -d' ' -f1)" "$MAX_CPU" "$(free_mb)" "$MIN_FREE_MB" "$(pressure)" "$MAX_PRESSURE" "$(now)" "$TIMEOUT" "$TOTAL_MB"
+  local f p w wc wm st args nrun cap emax efree idle; read -r emax efree idle <<< "$(limits)"; nrun=$(held_slots); cap=$(( nrun + $(headroom) )); [ "$cap" -gt "$MAX_JOBS" ] && cap=$MAX_JOBS
+  printf 'META\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$B_JOBS" "$B_CPU" "$B_MEM" \
+    "$(machine | cut -d' ' -f1)" "$emax" "$(free_mb)" "$efree" "$(pressure)" "$MAX_PRESSURE" "$(now)" "$TIMEOUT" "$TOTAL_MB" "$cap" "$idle"
   for f in "$Q_DIR"/slots/*; do
     [ -L "$f" ] || continue; p=$(readlink "$f"); wc=200; wm=2000
     read -r wc wm 2>/dev/null < "$f.w" || true
@@ -204,7 +220,7 @@ snapshot_js() {
   snapshot_tsv | awk -F'\t' '
     function q(s){gsub(/\\/,"\\\\",s); gsub(/"/,"\\\"",s); return "\"" s "\""}
     function join(a,n,  i,o){for(i=1;i<=n;i++)o=o (i>1?",":"") a[i]; return o}
-    $1=="META"{m=sprintf("\"jobs\":%d,\"cpu\":%d,\"mem\":%d,\"load\":%s,\"maxLoad\":%s,\"freeMb\":%d,\"minFreeMb\":%d,\"pressure\":%d,\"maxPressure\":%d,\"ts\":%d,\"timeout\":%d,\"totalMb\":%d",$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)}
+    $1=="META"{m=sprintf("\"jobs\":%d,\"cpu\":%d,\"mem\":%d,\"load\":%s,\"maxLoad\":%s,\"freeMb\":%d,\"minFreeMb\":%d,\"pressure\":%d,\"maxPressure\":%d,\"ts\":%d,\"timeout\":%d,\"totalMb\":%d,\"cap\":%d,\"idle\":%d",$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)}
     $1=="RUN"{r[++nr]=sprintf("{\"pid\":%d,\"cpu\":%d,\"mem\":%d,\"started\":%d,\"cmd\":%s}",$2,$3,$4,$5,q($6))}
     $1=="WAIT"{w[++nw]=sprintf("{\"pid\":%d,\"cpu\":%d,\"mem\":%d,\"queued\":%d,\"cmd\":%s}",$2,$3,$4,$5,q($6))}
     function nz(x){return x=="-"?"null":x+0}
@@ -237,10 +253,10 @@ AWK_GROUP='function norm(c){ sub(/^sh -c /,"",c); gsub(/[^ \/]+\.(mjs|cjs|js|ts|
 cmd_status() {
   mkdir -p "$Q_DIR/slots" "$Q_DIR/queue"; reap
   snapshot_tsv | awk -F'\t' -v now="$(now)" -v w="${COLUMNS:-110}" "$AWK_GROUP"'
-    $1=="META"{ jobs=$2; load=$5; maxl=$6; fr=$7; minf=$8; pr=$9 }
+    $1=="META"{ cap=$14; load=$5; maxl=$6; fr=$7; minf=$8; pr=$9 }
     $1=="RUN"{ r[++nr]=sprintf("RUN  %-6s %s cpu=%.1f mem=%s  %s", $2, mmss(now-$5), $3/100, sz($4), substr(norm($6),1,w-40)) }
     $1=="WAIT"{ k=norm($6); if(!(k in n)){ order[++ng]=k; first[k]=$5 } n[k]++; if($5<first[k]) first[k]=$5; nw++ }
-    END{ printf "chạy %d/%d · chờ %d | cpu=%s%%/%s%% free=%dMB/%d áp lực RAM=%d\n", nr, jobs, nw, load, maxl, fr, minf, pr
+    END{ printf "chạy %d · chờ %d · nhận thêm được %d | cpu=%s%%/%s%% free=%dMB/%d áp lực RAM=%d\n", nr, nw, (cap>nr ? cap-nr : 0), load, maxl, fr, minf, pr
       for(i=1;i<=nr;i++) print r[i]
       for(i=1;i<=ng;i++){ k=order[i]; printf "WAIT %s %s  %s\n", cnt(n[k]), mmss(now-first[k]), substr(k,1,w-18) } }'
   return 0
@@ -366,7 +382,7 @@ cmd_run() {
     fi
     # chờ khởi động: lệnh vừa nhận cần vài giây mới dùng đủ CPU/RAM, nhận tiếp ngay thì số đo còn thấp và dễ nhận quá tay
     if [ "$ok" = 1 ] && [ "$hn" -gt 0 ]; then la=$(cat "$Q_DIR/last_admit" 2>/dev/null || echo 0); [ $(( $(now) - la )) -ge "$COOLDOWN" ] || ok=0; fi
-    if [ "$ok" = 1 ] && gate_ok; then
+    if [ "$ok" = 1 ] && gate_ok "$W_CPU" "$W_MEM"; then
       for i in $(seq 1 "$MAX_JOBS"); do
         ln -s "$$" "$Q_DIR/slots/$i" 2>/dev/null && { got=$i; echo "$W_CPU $W_MEM $(now)" > "$Q_DIR/slots/$i.w"; now > "$Q_DIR/last_admit"; break; }
       done
