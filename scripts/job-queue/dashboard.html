@@ -33,9 +33,8 @@ button{font:inherit}
 button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .notice{display:none;padding:8px 12px;border-left:3px solid var(--warn);color:var(--warn);font-size:14px}
 .grid{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr) minmax(0,1.15fr);gap:20px;padding-top:10px}
-.left{display:grid;grid-template-rows:auto minmax(0,1fr);gap:20px;min-height:0}
+.left{display:grid;grid-template-rows:auto;align-content:start;min-height:0}
 .mid{display:grid;grid-template-rows:fit-content(60%) minmax(120px,1fr);gap:20px;min-height:0}
-.p-stats-panel .hide{display:none}.t-stats{display:none}
 .panel{position:relative;border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
 .panel>h2,.panel>.tabs{position:absolute;top:-10px;left:10px;margin:0;padding:0 6px;background:var(--bg);height:20px;font:600 12px/20px var(--mono);color:var(--muted);max-width:calc(100% - 20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .panel>.tabs{display:flex;gap:2px;padding:0 4px}
@@ -90,18 +89,13 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 .only-fail details.run:not(.fail){display:none}
 .empty-fail{display:none}.only-fail:not(:has(.fail)) .empty-fail{display:block}
 .out{margin:4px 0 12px 20px;padding:8px 10px;background:var(--bg);font:12px/1.5 var(--mono);max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);border:1px solid var(--line)}
-table{width:100%;border-collapse:collapse}
-th{padding:6px 0;text-align:left;font:12px var(--mono);color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
-td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
-.r{text-align:right;white-space:nowrap;padding-left:12px}td.r{font:12px var(--mono)}
-td:first-child{width:100%;max-width:0}td .title{display:block}
 [role="tabpanel"][hidden]{display:none}
 dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;color:var(--muted);font-size:14px}
 @media (pointer:coarse){.run summary{min-height:44px}.tabs button,.seg2 button,.chip{min-height:44px}}
 @media (prefers-reduced-motion:reduce){.live.fresh i{animation:none}.bar i{transition:none}}
 @media (max-width:1099px){
   .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
-  .left{display:contents}.p-stats-panel{display:none}.t-stats{display:inline-block}
+  .left{display:contents}
   .p-machine{grid-column:1/-1}.p-machine .body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.p-machine .m{margin:0}
 }
 @media (max-width:899px){
@@ -116,7 +110,6 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
   .head{grid-template-columns:12px minmax(0,1fr)}.head .no{display:none}.head .time{grid-column:2;white-space:normal}
   .qt{flex-wrap:wrap}
   .run summary{grid-template-columns:12px minmax(0,1fr) auto;min-height:44px}.run .tm{display:none}
-  .r.hide{display:none}td:first-child{max-width:none}
 }
 </style>
 </head>
@@ -133,7 +126,6 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
   <div class="grid">
     <div class="left">
       <section class="panel p-machine" aria-labelledby="h-machine"><h2 id="h-machine">máy</h2><div class="body" id="readouts"></div></section>
-      <section class="panel p-stats-panel" aria-labelledby="h-stats"><h2 id="h-stats">tốn máy</h2><div class="body" id="history"></div></section>
     </div>
     <div class="mid">
       <section class="panel" aria-labelledby="h-lanes"><h2 id="h-lanes">chỗ chạy</h2><div class="body" id="lanes"></div></section>
@@ -142,7 +134,6 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
     <section class="panel p-info" aria-label="Thông tin thêm">
       <div class="tabs" role="tablist" aria-label="Thông tin thêm">
         <button type="button" role="tab" id="t-runs" aria-controls="p-runs" aria-selected="true">lịch sử</button>
-        <button type="button" role="tab" id="t-stats" class="t-stats" aria-controls="p-stats" aria-selected="false">tốn máy</button>
         <button type="button" role="tab" id="t-help" aria-controls="p-help" aria-selected="false">giải thích</button>
       </div>
       <div class="body">
@@ -150,7 +141,6 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
           <div class="tools2"><span>50 lệnh gần nhất. Bấm vào một dòng để xem kết quả in ra.</span><button type="button" class="chip" id="onlyFail" aria-pressed="false">chỉ lệnh lỗi</button></div>
           <div id="runs"></div>
         </div>
-        <div id="p-stats" role="tabpanel" aria-labelledby="t-stats" tabindex="0" hidden><div class="tools2"><span>Số đo từ các lần chạy trước, dùng để biết còn chỗ cho lệnh khác hay không.</span></div><div id="history2"></div></div>
         <div id="p-help" role="tabpanel" aria-labelledby="t-help" tabindex="0" hidden><dl>
           <dt>Lệnh nặng</dt><dd>Lệnh tốn nhiều CPU hoặc RAM như chạy test, kiểm tra kiểu, build, xử lý ảnh. Claude gửi chúng vào hàng đợi để máy không bị đơ.</dd>
           <dt>Chỗ chạy</dt><dd>Số lệnh được chạy cùng một lúc. Khi máy bận, jobq tự giảm số chỗ rồi tăng lại khi máy rảnh.</dd>
@@ -322,18 +312,6 @@ function renderQueue(d, p) {
     else { const dy = old - n.getBoundingClientRect().top; if (Math.abs(dy) > 1) n.animate([{ transform: "translateY(" + dy + "px)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(0,0,0.32,1)" }); }
   });
 }
-function renderHistory(d, box) {
-  box.replaceChildren();
-  if (!d.stats.length) { box.append(el("div", "empty", "Chưa có lịch sử. Chạy vài lệnh qua jobq là có số liệu.")); return; }
-  const tbl = el("table"), head = el("tr");
-  [["Lệnh", ""], ["Số lần", "r"], ["Thường mất", "r hide"], ["RAM", "r"], ["CPU", "r hide"]].forEach(([t, c]) => head.append(el("th", c, t)));
-  tbl.append(head);
-  for (const s of d.stats) {
-    const tr = el("tr"), c = el("td"); c.append(el("span", "title", niceTitle(s.cmd)), cmdLine(s.cmd));
-    tr.append(c, el("td", "r", String(s.runs)), el("td", "r hide", fmtTime(s.secs)), el("td", "r", fmtMem(s.mem)), el("td", "r hide", fmtCpu(s.cpu) + " nhân")); tbl.append(tr);
-  }
-  box.append(tbl);
-}
 const COLORS = { idle: "%238a867c", run: "%2317794f", warn: "%23c77700" };
 let lastIcon = "";
 function renderTab(d) {
@@ -347,7 +325,7 @@ function renderTab(d) {
 function render(d) {
   if (d.ts !== lastTs) { lastTs = d.ts; loads.push(d.load); if (loads.length > 60) loads.shift(); }
   const p = derive(d);
-  renderMachine(d, p); renderLanes(d, p); renderQueue(d, p); renderRuns(d); renderHistory(d, $("history")); renderHistory(d, $("history2")); renderTab(d); rendered = true;
+  renderMachine(d, p); renderLanes(d, p); renderQueue(d, p); renderRuns(d); renderTab(d); rendered = true;
 }
 const level = (pct) => pct >= 95 ? "bad" : pct >= 80 ? "warn" : "";
 // Đếm giây ngay trên trình duyệt giữa hai lần nạp dữ liệu, chỉ sửa chữ và transform nên rất nhẹ.
@@ -380,7 +358,7 @@ function tick() {
   const s = document.createElement("script"); s.id = "snap"; s.src = "snapshot.js?t=" + Date.now();
   s.onload = () => {
     if (!window.JOBQ) { loadFailed = true; if (!last) showNoData(); return; }
-    last = Object.assign({ running: [], waiting: [], stats: [], history: [] }, window.JOBQ); loadFailed = false;
+    last = Object.assign({ running: [], waiting: [], history: [] }, window.JOBQ); loadFailed = false;
     try { render(last); } catch (e) { console.error("jobq: không vẽ được trang", e); loadFailed = true; return; }
     tickTimes(); checkFresh();
   };
@@ -402,8 +380,6 @@ tabs.forEach((b, i) => {
     if (to >= 0) { e.preventDefault(); selectTab(vis[to], true); }
   });
 });
-// Từ 1100px bảng "lệnh tốn máy" nằm riêng ở cột trái nên tab của nó biến mất; nếu đang chọn thì quay về tab đầu.
-matchMedia("(min-width:1100px)").addEventListener("change", (e) => { if (e.matches && !$("p-stats").hidden) selectTab(tabs[0], false); });
 $("onlyFail").addEventListener("click", (e) => { const on = e.currentTarget.getAttribute("aria-pressed") !== "true"; e.currentTarget.setAttribute("aria-pressed", String(on)); $("runs").classList.toggle("only-fail", on); });
 // Giao diện: tự động theo hệ thống, hoặc ép sáng/tối; lưu lựa chọn nếu trình duyệt cho phép.
 function applyTheme(mode) {
