@@ -238,6 +238,15 @@ line=$("$HERE/jobq" split 1 -- "src/(auth)/x y.test.ts" z.ts); eval "set -- $lin
   kill $P 2>/dev/null
   [ "$heavy_rc" -eq 75 ] && [ "$est_rc" -eq 0 ] ) || fail "nhận lệnh theo số đo thật sai (đo 7 nhân phải chặn, chỉ ước 2 nhân phải cho qua)"
 
+# 31) máy nóng bị hạ xung hoặc chạy bằng pin thì trần CPU giảm theo: cùng một mức đo, bình thường thì nhận lệnh, hạ xung còn 50% thì giữ lại
+( export JOBQ_DIR="$T/q18" JOBQ_SLOTS=3 JOBQ_MAX_CPU=80 JOBQ_FAKE_MACHINE="40 0 0"; mkdir -p "$JOBQ_DIR/slots" "$JOBQ_DIR/queue"
+  sleep 30 & P=$!
+  ln -s "$P" "$JOBQ_DIR/slots/1"; echo "100 500 $(( $(date +%s) - 60 ))" > "$JOBQ_DIR/slots/1.w"
+  JOBQ_FAKE_POWER=100 "$HERE/jobq" run --cost cpu=2,mem=100 -w 3 -- true 2>/dev/null; ok_rc=$?
+  JOBQ_FAKE_POWER=50 "$HERE/jobq" run --cost cpu=2,mem=100 -w 3 -- true 2>/dev/null; hot_rc=$?
+  kill $P 2>/dev/null
+  [ "$ok_rc" -eq 0 ] && [ "$hot_rc" -eq 75 ] ) || fail "trần CPU không giảm theo hạ xung hoặc pin (bình thường phải nhận, hạ xung 50% phải giữ lại)"
+
 # 30) timeout cũng dừng tiến trình con đã tự tách phiên (như trình duyệt do test mở), kill theo nhóm không với tới chúng
 "$HERE/jobq" run -t 2 -- python3 -c "import subprocess,time;subprocess.Popen(['sleep','77'],start_new_session=True);time.sleep(60)" >/dev/null 2>&1
 sleep 1; pgrep -f 'sleep 77( |$)' >/dev/null && { pkill -f 'sleep 77( |$)'; fail "tiến trình con tự tách phiên còn sống sau timeout"; }

@@ -136,9 +136,20 @@ measure_machine() { # in "cpu_% pageouts giây_không_đụng_máy" từ số đ
   fi
   echo "${cpu:-0} ${po:-0} ${idle:-0}"
 }
+power_factor() { # % trần CPU còn dùng được theo tình trạng phần cứng, tự phát hiện (macOS), kiểm tra mỗi 30 giây: máy nóng bị hạ xung thì trần giảm theo đúng tỉ lệ tốc độ còn lại, chạy bằng pin thì còn 85% để máy khỏi nóng và hao pin; nơi không có pmset (Linux, máy bàn) là 100
+  [ -n "${JOBQ_FAKE_POWER:-}" ] && { echo "$JOBQ_FAKE_POWER"; return; }
+  local f="$Q_DIR/power" ts=0 v=100 t; t=$(now); read -r ts v 2>/dev/null < "$f" || true
+  if [ $(( t - ${ts:-0} )) -ge 30 ]; then
+    local th bt; th=$(pmset -g therm 2>/dev/null | awk '/CPU_Speed_Limit/{print $NF}'); case "$th" in ''|*[!0-9]*) th=100 ;; esac; [ "$th" -gt 100 ] && th=100; [ "$th" -lt 30 ] && th=30
+    bt=100; pmset -g batt 2>/dev/null | grep -q "Battery Power" && bt=85
+    v=$(( th * bt / 100 )); echo "$t $v" > "$f.tmp" && mv "$f.tmp" "$f"
+  fi
+  echo "${v:-100}"
+}
 limits() { # in "cpu_tối_đa% ram_trống_tối_thiểu_MB giây_không_đụng_máy": hạn mức đổi theo từng thời điểm, nới khi bạn không dùng máy (không có gì để làm giật), siết lại khi bạn đang gõ phím hoặc dùng chuột
   local cpu po idle; read -r cpu po idle <<< "$(machine)"
-  if [ "${idle:-0}" -ge "$IDLE_SEC" ]; then echo "$MAX_CPU_IDLE $(( MIN_FREE_MB / 2 )) $idle"; else echo "$MAX_CPU $MIN_FREE_MB ${idle:-0}"; fi
+  local pf; pf=$(power_factor)
+  if [ "${idle:-0}" -ge "$IDLE_SEC" ]; then echo "$(( MAX_CPU_IDLE * pf / 100 )) $(( MIN_FREE_MB / 2 )) $idle"; else echo "$(( MAX_CPU * pf / 100 )) $MIN_FREE_MB ${idle:-0}"; fi
 }
 machine() { # in "cpu_% pageouts" từ số đo mới nhất; chỉ một tiến trình đo mỗi 3 giây, các lệnh đang chờ đọc kết quả đó nên hàng chờ dài không gọi top liên tục
   local f="$Q_DIR/machine" ts=0 cpu=0 po=0 t; t=$(now)
