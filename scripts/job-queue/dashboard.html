@@ -683,7 +683,7 @@ function npcStep(dt, g) {
   const q = nPts(g);
   for (const n of sim.npcs) {
     if (!n.p) n.p = (n.k === 2 ? [g.fx - 24, g.fieldTop + 60] : n.k === 3 ? [Math.round(g.W * 0.5), g.H - 80] : n.k === 4 ? [q.hay[0], q.hay[1] + 20] : n.k === 1 ? q.mill.slice() : q.well.slice());
-    if (!n.segs) { let ids = n.pool.filter((id) => id !== n.last && npcOk(g, id)); if (!ids.length) ids = ["water", "wood", "hens", "mill"].filter((id) => id !== n.last); const id = ids[Math.floor(Math.random() * ids.length)]; n.last = id; n.segs = NPC_TASKS[id](g, n.p); n.i = 0; n.t = 0; }
+    if (!n.segs) { let ids = n.pool.filter((id) => id !== n.last && npcOk(g, id)); if (!ids.length) ids = ["water", "wood", "hens", "mill"].filter((id) => id !== n.last); const id = ids[Math.floor(Math.random() * ids.length)]; n.last = id; n.segs = NPC_TASKS[id](g, n.p); const off = ((n.k % 3) - 1) * 16; n.segs.forEach((sg, j) => { if (j) sg.a[0] += off; sg.b[0] += off; }); /* mỗi người lệch ngang một chút để cùng đến một chỗ cũng không đứng chồng nhau */ n.i = 0; n.t = 0; }
     const sg = n.segs[n.i]; n.t += dt; if (n.t >= sg.dur) { n.t -= sg.dur; n.i++; if (n.i >= n.segs.length) { n.p = n.segs[n.segs.length - 1].b.slice(); n.segs = null; continue; } }
     const c = n.segs[n.i], u = c.dur ? Math.min(1, n.t / c.dur) : 1; n.p = [c.a[0] + (c.b[0] - c.a[0]) * u, c.a[1] + (c.b[1] - c.a[1]) * u]; n.pose = c.pose; n.item = c.item; if (Math.abs(c.b[0] - c.a[0]) > 1) n.fc = c.b[0] > c.a[0] ? 1 : -1; if (c.pose === "walk" && (c.a[0] !== c.b[0] || c.a[1] !== c.b[1])) n.walk += dt * 7;
   }
