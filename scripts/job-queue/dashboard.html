@@ -95,10 +95,10 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 .simbody{display:flex;flex-direction:column;gap:8px;overflow:auto;padding:16px 12px 12px}
 .simnote{font-size:12px;color:var(--muted);min-height:18px}.simhint{display:none}
 @media (max-width:760px){.simhint{display:block}}.simnote.warn{color:var(--warn)}
-#stage{position:relative;flex:1 1 auto;min-height:440px}
+#stage{position:relative;flex:1 1 auto;min-height:480px}
 #simCv{display:block}#simCv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 #stage{overflow-x:auto;overflow-y:hidden}
-#simDetail{flex:none;height:176px;overflow:auto;border:1px solid var(--line);background:var(--panel);padding:10px 12px}#simDetail .out{max-height:none}
+#simDetail{flex:none;height:150px;overflow:auto;border:1px solid var(--line);background:var(--panel);padding:10px 12px}#simDetail .out{max-height:none}
 .sd-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.sd-head .title{font-weight:650;overflow-wrap:anywhere}
 .sd-grid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:2px 14px;margin:8px 0;font-size:12px;color:var(--muted)}.sd-grid b{font-weight:600;color:var(--text);overflow-wrap:anywhere}
 dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;color:var(--muted);font-size:14px}
@@ -338,54 +338,63 @@ function renderTab(d) {
   if (lastIcon === state) return; lastIcon = state;
   $("icon").href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' fill='" + COLORS[state] + "'/%3E%3C/svg%3E";
 }
-// Mô phỏng dạng bãi đỗ xe thông minh: lệnh là xe (lệnh nặng là xe tải), xe chờ trước rào chắn, rào mở thì xe chạy theo đường nhựa vào chỗ đỗ và đỗ lại cho tới khi xong rồi chạy ra bãi xe ra. Số chỗ đỗ là hạn mức động lấy từ CPU và RAM trống, mưa rơi theo áp lực RAM. Dữ liệu chỉ đến 3 giây một lần nên xe tự chạy tới đích; hoạt ảnh không phụ thuộc nhịp dữ liệu.
+// Mô phỏng 3D bếp nhà hàng: bộ chiếu phối cảnh tự viết trên canvas 2D (không thêm thư viện). Phiếu gọi món treo trên ray phía sau, nồi hình trụ trên các bếp ở giữa, quầy lấy món phía trước. Lệnh đến lượt thì phiếu bay theo vòng cung xuống bếp, nồi đặt lên và lửa bùng (lửa theo CPU, nước trong nồi theo RAM, vòng quanh nồi là thời gian đã nấu); xong thì đĩa bay ra quầy. Số bếp mở là hạn mức động. Camera lắc nhẹ, kéo chuột để xoay, nhấp đúp để đặt lại. Dữ liệu chỉ đến 3 giây một lần nên mọi thứ tự bay tới đích; hoạt ảnh không phụ thuộc nhịp dữ liệu.
 const SIM_FPS = 24; // máy yếu: 24 khung/giây là đủ mượt
 let view = "list", simFirst = true, simSel = "", simSig = "";
-const simSlot = new Map(), sim = { ents: new Map(), parts: [], rain: [], podAng: [], podFx: {}, bayA: [], cv: null, cx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", smokeAt: 0, waiting: 0, running: 0, extra: 0, pressure: 1, valve: 0, trayAt: -9 };
+const simSlot = new Map(), sim = { ents: new Map(), parts: [], fog: [], podFx: {}, bayA: [], cv: null, cx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", smokeAt: 0, waiting: 0, running: 0, extra: 0, pressure: 1, bell: -9, trayAt: -9, yaw: 0, pitchUser: null, drag: null, dragged: false };
 function simColors() {
   const probe = el("i"); probe.style.cssText = "position:absolute;visibility:hidden"; document.body.append(probe); const c = {};
   for (const n of ["panel", "text", "muted", "faint", "line", "track", "accent", "warn", "bad"]) { probe.style.color = "var(--" + n + ")"; c[n] = getComputedStyle(probe).color; }
   probe.remove(); return c;
 }
 const rgba = (rgb, a) => rgb.replace(/rgba?\(([^)]+)\)/, (m, v) => "rgba(" + v.split(/[ ,/]+/).filter(Boolean).slice(0, 3).join(",") + "," + a + ")");
-const pathLen = (p) => { let L = 0; for (let i = 1; i < p.length; i++) L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); return L; };
-function pathAt(p, u) {
-  let L = pathLen(p) * u;
-  for (let i = 1; i < p.length; i++) { const s = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); if (L <= s || i === p.length - 1) { const f = s ? Math.min(1, L / s) : 0; return [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * f, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * f]; } L -= s; }
+const path3Len = (p) => { let L = 0; for (let i = 1; i < p.length; i++) L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1], p[i][2] - p[i - 1][2]); return L; };
+function path3At(p, u) {
+  let L = path3Len(p) * u;
+  for (let i = 1; i < p.length; i++) { const s = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1], p[i][2] - p[i - 1][2]); if (L <= s || i === p.length - 1) { const f = s ? Math.min(1, L / s) : 0; return [0, 1, 2].map((k) => p[i - 1][k] + (p[i][k] - p[i - 1][k]) * f); } L -= s; }
 }
-function strokePath(cx, p) { cx.beginPath(); cx.moveTo(p[0][0], p[0][1]); for (let i = 1; i < p.length - 1; i++) cx.arcTo(p[i][0], p[i][1], p[i + 1][0], p[i + 1][1], 12); cx.lineTo(p[p.length - 1][0], p[p.length - 1][1]); }
+const arc3 = (a, b, lift) => { const pts = []; for (let i = 0; i <= 16; i++) { const u = i / 16; pts.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u + lift * 4 * u * (1 - u), a[2] + (b[2] - a[2]) * u]); } return pts; };
+const simQueueLabel = () => "phiếu chờ " + sim.waiting + (sim.g && sim.waiting > sim.g.qvis ? " (hiện " + sim.g.qvis + ")" : "");
+const simRunLabel = () => "bếp đang dùng " + sim.running + (sim.extra > 0 ? " · nhận thêm được " + sim.extra : "");
 const simClock = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60, p2 = (n) => String(n).padStart(2, "0"); return h ? h + ":" + p2(m) + ":" + p2(r) : p2(m) + ":" + p2(r); };
-const simQueueLabel = () => "xe chờ " + sim.waiting + (sim.g && sim.waiting > sim.g.qrows ? " (hiện " + sim.g.qrows + ")" : "");
-const simRunLabel = () => "chỗ đỗ đang dùng " + sim.running + (sim.extra > 0 ? " · nhận thêm được " + sim.extra : "");
-function simGeo(d, W, H) {
-  const n = Math.max(d.cap, d.running.length, 1), zq = Math.max(150, Math.round(W * 0.2)), zd = Math.max(110, Math.round(W * 0.12)), top = 64, ch = 56, inY = 24, outY = 46;
-  const px = zq + 52, pw = Math.max(200, W - px - zd - 40), cols = Math.min(n, pw >= 760 ? 3 : pw >= 420 ? 2 : 1), rows = Math.ceil(n / cols);
-  const podW = (pw - (cols - 1) * ch) / cols, podH = Math.min(124, (H - top - (rows - 1) * 10) / rows), qh = 48, qrows = Math.max(1, Math.floor((H - top - 8) / (qh + 8)));
-  const tx0 = W - zd, dcols = Math.max(1, Math.floor((zd - 12) / 26)), drows = Math.max(1, Math.floor((H - top - 8 - 40) / 26));
-  const pod = (i) => ({ x: px + (i % cols) * (podW + ch), y: top + Math.floor(i / cols) * (podH + 10) });
-  const que = (k) => ({ x: 0, y: top + Math.min(k, qrows - 1) * (qh + 8) });
-  const done = (m) => ({ x: tx0 + 8 + (m % dcols) * 26, y: top + 8 + Math.floor(m / dcols) * 26 });
-  const ptIn = (i) => { const a = pod(i), ym = a.y + podH / 2, h = top + qh / 2; return [[zq, h], [zq + 14, h], [zq + 14, inY], [a.x - 16, inY], [a.x - 16, ym], [a.x, ym]]; };
-  const ptOut = (i, c) => { const a = pod(i), ym = a.y + podH / 2, xo = a.x + podW + 16, bus = tx0 - 6, cell = c || done(0); return [[a.x + podW, ym], [xo, ym], [xo, outY], [bus, outY], [bus, cell.y + 10], [cell.x + 11, cell.y + 10]]; };
-  return { n, zq, zd, px, cols, podW, podH, qh, qrows, dsz: 20, dcap: dcols * drows, tx0, top, H, pod, que, done, ptIn, ptOut };
+// Chiếu điểm thế giới (x sang phải, y lên, z về phía người xem) ra màn hình: xoay quanh trục đứng rồi nghiêng xuống, chia cho độ sâu.
+function proj3(p, cam, fit) {
+  const x = p[0], y = p[1] - 20, z = p[2], cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), x1 = x * cy + z * sy, z1 = -x * sy + z * cy, cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const depth = fit.dist - (y * sp + z1 * cp), k = fit.F / depth;
+  return [fit.ox + fit.s * x1 * k, fit.oy - fit.s * (y * cp - z1 * sp) * k, depth, fit.s * k];
 }
-function simPut(key, state, tg, alpha, job, extra) {
+function simGeo(d, W, H) {
+  const n = Math.max(d.cap, d.running.length, 1), rows = Math.ceil(n / 6), cols = Math.ceil(n / rows), S = 124, RZ = 170, TW = 112, pitch0 = rows > 1 ? 0.95 : 0.72;
+  const qvis = Math.min(8, Math.max(cols + 1, 4)), pcols = 8, zRail = -((rows - 1) * RZ) / 2 - 120, zPass = ((rows - 1) * RZ) / 2 + 150, railY = 130;
+  const pod = (i) => [((i % cols) - (cols - 1) / 2) * S, 0, Math.floor(i / cols) * RZ - ((rows - 1) * RZ) / 2];
+  const que = (k) => [(Math.min(k, qvis - 1) - (qvis - 1) / 2) * TW, railY - 34, zRail];
+  const done = (m) => [(m % pcols - (pcols - 1) / 2) * 38, 2, zPass];
+  const sceneW = Math.max(cols * S, qvis * TW, pcols * 38) + 60, g = { n, rows, cols, S, RZ, TW, qvis, pcols, zRail, zPass, railY, sceneW, pitch0, pod, que, done, dcap: pcols, W, H };
+  // khung nhìn tự co giãn cho vừa canvas: chiếu các góc cảnh với camera chuẩn rồi tính tỉ lệ và vị trí
+  const fit = { F: 900, dist: sceneW * 1.1, s: 1, ox: 0, oy: 0 }, cam = { yaw: 0, pitch: pitch0 }, pts = [], hx = sceneW / 2;
+  for (const sx of [-hx, hx]) pts.push([sx, railY + 30, zRail], [sx, -40, zPass + 40], [sx, -40, zRail]);
+  const raw = pts.map((p) => proj3(p, cam, fit)), x0 = Math.min(...raw.map((r) => r[0])), x1 = Math.max(...raw.map((r) => r[0])), y0 = Math.min(...raw.map((r) => r[1])), y1 = Math.max(...raw.map((r) => r[1]));
+  const topM = 40, botM = 34; fit.s = Math.min((W - 24) / (x1 - x0), (H - topM - botM) / (y1 - y0)); fit.ox = W / 2 - fit.s * (x0 + x1) / 2; fit.oy = topM + (H - topM - botM) / 2 - fit.s * (y0 + y1) / 2;
+  g.fit = fit; return g;
+}
+const simCam = (t) => ({ yaw: sim.yaw + (sim.drag ? 0 : Math.sin(t * 0.18) * 0.08), pitch: sim.pitchUser == null ? sim.g.pitch0 : sim.pitchUser });
+function simPut(key, state, tp, alpha, job, extra) {
   let e = sim.ents.get(key); const now = performance.now() / 1000, g = sim.g;
   if (!e) {
-    e = { key, state, x: tg.x, y: tg.y, w: tg.w, h: tg.h, a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now, trail: [], ang: state === "q" ? -Math.PI / 2 : 0, hue: [...key].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7) };
-    if (!simFirst) e.y = tg.y - (state === "d" ? 30 : 56); // xe mới rơi vào từ trên xuống
+    e = { key, state, p: tp.slice(), a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now, landed: simFirst ? -9 : now, hue: [...key].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7), sb: null };
+    if (!simFirst) e.p[1] += state === "d" ? 40 : 60; // vật mới rơi vào từ phía trên
     sim.ents.set(key, e);
   } else if (e.state !== state && !simFirst) {
-    if (state === "r") startFlow(e, g.ptIn(extra.slot), "in");
-    if (state === "d") { startFlow(e, g.ptOut(e.slot, tg), "out"); ring(e.x + e.w / 2, e.y + e.h / 2, sim.C.warn); if (extra.fail) sim.podFx[e.slot] = { t0: now, kind: "fail" }; }
+    if (state === "r") { startFlow(e, arc3(e.p, [tp[0], 40, tp[2]], 110), "in"); sim.bell = now; ring3(e.p, sim.C.warn); }
+    if (state === "d") { startFlow(e, arc3([e.p[0], 36, e.p[2]], tp, 130), "out"); ring3([e.p[0], 36, e.p[2]], sim.C.warn); if (extra.fail) sim.podFx[e.slot] = { t0: now, kind: "fail" }; }
   }
-  e.state = state; e.tx = tg.x; e.ty = tg.y; e.tw = tg.w; e.th = tg.h; e.ta = alpha; e.job = job; Object.assign(e, extra);
-  if (simFirst) { e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.a = alpha; }
+  e.state = state; e.tp = tp; e.ta = alpha; e.job = job; Object.assign(e, extra);
+  if (simFirst) { e.p = tp.slice(); e.a = alpha; }
   return e;
 }
-function startFlow(e, pts, kind) { e.flow = { pts, u: 0, dur: Math.max(0.9, pathLen(pts) / 300), kind }; e.trail = []; e.a = 1; }
-const burst = (x, y, color, n) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = 40 + Math.random() * 110; sim.parts.push({ k: "spark", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, life: 0.7, max: 0.7, s: 2 + Math.random() * 2, c: color }); } };
-const ring = (x, y, color) => sim.parts.push({ k: "ring", x, y, vx: 0, vy: 0, life: 0.7, max: 0.7, s: 6, c: color });
+function startFlow(e, pts, kind) { e.flow = { pts, u: 0, dur: Math.max(1, path3Len(pts) / 240), kind }; e.trail = []; e.a = 1; }
+const burst3 = (p, color, n) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = 40 + Math.random() * 90; sim.parts.push({ k: "spark", p: p.slice(), v: [Math.cos(a) * v, 60 + Math.random() * 80, Math.sin(a) * v], life: 0.8, max: 0.8, s: 2 + Math.random() * 2, c: color }); } };
+const ring3 = (p, color) => sim.parts.push({ k: "ring", p: [p[0], 1, p[2]], v: [0, 0, 0], life: 0.8, max: 0.8, s: 8, c: color });
 function renderSim(d, p) {
   const stage = $("stage"), H = stage.clientHeight, W = Math.max(stage.clientWidth, 720); // màn hẹp: cảnh giữ chiều rộng tối thiểu và cuộn ngang trong khung
   if (stage.clientWidth < 80 || H < 80) return; // trang đang ẩn: chưa đo được
@@ -398,17 +407,17 @@ function renderSim(d, p) {
   d.running.forEach((j) => { if (!simSlot.has(j.pid)) { let s = 0; while (used.has(s)) s++; simSlot.set(j.pid, s); used.add(s); } });
   sim.used = used; sim.free = g.n - used.size;
   for (let i = 0; i < g.n; i++) if (sim.bayA[i] === undefined) sim.bayA[i] = simFirst ? 1 : 0;
-  d.running.forEach((j) => { const slot = simSlot.get(j.pid), a = g.pod(slot), k = "p" + j.pid; seen.add(k); simPut(k, "r", { x: a.x + 6, y: a.y + 24, w: g.podW - 12, h: Math.max(44, g.podH - 30) }, 1, j, { slot }); });
-  p.waiting.forEach((j, i) => { const k = "p" + j.pid; seen.add(k); simPut(k, "q", { ...g.que(i), w: g.zq, h: g.qh }, i < g.qrows ? 1 : 0, j, { idx: i }); });
+  d.running.forEach((j) => { const slot = simSlot.get(j.pid), k = "p" + j.pid; seen.add(k); simPut(k, "r", g.pod(slot), 1, j, { slot }); });
+  p.waiting.forEach((j, i) => { const k = "p" + j.pid; seen.add(k); simPut(k, "q", g.que(i), i < g.qvis ? 1 : 0, j, { idx: i }); });
   let m = 0;
   for (const r of d.history) {
     if (r.rc == null || m >= g.dcap) continue;
     const k = "p" + parseInt(r.id.split("-")[1], 10); if (seen.has(k)) continue; seen.add(k);
-    simPut(k, "d", { ...g.done(m++), w: 22, h: 14 }, 1, r, { fail: r.rc !== 0 });
+    simPut(k, "d", g.done(m++), 1, r, { fail: r.rc !== 0 });
   }
   sim.okN = d.history.filter((r) => r.rc === 0).length; sim.failN = d.history.filter((r) => r.rc != null && r.rc !== 0).length;
-  for (const [k, e] of sim.ents) if (!seen.has(k) && !e.flow) { e.ta = 0; e.tw = e.w; e.th = e.h; e.tx = e.x; e.ty = e.y; }
-  sim.note = p.waiting.length ? (p.cause ? "Hàng đợi đang chờ vì " + p.cause + "." : waitReason(p.waiting[0], 0, d, p).text) : "Không có lệnh nào đang chờ.";
+  for (const [k, e] of sim.ents) if (!seen.has(k) && !e.flow) { e.ta = 0; e.tp = e.p.slice(); }
+  sim.note = p.waiting.length ? (p.cause ? "Phiếu đang chờ vì " + p.cause + "." : waitReason(p.waiting[0], 0, d, p).text) : "Không có phiếu nào đang chờ.";
   $("simNote").textContent = sim.note; $("simNote").className = "simnote" + (p.waiting.length && p.cause ? " warn" : "");
   renderSimDetail(d, p); simFirst = false; sim.d = d; simKick();
 }
@@ -417,36 +426,33 @@ function simStep(dt, t) {
   for (const [key, e] of sim.ents) {
     const f = e.flow;
     if (f) {
-      f.u += dt / f.dur; const u = Math.min(1, f.u), s = u * u * (3 - 2 * u), [x, y] = pathAt(f.pts, s), [x2, y2] = pathAt(f.pts, Math.min(1, s + 0.02)), sw = f.kind === "in" ? 44 : 30, sh = f.kind === "in" ? 26 : 18;
-      if (Math.hypot(x2 - x, y2 - y) > 0.01) e.ang = Math.atan2(y2 - y, x2 - x);
-      e.x = x - sw / 2; e.y = y - sh / 2; e.w = sw; e.h = sh; e.trail.push([x, y]); if (e.trail.length > 7) e.trail.shift();
+      f.u += dt / f.dur; const u = Math.min(1, f.u), s = u * u * (3 - 2 * u); e.p = path3At(f.pts, s); e.spin = u * 9; e.trail.push(e.p.slice()); if (e.trail.length > 8) e.trail.shift();
       if (f.u >= 1) {
-        e.flow = null; e.trail = []; e.ang = 0;
-        if (f.kind === "in") { ring(x, y, sim.C.accent); e.x = x - 4; e.y = y - 7; e.w = 12; e.h = 14; }
-        else { e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.born = now; sim.trayAt = now; burst(x, y, e.fail ? sim.C.bad : sim.C.accent, e.fail ? 16 : 9); ring(x, y, e.fail ? sim.C.bad : sim.C.accent); }
+        e.flow = null; e.trail = []; e.p = e.tp.slice();
+        if (f.kind === "in") { e.landed = now; ring3(e.tp, sim.C.accent); burst3([e.tp[0], 30, e.tp[2]], sim.C.warn, 8); }
+        else { e.born = now; sim.trayAt = now; burst3(e.tp, e.fail ? sim.C.bad : sim.C.accent, e.fail ? 16 : 10); ring3(e.tp, e.fail ? sim.C.bad : sim.C.accent); }
       }
       continue;
     }
-    e.x += (e.tx - e.x) * k; e.y += (e.ty - e.y) * k; e.w += (e.tw - e.w) * k; e.h += (e.th - e.h) * k; e.a += (e.ta - e.a) * ka;
+    for (let i = 0; i < 3; i++) e.p[i] += (e.tp[i] - e.p[i]) * k; e.a += (e.ta - e.a) * ka;
     if (e.ta === 0 && e.a < 0.02) { sim.ents.delete(key); if (simSel === key) simSel = ""; }
   }
-  sim.valve += ((sim.waiting > 0 ? 1 : 0) - sim.valve) * (1 - Math.exp(-dt * 8));
   for (let i = 0; i < sim.bayA.length; i++) sim.bayA[i] += ((i < g.n ? 1 : 0) - sim.bayA[i]) * (1 - Math.exp(-dt * 5));
-  const want = sim.pressure >= 4 ? 90 : sim.pressure >= 2 ? 36 : 0; // mưa theo áp lực RAM
-  while (sim.rain.length < want) sim.rain.push({ x: Math.random() * sim.W, y: Math.random() * sim.H, v: 320 + Math.random() * 160 });
-  if (sim.rain.length > want) sim.rain.length = want;
-  for (const r of sim.rain) { r.y += r.v * dt; r.x += 70 * dt; if (r.y > sim.H) { r.y = -10; r.x = Math.random() * sim.W; } if (r.x > sim.W) r.x = 0; }
+  const want = sim.pressure >= 4 ? 16 : sim.pressure >= 2 ? 8 : 0; // hơi nước phủ bếp theo áp lực RAM
+  while (sim.fog.length < want) sim.fog.push({ x: Math.random() * sim.W, y: sim.H * (0.3 + Math.random() * 0.5), r: 50 + Math.random() * 70, v: 6 + Math.random() * 10, ph: Math.random() * 6.28 });
+  if (sim.fog.length > want) sim.fog.length = want;
+  for (const f of sim.fog) { f.x += f.v * dt; if (f.x - f.r > sim.W) f.x = -f.r; }
   const parts = sim.parts;
-  for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.life -= dt; if (q.life <= 0) { parts.splice(i, 1); continue; } q.x += q.vx * dt; q.y += q.vy * dt; if (q.k === "spark") q.vy += 220 * dt; if (q.k === "smoke") q.vx += Math.sin(t * 3 + q.s) * 6 * dt; }
+  for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.life -= dt; if (q.life <= 0) { parts.splice(i, 1); continue; } for (let a = 0; a < 3; a++) q.p[a] += q.v[a] * dt; if (q.k === "spark") q.v[1] -= 260 * dt; if (q.k === "steam") { q.v[0] += Math.sin(t * 2.4 + q.s) * 10 * dt; q.s += dt * 4; } }
   sim.d && sim.d.running.forEach((j) => {
-    const slot = simSlot.get(j.pid), lvl = Math.min(1, j.cpu / 200);
-    if (lvl > 0.45 && t - sim.smokeAt > 0.35 * (1.6 - lvl)) { sim.smokeAt = t; const a = g.pod(slot); parts.push({ k: "smoke", x: a.x + 14 + Math.random() * 6, y: a.y + 40 + Math.random() * 6, vx: -10, vy: -24 - 14 * lvl, life: 1.4, max: 1.4, s: 3 + Math.random() * 3, c: sim.C.faint }); }
+    const slot = simSlot.get(j.pid), lvl = Math.min(1, j.cpu / 200), e = sim.ents.get("p" + j.pid);
+    if (e && !e.flow && lvl > 0.2 && t - sim.smokeAt > 0.28 * (1.5 - lvl)) { sim.smokeAt = t; const b = g.pod(slot); parts.push({ k: "steam", p: [b[0] + (Math.random() - 0.5) * 24, 44, b[2] + (Math.random() - 0.5) * 24], v: [0, 26 + 22 * lvl, 0], life: 1.8, max: 1.8, s: Math.random() * 6, r: 7 + Math.random() * 5, c: sim.C.muted }); }
   });
 }
 function simBusy() {
-  if (sim.running || sim.parts.length || sim.rain.length) return true;
-  for (const e of sim.ents.values()) if (e.flow || Math.abs(e.tx - e.x) + Math.abs(e.ty - e.y) + Math.abs(e.tw - e.w) > 0.6 || Math.abs(e.ta - e.a) > 0.02) return true;
-  return Math.abs(sim.valve - (sim.waiting > 0 ? 1 : 0)) > 0.02;
+  if (sim.running || sim.parts.length || sim.fog.length || sim.waiting > 0) return true;
+  for (const e of sim.ents.values()) if (e.flow || Math.abs(e.ta - e.a) > 0.02 || Math.hypot(e.tp[0] - e.p[0], e.tp[1] - e.p[1], e.tp[2] - e.p[2]) > 0.5) return true;
+  return false;
 }
 function simFrame(now) {
   sim.raf = 0; if (view !== "sim" || document.hidden) return;
@@ -455,133 +461,135 @@ function simFrame(now) {
   const tt = performance.now() / 1000; simStep(dt, tt); simDraw(tt); if (simBusy()) sim.raf = requestAnimationFrame(simFrame); else sim.last = 0;
 }
 function simKick() {
-  if (reduceMotion()) { for (const e of sim.ents.values()) { e.flow = null; e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.a = e.ta; } sim.parts.length = 0; sim.rain.length = 0; sim.valve = sim.waiting > 0 ? 1 : 0; simDraw(performance.now() / 1000); return; }
+  if (reduceMotion()) { for (const e of sim.ents.values()) { e.flow = null; e.p = e.tp.slice(); e.a = e.ta; } sim.parts.length = 0; sim.fog.length = 0; simDraw(performance.now() / 1000); return; }
   simDraw(performance.now() / 1000); if (!sim.raf && !document.hidden) sim.raf = requestAnimationFrame(simFrame);
 }
-const rr = (cx, x, y, w, h, r) => { cx.beginPath(); if (cx.roundRect) cx.roundRect(x, y, w, h, r); else cx.rect(x, y, w, h); };
-// Xe nhìn từ trên xuống, tâm (x, y), đầu xe quay về góc ang; truck vẽ xe tải có thùng.
-function car(cx, x, y, len, wid, ang, hue, o) {
-  const L = len / 2, Wd = wid / 2, body = "hsl(" + hue + ",62%,54%)", dark = "hsl(" + hue + ",55%,36%)";
-  cx.save(); cx.translate(x, y); cx.rotate(ang);
-  if (o.beam) { const gr = cx.createLinearGradient(L, 0, L + len * 1.2, 0); gr.addColorStop(0, "rgba(255,236,160,0.38)"); gr.addColorStop(1, "rgba(255,236,160,0)"); cx.fillStyle = gr; cx.beginPath(); cx.moveTo(L, -Wd * 0.6); cx.lineTo(L + len * 1.2, -Wd * 1.7); cx.lineTo(L + len * 1.2, Wd * 1.7); cx.lineTo(L, Wd * 0.6); cx.fill(); }
-  cx.fillStyle = "rgba(0,0,0,0.5)"; for (const sx of [-L * 0.62, L * 0.5]) { cx.fillRect(sx - len * 0.08, -Wd - 1.5, len * 0.16, 3); cx.fillRect(sx - len * 0.08, Wd - 1.5, len * 0.16, 3); }
-  if (o.truck) { cx.fillStyle = dark; rr(cx, -L, -Wd, len * 0.62, wid, 2); cx.fill(); cx.fillStyle = body; rr(cx, -L + len * 0.66, -Wd + 1, len * 0.34, wid - 2, 3); cx.fill(); cx.fillStyle = "rgba(20,30,40,0.78)"; cx.fillRect(L - len * 0.14, -Wd * 0.7, len * 0.1, Wd * 1.4); }
-  else { cx.fillStyle = body; rr(cx, -L, -Wd, len, wid, 4); cx.fill(); cx.fillStyle = "rgba(20,30,40,0.78)"; cx.fillRect(L * 0.12, -Wd * 0.7, L * 0.5, Wd * 1.4); cx.fillRect(-L * 0.7, -Wd * 0.62, L * 0.28, Wd * 1.24); cx.fillStyle = "rgba(255,255,255,0.22)"; cx.fillRect(-L * 0.38, -Wd * 0.6, L * 0.48, Wd * 1.2); }
-  cx.fillStyle = "#fff4c2"; cx.fillRect(L - 2.5, -Wd + 1.5, 2.5, 4); cx.fillRect(L - 2.5, Wd - 5.5, 2.5, 4);
-  cx.fillStyle = o.brake ? "#ff3b30" : "#74201e"; cx.fillRect(-L, -Wd + 1.5, 2.5, 4); cx.fillRect(-L, Wd - 5.5, 2.5, 4);
-  if (o.brake) { cx.fillStyle = "rgba(255,59,48,0.25)"; cx.fillRect(-L - 5, -Wd, 5, wid); }
-  if (o.hazard) { cx.fillStyle = "#ffb020"; for (const [hx, hy] of [[-L, -Wd], [-L, Wd - 3], [L - 3, -Wd], [L - 3, Wd - 3]]) cx.fillRect(hx, hy, 3, 3); }
-  cx.restore();
-}
+const LIGHT = [-0.35, 0.8, 0.5];
+const shade = (nx, ny, nz) => 0.5 + 0.5 * Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
 function simDraw(t) {
   const cx = sim.cx, C = sim.C, g = sim.g, W = sim.W, H = sim.H, d = sim.d; if (!cx || !g || !d) return;
   cx.setTransform(sim.dpr, 0, 0, sim.dpr, 0, 0); cx.clearRect(0, 0, W, H);
-  const fam = getComputedStyle(document.body).fontFamily, mono = "12px ui-monospace,Menlo,monospace", ents = [...sim.ents.values()], wet = sim.pressure >= 2;
-  const fit = (s, mw) => { if (cx.measureText(s).width <= mw) return s; let x = s; while (x.length > 1 && cx.measureText(x + "…").width > mw) x = x.slice(0, -1); return x + "…"; };
-  const isTruck = (e) => e.job && e.job.mem >= 1500;
-  cx.textBaseline = "alphabetic"; cx.font = "600 12px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted;
-  cx.fillText(simQueueLabel(), 0, 12); cx.fillText(simRunLabel(), g.px, 12); cx.textAlign = "right"; cx.fillText("bãi xe ra", W, 12); cx.textAlign = "left";
-  // đường nhựa: làn vào và làn ra, vạch giữa đường chạy khi có xe
-  const busyIn = new Set(ents.filter((e) => e.flow && e.flow.kind === "in").map((e) => e.slot)), busyOut = new Set(ents.filter((e) => e.flow && e.flow.kind === "out").map((e) => e.slot));
-  for (let i = 0; i < g.n; i++) {
-    for (const [pts, on] of [[g.ptIn(i), busyIn.has(i)], [g.ptOut(i), busyOut.has(i)]]) {
-      cx.save(); cx.lineJoin = "round"; cx.lineCap = "round"; strokePath(cx, pts); cx.strokeStyle = rgba(C.text, wet ? 0.13 : 0.08); cx.lineWidth = 16; cx.stroke();
-      strokePath(cx, pts); cx.strokeStyle = rgba(C.muted, on ? 0.9 : 0.4); cx.lineWidth = 1; cx.setLineDash([7, 9]); cx.lineDashOffset = on ? -t * 40 : 0; cx.stroke(); cx.restore();
-    }
-  }
-  // rào chắn ở đầu hàng chờ: hạ khi có xe chờ mà chưa vào được, nâng khi trống
-  const bx = g.zq + 3, by = 56, free = sim.free > 0;
-  cx.save(); cx.translate(bx, by); cx.fillStyle = C.muted; cx.fillRect(-4, -4, 8, 8); cx.rotate(-(1 - sim.valve) * Math.PI * 0.45);
-  for (let k = 0; k < 4; k++) { cx.fillStyle = k % 2 ? C.panel : (free ? C.warn : C.faint); cx.fillRect(4 + k * 5, -2.5, 5, 5); }
-  cx.restore();
-  // bãi xe ra
-  cx.save(); cx.strokeStyle = performance.now() / 1000 - sim.trayAt < 0.4 ? C.accent : C.line; cx.setLineDash([4, 4]); cx.strokeRect(g.tx0 + 0.5, g.top + 0.5, g.zd - 1, g.H - g.top - 4); cx.restore();
-  cx.font = mono; cx.fillStyle = C.muted; cx.fillText("xong " + sim.okN, g.tx0 + 8, g.H - 22); cx.fillStyle = sim.failN ? C.bad : C.muted; cx.fillText("lỗi " + sim.failN, g.tx0 + 8, g.H - 8);
-  // chỗ đỗ: vạch sơn hai bên, thanh chặn bánh ở cuối, đèn báo; chỗ mới mở nhạt dần hiện ra
-  for (let i = 0; i < g.n; i++) {
-    const a = g.pod(i), busy = sim.used.has(i), fx = sim.podFx[i], run = ents.find((e) => e.state === "r" && e.slot === i), lvl = busy && run ? Math.min(1, run.job.cpu / 200) : 0; let dx = 0;
-    if (fx && t - fx.t0 < 0.5) dx = Math.sin(t * 70) * 3 * (1 - (t - fx.t0) / 0.5);
-    cx.save(); cx.globalAlpha = Math.max(0, Math.min(1, sim.bayA[i])); cx.translate(dx, 0);
-    if (busy) { cx.shadowColor = rgba(C.warn, 0.9); cx.shadowBlur = lvl * (10 + 10 * Math.sin(t * 3)); }
-    cx.fillStyle = rgba(C.text, busy ? 0.1 : 0.05); cx.fillRect(a.x, a.y, g.podW, g.podH); cx.shadowBlur = 0;
-    cx.strokeStyle = busy ? rgba(C.accent, 0.8) : C.line; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(a.x, a.y + 1); cx.lineTo(a.x + g.podW, a.y + 1); cx.moveTo(a.x, a.y + g.podH - 1); cx.lineTo(a.x + g.podW, a.y + g.podH - 1); cx.stroke();
-    cx.fillStyle = busy ? C.accent : C.faint; cx.fillRect(a.x + g.podW - 5, a.y + 6, 5, g.podH - 12);
-    cx.fillStyle = busy ? rgba(C.accent, 0.6 + 0.4 * Math.sin(t * 4)) : sim.waiting ? C.warn : C.faint; cx.beginPath(); cx.arc(a.x + 12, a.y + 12, 4, 0, 6.3); cx.fill();
-    cx.font = mono; cx.fillStyle = C.muted; cx.fillText("chỗ " + (i + 1), a.x + 22, a.y + 16);
+  const cam = simCam(t), fit = g.fit, P = (p) => proj3(p, cam, fit), now = performance.now() / 1000, fam = getComputedStyle(document.body).fontFamily, mono = "12px ui-monospace,Menlo,monospace";
+  const fit2 = (s, mw) => { if (cx.measureText(s).width <= mw) return s; let x = s; while (x.length > 1 && cx.measureText(x + "…").width > mw) x = x.slice(0, -1); return x + "…"; };
+  const poly = (pts, fill, stroke, lw) => { cx.beginPath(); pts.forEach((q, i) => i ? cx.lineTo(q[0], q[1]) : cx.moveTo(q[0], q[1])); cx.closePath(); if (fill) { cx.fillStyle = fill; cx.fill(); } if (stroke) { cx.strokeStyle = stroke; cx.lineWidth = lw || 1; cx.stroke(); } };
+  const box = (x0, x1, y0, y1, z0, z1, top, front, side) => { // hộp: mặt trên, mặt trước, hai mặt bên
+    const c = (x, y, z) => P([x, y, z]);
+    poly([c(x0, y1, z0), c(x1, y1, z0), c(x1, y1, z1), c(x0, y1, z1)], top, C.line);
+    poly([c(x0, y1, z1), c(x1, y1, z1), c(x1, y0, z1), c(x0, y0, z1)], front, C.line);
+    poly([c(x0, y1, z0), c(x0, y1, z1), c(x0, y0, z1), c(x0, y0, z0)], side, C.line); poly([c(x1, y1, z1), c(x1, y1, z0), c(x1, y0, z0), c(x1, y0, z1)], side, C.line);
+  };
+  const hx = g.sceneW / 2;
+  // sàn gạch và tường sau
+  for (let zi = -8; zi < 8; zi++) for (let xi = -10; xi < 10; xi++) { const x = xi * 70, z = zi * 70 + g.zPass - 280; if (z < g.zRail - 60 || z > g.zPass + 70) continue; poly([P([x, -40, z]), P([x + 70, -40, z]), P([x + 70, -40, z + 70]), P([x, -40, z + 70])], rgba(C.text, (xi + zi) & 1 ? 0.035 : 0.07)); }
+  poly([P([-hx - 100, -40, g.zRail - 60]), P([hx + 100, -40, g.zRail - 60]), P([hx + 100, 260, g.zRail - 60]), P([-hx - 100, 260, g.zRail - 60])], rgba(C.text, 0.045));
+  // mặt bếp và quầy lấy món
+  const sx = (g.cols * g.S) / 2 + 20, szN = -((g.rows - 1) * g.RZ) / 2 - 64, szF = ((g.rows - 1) * g.RZ) / 2 + 64;
+  box(-sx, sx, -40, 0, szN, szF, rgba(C.text, 0.12), rgba(C.text, 0.2), rgba(C.text, 0.16));
+  const px2 = (g.pcols * 38) / 2 + 14; box(-px2, px2, -40, 0, g.zPass - 30, g.zPass + 30, rgba(C.text, 0.12), rgba(C.text, 0.2), rgba(C.text, 0.16));
+  // ray treo phiếu
+  const r0 = P([-hx + 20, g.railY, g.zRail]), r1 = P([hx - 20, g.railY, g.zRail]); cx.strokeStyle = C.muted; cx.lineWidth = Math.max(2, r0[3] * 4); cx.beginPath(); cx.moveTo(r0[0], r0[1]); cx.lineTo(r1[0], r1[1]); cx.stroke();
+  // các vật cần sắp theo độ sâu: xa vẽ trước
+  const items = [], ents = [...sim.ents.values()];
+  for (let i = 0; i < g.n; i++) { const b = g.pod(i), q = P([b[0], 0, b[2]]); items.push({ z: q[2], draw: () => drawBurner(i, b) }); }
+  for (const e of ents) { if (e.a < 0.02) continue; const q = P(e.p); items.push({ z: q[2], draw: () => drawEnt(e) }); }
+  for (const q of sim.parts) { const s = P(q.p); items.push({ z: s[2], draw: () => drawPart(q) }); }
+  items.sort((a, b) => b.z - a.z); items.forEach((it) => it.draw());
+  function drawBurner(i, b) {
+    const run = ents.find((e) => e.state === "r" && e.slot === i && !e.flow), busy = sim.used.has(i), a = Math.max(0, Math.min(1, sim.bayA[i])), ring = [];
+    for (let k = 0; k < 28; k++) { const ang = k / 28 * 6.2832; ring.push(P([b[0] + Math.cos(ang) * 36, 0.5, b[2] + Math.sin(ang) * 36])); }
+    cx.save(); cx.globalAlpha = a; poly(ring, rgba(C.text, 0.08), busy ? rgba(C.warn, 0.9) : C.line, 2);
+    for (let k = 0; k < 4; k++) { const ang = k * Math.PI / 2 + Math.PI / 4, s0 = P([b[0] + Math.cos(ang) * 14, 1, b[2] + Math.sin(ang) * 14]), s1 = P([b[0] + Math.cos(ang) * 36, 1, b[2] + Math.sin(ang) * 36]); cx.strokeStyle = rgba(C.muted, 0.7); cx.lineWidth = Math.max(1.5, s0[3] * 4); cx.beginPath(); cx.moveTo(s0[0], s0[1]); cx.lineTo(s1[0], s1[1]); cx.stroke(); }
+    if (!run) { const c = P([b[0], 1, b[2] + 50]); cx.font = mono; cx.fillStyle = C.muted; cx.textAlign = "center"; cx.fillText(busy ? "đặt nồi…" : "bếp " + (i + 1), c[0], c[1]); cx.textAlign = "left"; }
     cx.restore();
   }
-  // xe: hàng chờ và xe đã ra vẽ trước, xe đang đỗ vẽ sau cùng để nằm trên chỗ đỗ
-  for (const e of ents.sort((p, q) => (p.state === "r") - (q.state === "r"))) {
-    if (e.a < 0.02) continue; cx.save(); cx.globalAlpha = Math.min(1, e.a);
-    let x = e.x, y = e.y, w = e.w, h = e.h; const sel = e.key === simSel, hov = e.key === sim.hover, truck = isTruck(e);
+  function drawEnt(e) {
+    const c = P(e.p), k = c[3]; cx.save(); cx.globalAlpha = Math.min(1, e.a); let bb;
     if (e.flow) {
-      car(cx, x + w / 2, y + h / 2, truck ? 46 : 36, 18, e.ang, e.hue, { beam: true, truck, hazard: e.fail && e.flow.kind === "out" });
-    } else if (e.state === "d") {
-      const age = Math.max(0, t - (e.born || 0)), s = age < 0.6 ? 1 + 0.7 * Math.exp(-age * 7) * Math.cos(age * 14) : 1;
-      car(cx, x + w / 2, y + h / 2, 22 * s, 12 * s, 0, e.fail ? 2 : e.hue, { truck: false, hazard: e.fail && Math.sin(t * 8) > 0 });
-    } else if (e.state === "q") {
-      y += Math.sin(t * 2 + e.seed) * 1.2;
-      car(cx, x + 24, y + h / 2, truck ? 44 : 38, 19, -Math.PI / 2, e.hue, { truck, brake: sim.valve > 0.5 });
-      cx.font = "600 13px " + fam; cx.fillStyle = C.text; cx.fillText(fit(niceTitle(e.job.cmd), w - 50), x + 44, y + 20);
-      cx.font = mono; cx.fillStyle = C.muted; cx.fillText(fit("chờ " + simClock(Date.now() / 1000 - e.job.queued), w - 50), x + 44, y + 38);
-      if (e.idx === 0) { cx.strokeStyle = C.text; cx.lineWidth = 1; cx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); }
-    } else {
-      const dial = g.podW >= 200, R = dial ? Math.min(30, (h - 10) / 2) : 0, tw = w - 18 - (dial ? 2 * R + 8 : 0), age = Date.now() / 1000 - e.job.started, hot = Math.min(1, e.job.cpu / 200);
-      const prog = Math.max(0, Math.min(1, (e.w - 40) / Math.max(1, e.tw - 40)));
-      cx.font = "600 13px " + fam; cx.fillStyle = C.text; cx.fillText(fit(niceTitle(e.job.cmd), w - 16), x + 8, y + 15);
-      const len = truck ? 50 : 40, cyc = y + 15 + (h - 15) / 2;
-      car(cx, x + 12 + len / 2, cyc, len, 22, 0, e.hue, { truck, beam: false });
-      cx.fillStyle = rgba("#ff7a30", 0.15 + 0.35 * hot * (0.6 + 0.4 * Math.sin(t * 9))); cx.fillRect(x + 8, cyc - 4, 4, 8);
-      cx.globalAlpha = Math.min(1, e.a) * prog; cx.font = mono; cx.fillStyle = C.muted; const tx = x + 12 + len + 10;
-      const room = x + w - (dial ? 2 * R + 14 : 8) - tx;
-      if (room > 20) { if (h >= 72) { cx.fillText(fit(simClock(age), room), tx, cyc - 10); cx.fillText(fit(fmtCpu(e.job.cpu) + " nhân", room), tx, cyc + 6); cx.fillText(fit(fmtMem(e.job.mem), room), tx, cyc + 22); } else { cx.fillText(fit(simClock(age), room), tx, cyc - 2); if (h >= 58) cx.fillText(fit(fmtCpu(e.job.cpu) + " nhân", room), tx, cyc + 14); } }
-    }
-    if (sel || hov) { cx.strokeStyle = C.text; cx.lineWidth = sel ? 2 : 1; cx.strokeRect(x - 1.5, y - 1.5, w + 3, h + 3); }
+      e.trail.forEach((tp, i) => { const s = P(tp); cx.fillStyle = rgba(e.fail ? C.bad : C.warn, (i + 1) / (e.trail.length * 5)); cx.beginPath(); cx.arc(s[0], s[1], 3 * s[3], 0, 6.3); cx.fill(); });
+      cx.translate(c[0], c[1]);
+      if (e.flow.kind === "in") { cx.rotate(Math.sin(e.spin) * 0.35); cx.fillStyle = C.panel; cx.strokeStyle = C.warn; cx.lineWidth = 1.5; cx.fillRect(-17 * k, -11 * k, 34 * k, 22 * k); cx.strokeRect(-17 * k, -11 * k, 34 * k, 22 * k); cx.fillStyle = C.muted; cx.fillRect(-12 * k, -5 * k, 24 * k, 2 * k); cx.fillRect(-12 * k, 1 * k, 18 * k, 2 * k); bb = [c[0] - 17 * k, c[1] - 11 * k, c[0] + 17 * k, c[1] + 11 * k]; }
+      else { plate(0, 0, 14 * k, e); bb = [c[0] - 14 * k, c[1] - 8 * k, c[0] + 14 * k, c[1] + 8 * k]; }
+    } else if (e.state === "q") bb = drawTicket(e, c, k);
+    else if (e.state === "d") bb = drawPlate(e, c, k, t);
+    else bb = drawPot(e, t);
+    cx.restore(); e.sb = bb;
+    if (bb && (e.key === simSel || e.key === sim.hover)) { cx.save(); cx.strokeStyle = C.text; cx.lineWidth = e.key === simSel ? 2 : 1; cx.strokeRect(bb[0] - 2, bb[1] - 2, bb[2] - bb[0] + 4, bb[3] - bb[1] + 4); cx.restore(); }
+  }
+  function plate(x, y, r, e) { cx.fillStyle = C.panel; cx.strokeStyle = e.fail ? C.bad : C.muted; cx.lineWidth = 2; cx.beginPath(); cx.ellipse(x, y, r, r * 0.55, 0, 0, 6.3); cx.fill(); cx.stroke(); cx.fillStyle = e.fail ? "#2a1a18" : "hsl(" + e.hue + ",55%,45%)"; cx.beginPath(); cx.ellipse(x, y - r * 0.08, r * 0.55, r * 0.3, 0, 0, 6.3); cx.fill(); }
+  function drawPlate(e, c, k, tt) {
+    const age = Math.max(0, tt - (e.born || 0)), s = age < 0.6 ? 1 + 0.4 * Math.exp(-age * 7) * Math.cos(age * 14) : 1, r = 14 * k * s;
+    plate(c[0], c[1], r, e); if (e.fail && Math.sin(tt * 8) > 0) { cx.fillStyle = rgba(C.bad, 0.9); cx.fillRect(c[0] - 2, c[1] - r - 8, 4, 4); }
+    return [c[0] - r, c[1] - r * 0.6, c[0] + r, c[1] + r * 0.6];
+  }
+  function drawTicket(e, c, k) {
+    const w = 100, h = 58, sw = Math.sin(t * 1.6 + e.seed) * 0.05, top = e.p[1] + h / 2, xs = [-w / 2, w / 2], pts = [];
+    pts.push(P([e.p[0] - w / 2, top, e.p[2]]), P([e.p[0] + w / 2, top, e.p[2]]));
+    for (let q = 0; q <= 10; q++) pts.push(P([e.p[0] + w / 2 - q * w / 10, top - h + (q % 2 ? 5 : 0), e.p[2] + Math.sin(sw) * h]));
+    poly(pts, rgba(C.text, 0.1), e.idx === 0 ? C.text : C.line, 1);
+    const tl = P([e.p[0] - w / 2 + 6, top - 18, e.p[2]]), sc = Math.max(0.55, pts[0][3] * 1.0); void xs;
+    cx.save(); cx.translate(tl[0], tl[1]); cx.font = "600 " + Math.max(10, 13 * sc) + "px " + fam; cx.fillStyle = C.text; cx.fillText(fit2(niceTitle(e.job.cmd), (w - 12) * sc), 0, 0);
+    cx.font = Math.max(10, 12 * sc) + "px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted; cx.fillText("#" + (e.idx + 1) + " · " + simClock(Date.now() / 1000 - e.job.queued), 0, 17 * sc); cx.restore();
+    const clip = P([e.p[0], g.railY, g.zRail]); cx.strokeStyle = C.muted; cx.lineWidth = Math.max(1, k * 2); cx.beginPath(); cx.moveTo(clip[0], clip[1]); cx.lineTo(pts[0][0] / 2 + pts[1][0] / 2, pts[0][1]); cx.stroke();
+    const xsAll = pts.map((q) => q[0]), ysAll = pts.map((q) => q[1]); return [Math.min(...xsAll), Math.min(...ysAll), Math.max(...xsAll), Math.max(...ysAll)];
+  }
+  function cyl(b, R, hgt, base, lightK) { // thân trụ: các mảnh vẽ từ xa tới gần, đổ bóng theo hướng sáng
+    const N = 22, segs = [];
+    for (let i = 0; i < N; i++) { const a0 = i / N * 6.2832, a1 = (i + 1) / N * 6.2832, am = (a0 + a1) / 2; segs.push({ i, a0, a1, am, z: P([b[0] + Math.cos(am) * R, b[1] + hgt / 2, b[2] + Math.sin(am) * R])[2] }); }
+    segs.sort((p, q) => q.z - p.z);
+    for (const s of segs) { const sh = shade(Math.cos(s.am), 0, Math.sin(s.am)) * lightK; poly([P([b[0] + Math.cos(s.a0) * R, b[1] + hgt, b[2] + Math.sin(s.a0) * R]), P([b[0] + Math.cos(s.a1) * R, b[1] + hgt, b[2] + Math.sin(s.a1) * R]), P([b[0] + Math.cos(s.a1) * R, b[1], b[2] + Math.sin(s.a1) * R]), P([b[0] + Math.cos(s.a0) * R, b[1], b[2] + Math.sin(s.a0) * R])], "hsl(" + base + ",8%," + Math.round(20 + 42 * sh) + "%)"); }
+  }
+  function drawPot(e, tt) {
+    const b = [e.p[0], e.p[1], e.p[2]], big = e.job.mem >= 1500, R = big ? 30 : 25, hgt = big ? 40 : 30, hot = Math.min(1, e.job.cpu / 200), ign = Math.min(1, (now - e.landed) / 0.6);
+    const age = Date.now() / 1000 - e.job.started, pct = Math.min(1, age / d.timeout), col = pct >= 0.95 ? C.bad : pct >= 0.8 ? C.warn : C.accent, drop = Math.max(0, 1 - (now - e.landed) / 0.45), fx = sim.podFx[e.slot];
+    let dx = Math.sin(tt * 40) * hot * 1.2; if (fx && tt - fx.t0 < 0.5) dx += Math.sin(tt * 70) * 3 * (1 - (tt - fx.t0) / 0.5); b[0] += dx; b[1] += drop * 30;
+    const flame = (front) => { for (let k = 0; k < 12; k++) { const ang = k / 12 * 6.2832 + tt * 0.5, fr = Math.sin(ang) > 0; if (fr !== front) continue; const L = (6 + 22 * hot) * (0.6 + 0.4 * Math.sin(tt * 9 + k * 1.7)) * ign, r0 = R + 4;
+      for (const [sz, c2] of [[1, "rgba(255,120,30,0.85)"], [0.55, "rgba(255,225,120,0.95)"]]) poly([P([b[0] + Math.cos(ang - 0.22) * r0, 1, b[2] + Math.sin(ang - 0.22) * r0]), P([b[0] + Math.cos(ang) * (r0 + 3), 1 + L * sz, b[2] + Math.sin(ang) * (r0 + 3)]), P([b[0] + Math.cos(ang + 0.22) * r0, 1, b[2] + Math.sin(ang + 0.22) * r0])], c2); } };
+    flame(false);
+    cyl(b, R, hgt, big ? 215 : 30, 1);
+    const top = []; for (let k = 0; k < 26; k++) { const a = k / 26 * 6.2832; top.push(P([b[0] + Math.cos(a) * R, b[1] + hgt, b[2] + Math.sin(a) * R])); }
+    poly(top, "rgba(20,20,24,0.9)", C.muted, 2);
+    const lvl = Math.max(0.15, Math.min(1, e.job.mem / Math.max(500, d.totalMb / Math.max(2, d.cap)))), ly = b[1] + hgt - 3 - (1 - lvl) * (hgt - 8), liq = [];
+    for (let k = 0; k < 26; k++) { const a = k / 26 * 6.2832, rr = (R - 4) * (1 + 0.03 * Math.sin(a * 3 + tt * 3)); liq.push(P([b[0] + Math.cos(a) * rr, ly, b[2] + Math.sin(a) * rr])); }
+    poly(liq, "hsl(" + e.hue + ",55%,42%)");
+    for (let q = 0; q < 2 + Math.round(hot * 5); q++) { const ba = q * 2.4 + tt * 0.6, br = (R - 9) * ((q * 0.37 + tt * (0.3 + hot * 0.6)) % 1), s = P([b[0] + Math.cos(ba) * br * 0.8, ly + 0.5, b[2] + Math.sin(ba) * br * 0.8]); cx.fillStyle = "rgba(255,255,255,0.6)"; cx.beginPath(); cx.arc(s[0], s[1], Math.max(1, s[3] * (1.5 + (q % 2))), 0, 6.3); cx.fill(); }
+    const h1 = P([b[0] + R, b[1] + hgt - 6, b[2]]), h2 = P([b[0] + R + (big ? 10 : 26), b[1] + hgt - 6, b[2]]); cx.strokeStyle = C.muted; cx.lineWidth = Math.max(3, h1[3] * 6); cx.lineCap = "round"; cx.beginPath(); cx.moveTo(h1[0], h1[1]); cx.lineTo(h2[0], h2[1]); cx.stroke(); cx.lineCap = "butt";
+    flame(true);
+    const arcPts = []; for (let k = 0; k <= 28; k++) { const a = -Math.PI / 2 + k / 28 * pct * 6.2832; arcPts.push(P([b[0] + Math.cos(a) * (R + 12), 1.5, b[2] + Math.sin(a) * (R + 12)])); }
+    const full = []; for (let k = 0; k < 40; k++) { const a = k / 40 * 6.2832; full.push(P([b[0] + Math.cos(a) * (R + 12), 1.5, b[2] + Math.sin(a) * (R + 12)])); }
+    poly(full, null, rgba(C.track, 1), Math.max(2, full[0][3] * 5)); if (pct > 0) { cx.beginPath(); arcPts.forEach((q, i) => i ? cx.lineTo(q[0], q[1]) : cx.moveTo(q[0], q[1])); cx.strokeStyle = col; cx.lineWidth = Math.max(2, full[0][3] * 5); cx.stroke(); }
+    const lab = P([b[0], 0, b[2] + R + 30]), kk = lab[3], tw = g.S * kk * 0.92; cx.save(); cx.globalAlpha = Math.min(1, e.a) * Math.min(1, ign * 2); cx.textAlign = "center"; cx.font = "600 " + Math.max(11, 12 * kk) + "px " + fam; cx.fillStyle = C.text; cx.fillText(fit2(niceTitle(e.job.cmd), tw), lab[0], lab[1]);
+    cx.font = Math.max(11, 12 * kk) + "px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted; cx.fillText(simClock(age) + " · " + fmtCpu(e.job.cpu) + " nhân", lab[0], lab[1] + Math.max(13, 14 * kk)); cx.restore();
+    const xs = full.concat(top).map((q) => q[0]), ys = full.concat(top).map((q) => q[1]); return [Math.min(...xs), Math.min(...ys) - 10, Math.max(...xs), Math.max(...ys) + 26];
+  }
+  function drawPart(q) {
+    const s = P(q.p), f = q.life / q.max; cx.save();
+    if (q.k === "ring") { const pts = []; for (let k = 0; k < 24; k++) { const a = k / 24 * 6.2832, rr = q.s + (1 - f) * 40; pts.push(P([q.p[0] + Math.cos(a) * rr, q.p[1], q.p[2] + Math.sin(a) * rr])); } poly(pts, null, rgba(q.c, f), 2); }
+    else if (q.k === "steam") { cx.fillStyle = rgba(q.c, 0.34 * f); cx.beginPath(); cx.arc(s[0], s[1], (q.r + (1 - f) * 8) * s[3], 0, 6.3); cx.fill(); }
+    else { cx.fillStyle = rgba(q.c, f); cx.fillRect(s[0], s[1], q.s * s[3] * 1.5, q.s * s[3] * 1.5); }
     cx.restore();
   }
-  // đồng hồ xe ở mỗi chỗ đỗ: vòng = thời gian đã chạy, nước = RAM, kim = CPU
-  for (let i = 0; i < g.n && g.podW >= 200; i++) {
-    const a = g.pod(i), busy = sim.used.has(i), run = ents.find((e) => e.state === "r" && e.slot === i && !e.flow); if (busy && !run) continue;
-    const bh = Math.max(44, g.podH - 30), R = Math.min(30, (bh - 10) / 2), x0 = a.x + 6 + g.podW - 12 - 8 - R, y0 = a.y + 24 + bh / 2, job = run && run.job;
-    const pct = job ? Math.min(1, (Date.now() / 1000 - job.started) / d.timeout) : 0, col = pct >= 0.95 ? C.bad : pct >= 0.8 ? C.warn : C.accent;
-    cx.save(); cx.globalAlpha = Math.max(0, Math.min(1, sim.bayA[i])); cx.fillStyle = C.panel; cx.beginPath(); cx.arc(x0, y0, R, 0, 6.3); cx.fill(); cx.lineWidth = busy ? 5 : 2; cx.strokeStyle = rgba(busy ? C.track : C.faint, 1); cx.setLineDash(busy ? [] : [3, 4]); cx.beginPath(); cx.arc(x0, y0, R - 2, 0, 6.3); cx.stroke(); cx.setLineDash([]);
-    if (job) {
-      cx.strokeStyle = col; cx.beginPath(); cx.arc(x0, y0, R - 2, -Math.PI / 2, -Math.PI / 2 + pct * 6.2832); cx.stroke();
-      cx.save(); const lvl = Math.max(0.08, Math.min(1, job.mem / Math.max(500, d.totalMb / Math.max(2, d.cap)))), top = y0 + R - 7 - lvl * (2 * R - 14);
-      cx.beginPath(); cx.arc(x0, y0, R - 6, 0, 6.3); cx.clip(); cx.fillStyle = rgba(lvl > 0.9 ? C.warn : C.accent, 0.4); cx.beginPath(); cx.moveTo(x0 - R, y0 + R);
-      for (let wx = -R; wx <= R; wx += 3) cx.lineTo(x0 + wx, top + Math.sin(wx * 0.3 + t * 3) * 2); cx.lineTo(x0 + R, y0 + R); cx.fill(); cx.restore();
-      const na = (-225 + 270 * Math.min(1, job.cpu / 200)) * Math.PI / 180 + Math.sin(t * 13) * 0.04;
-      cx.strokeStyle = C.text; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(x0, y0); cx.lineTo(x0 + Math.cos(na) * (R - 8), y0 + Math.sin(na) * (R - 8)); cx.stroke(); cx.fillStyle = C.text; cx.beginPath(); cx.arc(x0, y0, 2.5, 0, 6.3); cx.fill();
-    }
-    cx.restore();
-  }
-  for (const q of sim.parts) {
-    const f = q.life / q.max; cx.save();
-    if (q.k === "ring") { cx.strokeStyle = rgba(q.c, f); cx.lineWidth = 2; cx.beginPath(); cx.arc(q.x, q.y, q.s + (1 - f) * 30, 0, 6.3); cx.stroke(); }
-    else if (q.k === "smoke") { cx.fillStyle = rgba(q.c, 0.5 * f); cx.beginPath(); cx.arc(q.x, q.y, q.s + (1 - f) * 6, 0, 6.3); cx.fill(); }
-    else { cx.fillStyle = rgba(q.c, f); cx.fillRect(q.x, q.y, q.s, q.s); }
-    cx.restore();
-  }
-  if (sim.rain.length) { cx.save(); cx.strokeStyle = rgba(C.text, 0.32); cx.lineWidth = 1; cx.beginPath(); for (const r of sim.rain) { cx.moveTo(r.x, r.y); cx.lineTo(r.x - 3, r.y - 9); } cx.stroke(); cx.restore(); }
-  // đường tải CPU ở đáy như máy đo nhịp tim, kèm chú giải
-  const y0 = H - 40, y1 = H - 6;
-  cx.font = mono; cx.fillStyle = C.muted; cx.fillText("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6); cx.fillText("vòng = thời gian · nước = RAM · kim = CPU · mưa = RAM căng", 130, y0 - 6);
+  for (const f of sim.fog) { const gr = cx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r); gr.addColorStop(0, rgba(C.muted, 0.2 + 0.05 * Math.sin(t + f.ph))); gr.addColorStop(1, rgba(C.muted, 0)); cx.fillStyle = gr; cx.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2); }
+  // chuông gọi món ở đầu ray
+  const bp = P([hx - 6, g.railY - 10, g.zRail]), rg = Math.max(0, 1 - (now - sim.bell) / 0.7); cx.save(); cx.translate(bp[0], bp[1]); cx.rotate(Math.sin(now * 40) * 0.25 * rg); cx.fillStyle = rg > 0 ? C.warn : C.muted; cx.beginPath(); cx.arc(0, 4, 13 * bp[3], Math.PI, 0); cx.fill(); cx.fillRect(-15 * bp[3], 4, 30 * bp[3], 4); cx.restore();
+  // chữ cố định trên màn hình: nhãn, bộ đếm, chú giải
+  cx.textBaseline = "alphabetic"; cx.font = "600 12px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted; cx.fillText(simQueueLabel(), 0, 12); cx.fillText(simRunLabel(), 0, 28);
+  cx.textAlign = "right"; cx.fillText("xong " + sim.okN, W - 78, 12); cx.fillStyle = sim.failN ? C.bad : C.muted; cx.fillText("lỗi " + sim.failN, W, 12); cx.textAlign = "left";
+  const y0 = H - 40, y1 = H - 6; cx.font = mono; cx.fillStyle = C.muted; cx.fillText("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6); cx.fillText("vòng = thời gian · lửa = CPU · nước trong nồi = RAM · hơi nước = RAM căng · kéo chuột để xoay", 130, y0 - 6);
   const top = Math.max(d.maxLoad * 1.25, ...loads, 1), yy = (v) => y1 - (Math.min(v, top) / top) * (y1 - y0);
   cx.save(); cx.setLineDash([3, 4]); cx.strokeStyle = rgba(C.faint, 0.6); cx.beginPath(); cx.moveTo(0, yy(d.maxLoad)); cx.lineTo(W, yy(d.maxLoad)); cx.stroke(); cx.restore();
   if (loads.length > 1) { cx.strokeStyle = loads[loads.length - 1] >= d.maxLoad ? C.bad : C.accent; cx.lineWidth = 1.5; cx.beginPath(); loads.forEach((v, i) => { const x = (i / (loads.length - 1)) * W; i ? cx.lineTo(x, yy(v)) : cx.moveTo(x, yy(v)); }); cx.stroke(); const lv = loads[loads.length - 1]; cx.fillStyle = cx.strokeStyle; cx.beginPath(); cx.arc(W - 2, yy(lv), 3 + Math.sin(t * 5), 0, 6.3); cx.fill(); }
 }
 function simHit(x, y) {
   let best = null;
-  for (const e of sim.ents.values()) if (e.ta > 0 && e.a > 0.4 && x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h && (!best || (e.state === "r") > (best.state === "r"))) best = e;
+  for (const e of sim.ents.values()) { const b = e.sb; if (e.ta > 0 && e.a > 0.4 && b && x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3] && (!best || e.p[2] > best.p[2])) best = e; }
   return best;
 }
-const simValveAt = (x, y) => sim.g && Math.hypot(x - (sim.g.zq + 14), y - 56) < 14;
 function simClickAt(x, y) { const e = simHit(x, y); if (e) selectSim(e.key); return !!e; }
 const simKeys = () => [...sim.ents.values()].filter((e) => e.ta > 0).map((e) => ({ key: e.key, state: e.state }));
-const simPoint = (key) => { const e = sim.ents.get(key); return { x: e.tx + e.tw / 2, y: e.ty + e.th / 2 }; };
+const simPoint = (key) => { const b = sim.ents.get(key).sb; return { x: (b[0] + b[2]) / 2, y: (b[1] + b[3]) / 2 }; };
 function simStats() {
   const c = { r: 0, q: 0, d: 0, f: 0, out: 0, fl: 0, pods: sim.g ? sim.g.n : 0 };
-  for (const e of sim.ents.values()) { if (e.flow) c.fl++; if (e.ta <= 0) continue; c[e.state]++; if (e.fail) c.f++; if (e.tx < -1 || e.ty < -1 || e.tx + e.tw > sim.W + 1 || e.ty + e.th > sim.H + 1) c.out++; }
+  for (const e of sim.ents.values()) { if (e.flow) c.fl++; if (e.ta <= 0) continue; c[e.state]++; if (e.fail) c.f++; const b = e.sb; if (!b || b[0] < -1 || b[1] < -1 || b[2] > sim.W + 1 || b[3] > sim.H + 1) c.out++; }
   return c;
 }
 // Kiểm tra tương phản các màu chữ và nét vẽ trong cảnh mô phỏng với nền panel (chữ 4,5:1, nét 3:1), dùng cho cả giao diện sáng lẫn tối.
@@ -592,31 +600,21 @@ function simContrast() {
   return bad;
 }
 const simAdvance = (sec) => { for (let i = 0; i < sec / 0.04; i++) simStep(0.04, performance.now() / 1000); simDraw(performance.now() / 1000); };
-// Kiểm tra bố cục tĩnh: mọi khối (nhãn, máy, ô chờ, khay, van, chữ đáy) không đè nhau, ống không xuyên qua máy và hai ống song song khác nhau cách nhau ít nhất 14px.
+// Kiểm tra bố cục tĩnh với camera chuẩn: nhãn, phiếu, bếp (cả chữ dưới nồi), đĩa, chuông, chú giải và đường tải đều nằm trong khung và không đè nhau trên màn hình.
 function simAudit() {
   const g = sim.g, cx = sim.cx, W = sim.W, H = sim.H, bad = [];
   cx.font = "600 12px ui-monospace,Menlo,monospace"; const tw = (t) => cx.measureText(t).width;
-  const R = (n, x, y, w, h) => ({ n, x, y, w, h }), hit = (a, b, pad) => a.x < b.x + b.w - pad && b.x < a.x + a.w - pad && a.y < b.y + b.h - pad && b.y < a.y + a.h - pad;
-  const items = [R("nhãn hàng chờ", 0, 0, tw(simQueueLabel()), 14), R("nhãn chỗ đỗ", g.px, 0, tw(simRunLabel()), 14), R("nhãn bãi xe ra", W - tw("bãi xe ra"), 0, tw("bãi xe ra"), 14)];
-  for (let i = 0; i < g.n; i++) { const a = g.pod(i); items.push(R("máy " + (i + 1), a.x, a.y, g.podW, g.podH)); }
-  for (let k = 0; k < g.qrows; k++) items.push(R("ô chờ " + (k + 1), 0, g.que(k).y, g.zq, g.qh));
-  const dcols = Math.max(1, Math.floor((g.zd - 12) / 26)), drows = Math.max(1, Math.floor((g.H - g.top - 8 - 40) / 26));
-  items.push(R("khay", g.tx0, g.top, g.zd, g.H - g.top - 4), R("rào chắn", g.zq + 1, 44, 28, 24));
-  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) { const a = items[i], b = items[j]; if (a.n === "khay" && b.n.startsWith("nhãn")) continue; if (hit(a, b, 1)) bad.push(a.n + " đè " + b.n); }
-  const bottom = [R("chữ tải máy", 0, H - 58, 440, 14), R("đường tải", 0, H - 40, W, 34)];
-  for (const a of items.concat([R("lưới xong", g.tx0 + 8, g.top + 8, dcols * 26, drows * 26), R("bộ đếm khay", g.tx0 + 8, g.H - 36, g.zd - 16, 32)])) for (const b of bottom) if (hit(a, b, 1) && a.n !== "khay") bad.push(a.n + " đè " + b.n);
-  if (g.top + 8 + drows * 26 > g.H - 36) bad.push("lưới xong đè bộ đếm khay");
-  const segs = [];
-  for (let i = 0; i < g.n; i++) for (const [kind, pts] of [["vào", g.ptIn(i)], ["ra", g.ptOut(i)]]) for (let k = 1; k < pts.length; k++) segs.push({ kind, i, a: pts[k - 1], b: pts[k] });
-  for (const sg of segs) {
-    const r = R("ống " + sg.kind + " máy " + (sg.i + 1), Math.min(sg.a[0], sg.b[0]) - 8, Math.min(sg.a[1], sg.b[1]) - 8, Math.abs(sg.a[0] - sg.b[0]) + 16, Math.abs(sg.a[1] - sg.b[1]) + 16);
-    for (const it of items) { const blocks = it.n.startsWith("máy ") ? it.n !== "máy " + (sg.i + 1) && hit(r, it, 3) : it.n.startsWith("nhãn") ? hit(r, it, 1) : false; if (blocks) bad.push(r.n + " xuyên " + it.n); }
-  }
-  const hz = (sg) => sg.a[1] === sg.b[1], lo = (a, b) => Math.min(a, b), hi = (a, b) => Math.max(a, b);
-  for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {
-    const p = segs[i], q = segs[j]; if (hz(p) !== hz(q)) continue;
-    const k = hz(p) ? 1 : 0, o = hz(p) ? 0 : 1, d = Math.abs(p.a[k] - q.a[k]);
-    if (d > 0.5 && d < 14 && Math.min(hi(p.a[o], p.b[o]), hi(q.a[o], q.b[o])) - Math.max(lo(p.a[o], p.b[o]), lo(q.a[o], q.b[o])) > 4) bad.push("ống " + p.kind + " máy " + (p.i + 1) + " sát ống " + q.kind + " máy " + (q.i + 1));
+  const R = (n, x0, y0, x1, y1) => ({ n, x: x0, y: y0, w: x1 - x0, h: y1 - y0 }), hit = (a, b) => a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1;
+  const bb = (n, pts, padB) => { const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]); return R(n, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys) + (padB || 0)); };
+  const hud = [R("nhãn phiếu chờ", 0, 0, tw(simQueueLabel()), 14), R("nhãn bếp", 0, 16, tw(simRunLabel()), 30), R("bộ đếm", W - 130, 0, W, 14), R("chú giải", 0, H - 58, W, H - 44), R("đường tải", 0, H - 40, W, H - 6)];
+  for (const yaw of [-0.08, 0, 0.08]) {
+    const P = (p) => proj3(p, { yaw, pitch: g.pitch0 }, g.fit), tickets = [], pots = [], plates = [], hx = g.sceneW / 2;
+    for (let k = 0; k < g.qvis; k++) { const c = g.que(k), top = c[1] + 29; tickets.push(bb("phiếu " + (k + 1), [P([c[0] - 50, top, c[2]]), P([c[0] + 50, top, c[2]]), P([c[0] - 50, top - 58, c[2] + 3]), P([c[0] + 50, top - 58, c[2] + 3])])); }
+    for (let i = 0; i < g.n; i++) { const b = g.pod(i), pts = []; for (let k = 0; k < 16; k++) { const a = k / 16 * 6.2832; pts.push(P([b[0] + Math.cos(a) * 42, 1.5, b[2] + Math.sin(a) * 42]), P([b[0] + Math.cos(a) * 30, 40, b[2] + Math.sin(a) * 30])); } pts.push(P([b[0], 0, b[2] + 60])); pots.push(bb("bếp " + (i + 1), pts, 14)); }
+    for (let m = 0; m < g.pcols; m++) { const c = g.done(m); plates.push(bb("đĩa " + (m + 1), [P([c[0] - 14, c[1], c[2] - 8]), P([c[0] + 14, c[1], c[2] + 8])])); }
+    const bp = P([hx - 6, g.railY - 10, g.zRail]), all = [...hud, ...tickets, ...pots, ...plates, R("chuông", bp[0] - 16, bp[1] - 16, bp[0] + 16, bp[1] + 12)];
+    for (const r of all) if (r.x < -1 || r.y < -1 || r.x + r.w > W + 1 || r.y + r.h > H + 1) bad.push(r.n + " nằm ngoài khung");
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) if (hit(all[i], all[j])) bad.push(all[i].n + " đè " + all[j].n);
   }
   return [...new Set(bad)];
 }
@@ -652,8 +650,12 @@ function renderSimDetail(d, p) {
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && simSel) selectSim(simSel); });
 const cvEl = $("simCv"), cvAt = (ev) => { const r = cvEl.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
-cvEl.addEventListener("click", (ev) => simClickAt(...cvAt(ev)));
-cvEl.addEventListener("mousemove", (ev) => { const pt = cvAt(ev), e = simHit(...pt), k = e ? e.key : ""; if (!e) cvEl.title = simValveAt(...pt) ? "Rào chắn: " + sim.note : ""; else cvEl.title = e.job.cmd || ""; if (k !== sim.hover) { sim.hover = k; cvEl.style.cursor = k ? "pointer" : ""; simKick(); } });
+cvEl.addEventListener("click", (ev) => { if (sim.dragged) { sim.dragged = false; return; } simClickAt(...cvAt(ev)); });
+cvEl.addEventListener("dblclick", () => { sim.yaw = 0; sim.pitchUser = null; if (sim.g && last) renderSim(last, derive(last)); });
+cvEl.addEventListener("pointerdown", (ev) => { sim.drag = { x: ev.clientX, y: ev.clientY, yaw: sim.yaw, pitch: sim.pitchUser == null ? (sim.g ? sim.g.pitch0 : 0.72) : sim.pitchUser }; sim.dragged = false; cvEl.setPointerCapture(ev.pointerId); });
+cvEl.addEventListener("pointermove", (ev) => { const d0 = sim.drag; if (!d0) return; const dx = ev.clientX - d0.x, dy = ev.clientY - d0.y; if (Math.abs(dx) + Math.abs(dy) < 5 && !sim.dragged) return; sim.dragged = true; sim.yaw = Math.max(-0.9, Math.min(0.9, d0.yaw + dx * 0.006)); sim.pitch = Math.max(0.3, Math.min(1.2, d0.pitch + dy * 0.004)); if (last) renderSim(last, derive(last)); });
+cvEl.addEventListener("pointerup", () => { sim.drag = null; });
+cvEl.addEventListener("mousemove", (ev) => { const pt = cvAt(ev), e = simHit(...pt), k = e ? e.key : ""; cvEl.title = e ? e.job.cmd || "" : ""; if (k !== sim.hover) { sim.hover = k; cvEl.style.cursor = k ? "pointer" : ""; simKick(); } });
 cvEl.addEventListener("mouseleave", () => { sim.hover = ""; cvEl.style.cursor = ""; simKick(); });
 cvEl.addEventListener("keydown", (ev) => { // phím mũi tên đi qua các lệnh theo thứ tự đang chạy, đang chờ, đã xong
   if (ev.key !== "ArrowRight" && ev.key !== "ArrowDown" && ev.key !== "ArrowLeft" && ev.key !== "ArrowUp") return;

@@ -33,7 +33,7 @@ jobq run -t 1800 -- pnpm test:e2e         # raise the timeout to 30 minutes
 jobq run --cost cpu=3,mem=2000 -- <lệnh>  # declare the weight up front for a command with no history
 jobq status                               # running and waiting commands (similar waiting ones grouped), active limits, machine load
 jobq stats                                # which commands are heaviest: run count, peak CPU/RAM, duration
-jobq web                                  # open the monitoring page (list view, or a moving smart-parking simulation: commands are cars (heavy ones are trucks), waiting cars queue at a barrier, bays open and close with the live headroom, and rain falls when RAM is under pressure)
+jobq web                                  # open the monitoring page (list view, or a 3D kitchen simulation: waiting commands are order tickets on a rail, a ticket flies down to a burner and a pot goes on (flame follows CPU, liquid level follows RAM, the ring is elapsed time), finished commands become plates on the pass; the number of open burners follows the live headroom, steam covers the kitchen when RAM is under pressure, and you can drag to rotate the camera)
 jobq clean                                # clean up slots of dead processes, trim history to 2000 lines
 ```
 
