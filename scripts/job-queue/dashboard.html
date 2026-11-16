@@ -95,25 +95,13 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 .simbody{display:flex;flex-direction:column;gap:8px;overflow:auto;padding:16px 12px 12px}
 .simnote{font-size:12px;color:var(--muted);min-height:18px}.simnote.warn{color:var(--warn)}
 #stage{position:relative;flex:none;height:clamp(380px,52vh,560px)}
-.zl{position:absolute;top:0;font:600 12px var(--mono);color:var(--muted);white-space:nowrap}
-.pod{position:absolute;border:1px dashed var(--line)}
-.pod.lock{border-style:solid;background:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--faint) 14%,transparent) 6px 7px)}
-.pod i{position:absolute;left:6px;bottom:3px;font:11px var(--mono);font-style:normal;color:var(--faint)}
-.tok{position:absolute;left:0;top:0;display:block;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;padding:6px 8px;border:1px solid var(--line);background:var(--panel);overflow:hidden;transition:transform .8s cubic-bezier(.2,.7,.2,1),width .8s cubic-bezier(.2,.7,.2,1),height .8s cubic-bezier(.2,.7,.2,1),opacity .5s}
-.tok.nt{transition:none}.tok:hover{border-color:var(--text)}.tok.sel{outline:2px solid var(--text);outline-offset:1px}
+#simCv{display:block;width:100%;height:100%}
 #simDetail{display:none;flex:none;border:1px solid var(--line);background:var(--panel);padding:10px 12px}#simDetail.on{display:block}
 .sd-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.sd-head .title{font-weight:650;overflow-wrap:anywhere}
 .sd-grid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:2px 14px;margin:8px 0;font-size:12px;color:var(--muted)}.sd-grid b{font-weight:600;color:var(--text);overflow-wrap:anywhere}
-.tok .title{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:unset}
-.tok .time{display:block;font-size:11px;color:var(--muted)}
-.tok.s-r{border-color:var(--accent);animation:pulse var(--beat,2s) ease-in-out infinite}
-.tok.s-r .bar{margin:6px 0 0}
-.tok.s-d{padding:0;border:1.5px solid var(--faint);background:transparent}
-.tok.s-d.fail{background:var(--bad);border-color:var(--bad)}
-@keyframes pulse{50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}}
 dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;color:var(--muted);font-size:14px}
 @media (pointer:coarse){.run summary{min-height:44px}.tabs button,.seg2 button,.chip{min-height:44px}}
-@media (prefers-reduced-motion:reduce){.live.fresh i{animation:none}.bar i{transition:none}.tok{transition:none}.tok.s-r{animation:none}}
+@media (prefers-reduced-motion:reduce){.live.fresh i{animation:none}.bar i{transition:none}}
 @media (max-width:1099px){
   .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
   .left{display:contents}
@@ -155,7 +143,7 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
       <section class="panel" aria-labelledby="h-queue"><h2 id="h-queue">đang chờ</h2><div class="body"><ol id="queue"></ol></div></section>
     </div>
     <section class="panel p-sim" aria-labelledby="h-sim"><h2 id="h-sim">mô phỏng</h2>
-      <div class="body simbody"><div id="simNote" class="simnote"></div><div id="stage"><div id="simBg"></div></div><div id="simDetail" aria-live="polite"></div></div>
+      <div class="body simbody"><div id="simNote" class="simnote"></div><div id="stage"><canvas id="simCv" tabindex="0" role="group" aria-label="Mô phỏng hàng đợi. Bấm vào một lệnh để xem chi tiết, dùng phím mũi tên để chuyển giữa các lệnh, Esc để bỏ chọn."></canvas></div><div id="simDetail" aria-live="polite"></div></div>
     </section>
     <section class="panel p-info" aria-label="Thông tin thêm">
       <div class="tabs" role="tablist" aria-label="Thông tin thêm">
@@ -348,68 +336,182 @@ function renderTab(d) {
   if (lastIcon === state) return; lastIcon = state;
   $("icon").href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' fill='" + COLORS[state] + "'/%3E%3C/svg%3E";
 }
-// Mô phỏng: mỗi lệnh là một ô (token) giữ nguyên theo pid; vị trí tính từ trạng thái (chờ, chạy, xong) và CSS transition tự trượt ô giữa hai lần nạp dữ liệu.
+// Mô phỏng dạng phim: canvas vẽ liên tục (băng chuyền, máy có bánh răng quay và toả nhiệt, tia lửa khi xong). Dữ liệu chỉ đến 3 giây một lần nên mọi vật thể tự trượt về vị trí đích; hoạt ảnh không phụ thuộc nhịp dữ liệu.
+const SIM_FPS = 24; // máy yếu: 24 khung/giây là đủ mượt
 let view = "list", simFirst = true, simSel = "", simSig = "";
-const simTok = new Map(), simSlot = new Map();
+const simSlot = new Map(), sim = { ents: new Map(), parts: [], podAng: [], podFx: {}, cv: null, cx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", smokeAt: 0, waiting: 0, running: 0 };
+function simColors() {
+  const probe = el("i"); probe.style.cssText = "position:absolute;visibility:hidden"; document.body.append(probe); const c = {};
+  for (const n of ["panel", "text", "muted", "faint", "line", "track", "accent", "warn", "bad"]) { probe.style.color = "var(--" + n + ")"; c[n] = getComputedStyle(probe).color; }
+  probe.remove(); return c;
+}
+const rgba = (rgb, a) => rgb.replace(/rgba?\(([^)]+)\)/, (m, v) => "rgba(" + v.split(/[ ,/]+/).filter(Boolean).slice(0, 3).join(",") + "," + a + ")");
 function simGeo(d, W, H) {
   const n = Math.max(d.jobs, d.running.length), zq = Math.max(150, Math.round(W * 0.22)), zd = Math.max(96, Math.round(W * 0.12)), gap = 20, top = 26;
   const px = zq + gap, pw = Math.max(80, W - zq - zd - gap * 2), cols = pw >= 700 ? 4 : pw >= 300 ? 2 : 1, rows = Math.ceil(n / cols);
   const podW = (pw - (cols - 1) * 10) / cols, podH = Math.min(120, (H - top - (rows - 1) * 10) / rows);
-  const qh = 48, qrows = Math.max(1, Math.floor((H - top - 20) / (qh + 8))), dsz = 20, dcols = Math.max(1, Math.floor((zd + 6) / 26)), drows = Math.max(1, Math.floor((H - top) / 26));
-  return { n, zq, zd, px, cols, podW, podH, qh, qrows, dsz, dcols, dcap: dcols * drows, W,
+  const qh = 48, qrows = Math.max(1, Math.floor((H - top - 20) / (qh + 8))), dcols = Math.max(1, Math.floor((zd + 6) / 26)), drows = Math.max(1, Math.floor((H - top) / 26));
+  return { n, zq, zd, px, cols, podW, podH, qh, qrows, dsz: 20, dcap: dcols * drows,
     pod: (i) => ({ x: px + (i % cols) * (podW + 10), y: top + Math.floor(i / cols) * (podH + 10) }),
     que: (k) => ({ x: 0, y: top + Math.min(k, qrows - 1) * (qh + 8) }),
     done: (m) => ({ x: W - zd + (m % dcols) * 26, y: top + Math.floor(m / dcols) * 26 }) };
 }
-function simPlace(key, state, pos, w, h, o, build, fail) {
-  let t = simTok.get(key), fresh = false;
-  if (!t) { t = el("button", "tok nt"); t.type = "button"; t.addEventListener("click", () => selectSim(key)); $("stage").append(t); simTok.set(key, t); fresh = true; }
-  if (t.dataset.state !== state) { t.dataset.state = state; t.replaceChildren(); if (build) build(t); }
-  t.className = "tok s-" + state + (fail ? " fail" : "") + (fresh ? " nt" : "") + (key === simSel ? " sel" : "");
-  t.style.pointerEvents = o ? "" : "none"; t.tabIndex = o ? 0 : -1; t.setAttribute("aria-pressed", String(key === simSel));
-  t.style.transform = "translate(" + pos.x + "px," + pos.y + "px)"; t.style.width = w + "px"; t.style.height = h + "px"; t.dataset.o = o;
-  if (fresh) { t.style.opacity = simFirst ? o : 0; requestAnimationFrame(() => requestAnimationFrame(() => { t.classList.remove("nt"); t.style.opacity = t.dataset.o; })); }
-  else t.style.opacity = o;
-  return t;
+function simPut(key, state, tg, alpha, job, extra) {
+  let e = sim.ents.get(key); const now = performance.now() / 1000;
+  if (!e) {
+    e = { key, state, x: tg.x, y: tg.y, w: tg.w, h: tg.h, a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now };
+    if (!simFirst) e.y = tg.y - (state === "d" ? 30 : 56); // lệnh mới rơi từ trên xuống băng chuyền
+    sim.ents.set(key, e);
+  } else if (e.state !== state && !simFirst) {
+    const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+    if (state === "r") ring(tg.x + tg.w / 2, tg.y + tg.h / 2, sim.C.accent);
+    if (state === "d") { burst(cx, cy, extra.fail ? sim.C.bad : sim.C.accent, extra.fail ? 16 : 10); if (extra.fail) sim.podFx[e.slot] = { t0: now, kind: "fail" }; else ring(cx, cy, sim.C.accent); e.born = now; }
+    e.at = now;
+  }
+  e.state = state; e.tx = tg.x; e.ty = tg.y; e.tw = tg.w; e.th = tg.h; e.ta = alpha; e.job = job; Object.assign(e, extra);
+  if (simFirst) { e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.a = alpha; }
+  return e;
 }
+const burst = (x, y, color, n) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = 40 + Math.random() * 110; sim.parts.push({ k: "spark", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, life: 0.7, max: 0.7, s: 2 + Math.random() * 2, c: color }); } };
+const ring = (x, y, color) => sim.parts.push({ k: "ring", x, y, vx: 0, vy: 0, life: 0.7, max: 0.7, s: 6, c: color });
 function renderSim(d, p) {
   const stage = $("stage"), W = stage.clientWidth, H = stage.clientHeight;
   if (W < 80 || H < 80) return; // trang đang ẩn: chưa đo được
-  const g = simGeo(d, W, H), seen = new Set(), bg = $("simBg"); bg.replaceChildren();
-  const zl = (x, text) => { const z = el("div", "zl", text); z.style.left = x + "px"; bg.append(z); };
-  zl(0, "hàng chờ " + p.waiting.length + (p.waiting.length > g.qrows ? " (hiện " + g.qrows + ")" : "")); zl(g.px, "máy chạy " + d.running.length + "/" + g.n); zl(W - g.zd, "xong (đặc = lỗi)");
-  const head = p.waiting[0], lockWhy = head ? waitReason(head, 0, d, p).text : "";
+  if (!sim.cv) { sim.cv = $("simCv"); sim.cx = sim.cv.getContext("2d"); }
+  const dpr = devicePixelRatio || 1; if (sim.cv.width !== Math.round(W * dpr) || sim.cv.height !== Math.round(H * dpr)) { sim.cv.width = Math.round(W * dpr); sim.cv.height = Math.round(H * dpr); }
+  sim.W = W; sim.H = H; sim.dpr = dpr; sim.C = simColors();
+  const g = simGeo(d, W, H - 44), seen = new Set(); sim.g = g; sim.waiting = p.waiting.length; sim.running = d.running.length; sim.head = p.waiting[0] || null; sim.cause = p.cause;
   for (const [pid] of simSlot) if (!d.running.some((j) => j.pid === pid)) simSlot.delete(pid);
   const used = new Set(simSlot.values());
   d.running.forEach((j) => { if (!simSlot.has(j.pid)) { let s = 0; while (used.has(s)) s++; simSlot.set(j.pid, s); used.add(s); } });
-  for (let i = 0; i < g.n; i++) {
-    const a = g.pod(i), busy = used.has(i), pod = el("div", "pod" + (!busy && head ? " lock" : ""));
-    pod.style.cssText = "left:" + a.x + "px;top:" + a.y + "px;width:" + g.podW + "px;height:" + g.podH + "px";
-    if (!busy && head) pod.title = lockWhy; pod.append(el("i", "", "máy " + (i + 1))); bg.append(pod);
-  }
-  d.running.forEach((j) => {
-    const a = g.pod(simSlot.get(j.pid)), k = "p" + j.pid; seen.add(k);
-    const t = simPlace(k, "r", { x: a.x + 6, y: a.y + 6 }, g.podW - 12, Math.max(44, g.podH - 12), 1, (n) => {
-      const b = el("div", "bar"); b.dataset.since = j.started; b.dataset.timeout = d.timeout; b.append(el("i"));
-      n.append(el("span", "title", niceTitle(j.cmd)), timeSpan(j.started, "run", d.timeout), b);
-    });
-    t.style.setProperty("--beat", Math.max(0.6, 2.4 - Math.min(j.cpu / 100, 1.8)) + "s"); t.title = j.cmd;
-  });
-  p.waiting.forEach((j, i) => {
-    const k = "p" + j.pid; seen.add(k);
-    simPlace(k, "q", g.que(i), g.zq, g.qh, i < g.qrows ? 1 : 0, (n) => n.append(el("span", "title", niceTitle(j.cmd)), timeSpan(j.queued, "wait", 0))).title = j.cmd;
-  });
+  sim.used = used;
+  d.running.forEach((j) => { const slot = simSlot.get(j.pid), a = g.pod(slot), k = "p" + j.pid; seen.add(k); simPut(k, "r", { x: a.x + 6, y: a.y + 24, w: g.podW - 12, h: Math.max(44, g.podH - 30) }, 1, j, { slot }); });
+  p.waiting.forEach((j, i) => { const k = "p" + j.pid; seen.add(k); simPut(k, "q", { ...g.que(i), w: g.zq, h: g.qh }, i < g.qrows ? 1 : 0, j, { idx: i }); });
   let m = 0;
   for (const r of d.history) {
     if (r.rc == null || m >= g.dcap) continue;
     const k = "p" + parseInt(r.id.split("-")[1], 10); if (seen.has(k)) continue; seen.add(k);
-    simPlace(k, "d", g.done(m++), g.dsz, g.dsz, 1, null, r.rc !== 0).title = niceTitle(r.cmd) + " · " + (r.rc === 0 ? "xong" : "lỗi " + r.rc) + " · " + fmtTime(r.secs);
+    simPut(k, "d", { ...g.done(m++), w: g.dsz, h: g.dsz }, 1, r, { fail: r.rc !== 0 });
   }
-  for (const [k, t] of simTok) if (!seen.has(k)) { simTok.delete(k); t.style.opacity = 0; setTimeout(() => t.remove(), 600); }
-  $("simNote").textContent = p.waiting.length ? (p.cause ? "Hàng đợi đang chờ vì " + p.cause + "." : lockWhy) : "Không có lệnh nào đang chờ.";
+  for (const [k, e] of sim.ents) if (!seen.has(k)) { e.ta = 0; e.tw = e.w; e.th = e.h; e.tx = e.x; e.ty = e.y; }
+  $("simNote").textContent = p.waiting.length ? (p.cause ? "Hàng đợi đang chờ vì " + p.cause + "." : waitReason(p.waiting[0], 0, d, p).text) : "Không có lệnh nào đang chờ.";
   $("simNote").className = "simnote" + (p.waiting.length && p.cause ? " warn" : "");
-  renderSimDetail(d, p); simFirst = false;
+  renderSimDetail(d, p); simFirst = false; sim.d = d; simKick();
 }
+function simStep(dt, t) {
+  const k = 1 - Math.exp(-dt * 7), ka = 1 - Math.exp(-dt * 6);
+  for (const [key, e] of sim.ents) {
+    e.x += (e.tx - e.x) * k; e.y += (e.ty - e.y) * k; e.w += (e.tw - e.w) * k; e.h += (e.th - e.h) * k; e.a += (e.ta - e.a) * ka;
+    if (e.ta === 0 && e.a < 0.02) { sim.ents.delete(key); if (simSel === key) simSel = ""; }
+  }
+  const g = sim.g, parts = sim.parts;
+  for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.life -= dt; if (q.life <= 0) { parts.splice(i, 1); continue; } q.x += q.vx * dt; q.y += q.vy * dt; if (q.k === "spark") q.vy += 220 * dt; if (q.k === "smoke") q.vx += Math.sin(t * 3 + q.s) * 6 * dt; }
+  sim.d && sim.d.running.forEach((j) => {
+    const slot = simSlot.get(j.pid), lvl = Math.min(1, j.cpu / 200); sim.podAng[slot] = (sim.podAng[slot] || 0) + dt * (1 + 5 * lvl);
+    if (lvl > 0.45 && t - sim.smokeAt > 0.35 * (1.6 - lvl)) { sim.smokeAt = t; const a = g.pod(slot); parts.push({ k: "smoke", x: a.x + g.podW - 20 + Math.random() * 6, y: a.y - 2, vx: 0, vy: -26 - 14 * lvl, life: 1.4, max: 1.4, s: 3 + Math.random() * 3, c: sim.C.faint }); }
+  });
+}
+function simBusy() {
+  if (sim.running || sim.parts.length) return true;
+  for (const e of sim.ents.values()) if (Math.abs(e.tx - e.x) + Math.abs(e.ty - e.y) + Math.abs(e.tw - e.w) > 0.6 || Math.abs(e.ta - e.a) > 0.02) return true;
+  return false;
+}
+function simFrame(now) {
+  sim.raf = 0; if (view !== "sim" || document.hidden) return;
+  if (sim.last && now - sim.last < 1000 / SIM_FPS - 3) { sim.raf = requestAnimationFrame(simFrame); return; }
+  const dt = Math.min(0.1, sim.last ? (now - sim.last) / 1000 : 0.04); sim.last = now;
+  simStep(dt, now / 1000); simDraw(now / 1000); if (simBusy()) sim.raf = requestAnimationFrame(simFrame); else sim.last = 0;
+}
+function simKick() {
+  if (reduceMotion()) { for (const e of sim.ents.values()) { e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.a = e.ta; } sim.parts.length = 0; simDraw(performance.now() / 1000); return; }
+  simDraw(performance.now() / 1000); if (!sim.raf && !document.hidden) sim.raf = requestAnimationFrame(simFrame);
+}
+function gear(cx, x, y, r, ang, color) {
+  cx.beginPath(); for (let i = 0; i < 16; i++) { const a = ang + (i * Math.PI) / 8, rr = i % 2 ? r * 0.72 : r; cx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  cx.closePath(); cx.fillStyle = color; cx.fill(); cx.fillStyle = sim.C.panel; cx.beginPath(); cx.arc(x, y, r * 0.3, 0, 6.3); cx.fill();
+}
+function simDraw(t) {
+  const cx = sim.cx, C = sim.C, g = sim.g, W = sim.W, H = sim.H; if (!cx || !g) return;
+  cx.setTransform(sim.dpr, 0, 0, sim.dpr, 0, 0); cx.clearRect(0, 0, W, H);
+  const fam = getComputedStyle(document.body).fontFamily, mono = "11px ui-monospace,Menlo,monospace";
+  const fit = (s, mw) => { if (cx.measureText(s).width <= mw) return s; let x = s; while (x.length > 1 && cx.measureText(x + "…").width > mw) x = x.slice(0, -1); return x + "…"; };
+  cx.textBaseline = "alphabetic"; cx.font = "600 12px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted;
+  cx.fillText("hàng chờ " + sim.waiting + (sim.waiting > g.qrows ? " (hiện " + g.qrows + ")" : ""), 0, 12); cx.fillText("máy chạy " + sim.running + "/" + g.n, g.px, 12); cx.textAlign = "right"; cx.fillText("xong (đặc = lỗi)", W, 12); cx.textAlign = "left";
+  // băng chuyền: vạch chạy lên khi có lệnh chờ, chạy sang phải về phía máy
+  cx.save(); cx.strokeStyle = rgba(C.faint, 0.55); cx.setLineDash([6, 8]); cx.lineWidth = 1;
+  cx.lineDashOffset = sim.waiting ? (t * 18) % 14 : 0; cx.beginPath(); cx.moveTo(g.zq + 6, 26); cx.lineTo(g.zq + 6, H - 52); cx.stroke();
+  cx.lineDashOffset = sim.waiting && sim.running < g.n ? -(t * 30) % 14 : 0; cx.beginPath(); cx.moveTo(g.zq + 6, 50); cx.lineTo(g.px - 4, 50); cx.stroke(); cx.restore();
+  // máy
+  const lock = !!sim.head;
+  for (let i = 0; i < g.n; i++) {
+    const a = g.pod(i), busy = sim.used.has(i), fx = sim.podFx[i], run = [...sim.ents.values()].find((e) => e.state === "r" && e.slot === i);
+    const lvl = busy && run ? Math.min(1, run.job.cpu / 200) : 0; let dx = 0;
+    if (fx && t - fx.t0 < 0.5) dx = Math.sin(t * 70) * 3 * (1 - (t - fx.t0) / 0.5);
+    cx.save(); cx.translate(dx, 0);
+    if (busy) { cx.shadowColor = rgba(C.warn, 0.9); cx.shadowBlur = lvl * (10 + 10 * Math.sin(t * 3)); }
+    cx.fillStyle = rgba(C.track, busy ? 0.55 : 0.25); cx.fillRect(a.x, a.y, g.podW, g.podH); cx.shadowBlur = 0;
+    cx.strokeStyle = busy ? rgba(C.accent, 0.8) : lock ? C.faint : C.line; cx.setLineDash(busy || lock ? [] : [4, 4]); cx.strokeRect(a.x + 0.5, a.y + 0.5, g.podW - 1, g.podH - 1); cx.setLineDash([]);
+    if (!busy && lock) { cx.save(); cx.beginPath(); cx.rect(a.x, a.y, g.podW, g.podH); cx.clip(); cx.strokeStyle = rgba(C.faint, 0.25); for (let x = -g.podH; x < g.podW; x += 8) { cx.beginPath(); cx.moveTo(a.x + x, a.y + g.podH); cx.lineTo(a.x + x + g.podH, a.y); cx.stroke(); } cx.restore(); }
+    cx.fillStyle = busy ? rgba(C.accent, 0.6 + 0.4 * Math.sin(t * 4)) : lock ? C.warn : C.faint; cx.beginPath(); cx.arc(a.x + 10, a.y + 12, 4, 0, 6.3); cx.fill();
+    cx.font = mono; cx.fillStyle = C.faint; cx.fillText("máy " + (i + 1), a.x + 20, a.y + 16);
+    gear(cx, a.x + g.podW - 16, a.y + 13, 8, busy ? sim.podAng[i] || 0 : 0, busy ? rgba(C.accent, 0.5 + 0.5 * lvl) : rgba(C.faint, 0.4));
+    cx.restore();
+  }
+  // vật thể: hàng chờ và ô xong ở dưới, lệnh đang chạy ở trên máy
+  const ents = [...sim.ents.values()].sort((p, q) => (p.state === "r") - (q.state === "r"));
+  for (const e of ents) {
+    if (e.a < 0.02) continue; cx.save(); cx.globalAlpha = Math.min(1, e.a);
+    let x = e.x, y = e.y, w = e.w, h = e.h;
+    if (e.state === "q") y += Math.sin(t * 2 + e.seed) * 1.5;
+    if (e.state === "d") { const age = t - (e.born || 0), s = age < 0.6 ? 1 + 0.7 * Math.exp(-age * 7) * Math.cos(age * 14) : 1; x -= (w * s - w) / 2; y -= (h * s - h) / 2; w *= s; h *= s; }
+    const sel = e.key === simSel, hov = e.key === sim.hover;
+    if (e.state === "d") { cx.lineWidth = 1.5; if (e.fail) { cx.fillStyle = C.bad; cx.fillRect(x, y, w, h); } else { cx.strokeStyle = C.faint; cx.strokeRect(x + 0.75, y + 0.75, w - 1.5, h - 1.5); } }
+    else {
+      cx.fillStyle = C.panel; cx.fillRect(x, y, w, h); cx.lineWidth = 1; cx.strokeStyle = e.state === "r" ? C.accent : (e.idx === 0 ? C.text : C.line); cx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      cx.font = "600 13px " + fam; cx.fillStyle = C.text; cx.fillText(fit(niceTitle(e.job.cmd), w - 16), x + 8, y + 18);
+      cx.font = mono; cx.fillStyle = C.muted;
+      if (e.state === "q") cx.fillText("chờ " + fmtTime(Date.now() / 1000 - e.job.queued), x + 8, y + 36);
+      else {
+        const age = Date.now() / 1000 - e.job.started, pct = Math.min(1, age / sim.d.timeout), col = pct >= 0.95 ? C.bad : pct >= 0.8 ? C.warn : C.accent;
+        cx.fillText(fmtTime(age), x + 8, y + 34); if (h >= 64) cx.fillText(fmtCpu(e.job.cpu) + " nhân · " + fmtMem(e.job.mem), x + 8, y + 49);
+        const by = y + h - 10, bw = w - 16; cx.fillStyle = C.track; cx.fillRect(x + 8, by, bw, 4);
+        cx.save(); cx.beginPath(); cx.rect(x + 8, by, Math.max(2, bw * pct), 4); cx.clip(); cx.fillStyle = col; cx.fillRect(x + 8, by, bw, 4);
+        cx.strokeStyle = rgba(C.panel, 0.55); cx.lineWidth = 2; for (let sx = -8 + ((t * 24) % 8); sx < bw; sx += 8) { cx.beginPath(); cx.moveTo(x + 8 + sx, by + 4); cx.lineTo(x + 8 + sx + 4, by); cx.stroke(); } cx.restore();
+      }
+    }
+    if (sel || hov) { cx.strokeStyle = C.text; cx.lineWidth = sel ? 2 : 1; cx.strokeRect(x - 1.5, y - 1.5, w + 3, h + 3); }
+    cx.restore();
+  }
+  for (const q of sim.parts) {
+    const f = q.life / q.max; cx.save();
+    if (q.k === "ring") { cx.strokeStyle = rgba(q.c, f); cx.lineWidth = 2; cx.beginPath(); cx.arc(q.x, q.y, q.s + (1 - f) * 30, 0, 6.3); cx.stroke(); }
+    else if (q.k === "smoke") { cx.fillStyle = rgba(q.c, 0.5 * f); cx.beginPath(); cx.arc(q.x, q.y, q.s + (1 - f) * 6, 0, 6.3); cx.fill(); }
+    else { cx.fillStyle = rgba(q.c, f); cx.fillRect(q.x, q.y, q.s, q.s); }
+    cx.restore();
+  }
+  // đường tải máy chạy như máy đo nhịp tim
+  const y0 = H - 40, y1 = H - 6, d = sim.d;
+  if (d) {
+    cx.font = mono; cx.fillStyle = C.faint; cx.fillText("tải máy " + Number(d.load).toFixed(0) + "/" + d.maxLoad, 0, y0 - 6);
+    const top = Math.max(d.maxLoad * 1.25, ...loads, 1), yy = (v) => y1 - (Math.min(v, top) / top) * (y1 - y0);
+    cx.save(); cx.setLineDash([3, 4]); cx.strokeStyle = rgba(C.faint, 0.6); cx.beginPath(); cx.moveTo(0, yy(d.maxLoad)); cx.lineTo(W, yy(d.maxLoad)); cx.stroke(); cx.restore();
+    if (loads.length > 1) { cx.strokeStyle = loads[loads.length - 1] >= d.maxLoad ? C.bad : C.accent; cx.lineWidth = 1.5; cx.beginPath(); loads.forEach((v, i) => { const x = (i / (loads.length - 1)) * W; i ? cx.lineTo(x, yy(v)) : cx.moveTo(x, yy(v)); }); cx.stroke(); const lv = loads[loads.length - 1]; cx.fillStyle = cx.strokeStyle; cx.beginPath(); cx.arc(W - 2, yy(lv), 3 + Math.sin(t * 5), 0, 6.3); cx.fill(); }
+  }
+}
+function simHit(x, y) {
+  let best = null;
+  for (const e of sim.ents.values()) if (e.ta > 0 && e.a > 0.4 && x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h && (!best || (e.state === "r") > (best.state === "r"))) best = e;
+  return best;
+}
+function simClickAt(x, y) { const e = simHit(x, y); if (e) selectSim(e.key); return !!e; }
+const simKeys = () => [...sim.ents.values()].filter((e) => e.ta > 0).map((e) => ({ key: e.key, state: e.state }));
+const simPoint = (key) => { const e = sim.ents.get(key); return { x: e.tx + e.tw / 2, y: e.ty + e.th / 2 }; };
+function simStats() {
+  const c = { r: 0, q: 0, d: 0, f: 0, out: 0, pods: sim.g ? sim.g.n : 0 };
+  for (const e of sim.ents.values()) { if (e.ta <= 0) continue; c[e.state]++; if (e.fail) c.f++; if (e.tx < -1 || e.ty < -1 || e.tx + e.tw > sim.W + 1 || e.ty + e.th > sim.H + 1) c.out++; }
+  return c;
+}
+function simInk() { const px = sim.cx.getImageData(0, 0, sim.cv.width, sim.cv.height).data; for (let i = 3; i < px.length; i += 4) if (px[i]) return 1; return 0; }
 function selectSim(key) {
   simSel = simSel === key ? "" : key;
   if (last) { renderSim(last, derive(last)); tickTimes(); }
@@ -440,6 +542,18 @@ function renderSimDetail(d, p) {
   g.replaceChildren(...rows.flat());
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && simSel) selectSim(simSel); });
+const cvEl = $("simCv"), cvAt = (ev) => { const r = cvEl.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+cvEl.addEventListener("click", (ev) => simClickAt(...cvAt(ev)));
+cvEl.addEventListener("mousemove", (ev) => { const e = simHit(...cvAt(ev)), k = e ? e.key : ""; if (k !== sim.hover) { sim.hover = k; cvEl.style.cursor = k ? "pointer" : ""; cvEl.title = e ? e.job.cmd || "" : ""; simKick(); } });
+cvEl.addEventListener("mouseleave", () => { sim.hover = ""; cvEl.style.cursor = ""; simKick(); });
+cvEl.addEventListener("keydown", (ev) => { // phím mũi tên đi qua các lệnh theo thứ tự đang chạy, đang chờ, đã xong
+  if (ev.key !== "ArrowRight" && ev.key !== "ArrowDown" && ev.key !== "ArrowLeft" && ev.key !== "ArrowUp") return;
+  const rank = { r: 0, q: 1, d: 2 }, list = [...sim.ents.values()].filter((e) => e.ta > 0).sort((a, b) => rank[a.state] - rank[b.state] || a.ty - b.ty || a.tx - b.tx);
+  if (!list.length) return; ev.preventDefault();
+  const at = list.findIndex((e) => e.key === simSel), step = ev.key === "ArrowRight" || ev.key === "ArrowDown" ? 1 : -1;
+  simSel = list[(at + step + list.length) % list.length].key; renderSim(last, derive(last)); tickTimes();
+});
+document.addEventListener("visibilitychange", () => { if (!document.hidden && view === "sim") simKick(); });
 function applyView(mode) {
   view = mode; $("grid").classList.toggle("sim", mode === "sim");
   document.querySelectorAll("#views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === mode)));
