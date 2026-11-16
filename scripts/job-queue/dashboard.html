@@ -37,8 +37,8 @@ button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outli
 .mid{display:grid;grid-template-rows:fit-content(60%) minmax(120px,1fr);gap:20px;min-height:0}
 .panel{position:relative;border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
 .panel>h2,.panel>.tabs{position:absolute;top:-10px;left:10px;margin:0;padding:0 6px;background:var(--bg);height:20px;font:600 12px/20px var(--mono);color:var(--muted);max-width:calc(100% - 20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.panel>.tabs{display:flex;gap:2px;padding:0 4px}
-.tabs button{border:0;background:transparent;color:var(--muted);font:600 12px/20px var(--mono);padding:0 6px;cursor:pointer}
+.panel>.tabs{display:flex;gap:2px;padding:0 4px;height:24px;top:-12px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:600 12px/24px var(--mono);padding:0 6px;cursor:pointer}
 .tabs button:focus-visible{outline-offset:-2px}
 .tabs button:hover{color:var(--text)}.tabs button[aria-selected="true"]{color:var(--text);box-shadow:inset 0 -1px 0 var(--text)}
 .body{flex:1;min-height:0;overflow:auto;padding:16px 12px 8px}
@@ -199,7 +199,7 @@ function niceTitle(cmd) {
 function derive(d) {
   const waiting = [...d.waiting].sort((a, b) => a.queued - b.queued);
   const used = d.running.reduce((a, j) => ({ cpu: a.cpu + j.cpu, mem: a.mem + j.mem }), { cpu: 0, mem: 0 });
-  const allow = d.jobs;
+  const allow = d.jobs; // mức trần số chỗ chạy, rất rộng: giới hạn thật là số đo sống của máy
   const cause = d.pressure >= d.maxPressure ? "máy đang thiếu RAM" : d.load >= d.maxLoad ? "CPU của máy đang bận" : d.freeMb < d.minFreeMb ? "RAM trống còn ít" : "";
   return { waiting, used, allow, cause, eCpu: d.cpu, eMem: d.mem };
 }
@@ -230,7 +230,7 @@ function meter(label, big, unit, pct, cls, note, aria) {
 }
 function renderMachine(d, p) {
   const cpuPct = (d.load / d.maxLoad) * 100, cpuCls = cpuPct >= 100 ? "bad" : "";
-  const cpu = meter("CPU", fmtNum(Number(d.load).toFixed(0)) + "%", "trên " + d.maxLoad + "%", cpuPct, cpuCls, cpuCls === "bad" ? "Quá bận, lệnh mới phải chờ." : cpuPct >= 75 ? "Khá bận." : "Còn rảnh.", "CPU so với mức tối đa");
+  const cpu = meter("CPU", fmtNum(Number(d.load).toFixed(0)) + "%", "trên " + d.maxLoad + "%", cpuPct, cpuCls, d.idle >= 120 ? "Bạn đang không dùng máy nên jobq nới giới hạn lên " + d.maxLoad + "%." : cpuCls === "bad" ? "Quá bận, lệnh mới phải chờ." : cpuPct >= 75 ? "Khá bận." : "Còn rảnh.", "CPU so với mức tối đa");
   cpu.append(spark(d.maxLoad));
   const total = d.totalMb || 0, usedPct = total ? ((total - d.freeMb) / total) * 100 : 0, ramCls = d.freeMb < d.minFreeMb ? "bad" : "";
   const ram = meter("RAM", fmtMem(d.freeMb), "còn trống" + (total ? " / " + fmtMem(total) : ""), total ? usedPct : null, ramCls, "Cần ít nhất " + fmtMem(d.minFreeMb) + " trống mới nhận thêm lệnh.", "RAM đã dùng");
@@ -262,8 +262,8 @@ function laneEmpty(label, kind, title, why, warn) {
 // Chỗ trống chỉ được gọi là "sẵn sàng" khi không có lệnh nào đang chờ; nếu có lệnh chờ mà chỗ vẫn trống thì phải nói lý do jobq đang giữ lại.
 function renderLanes(d, p) {
   const box = $("lanes"); box.replaceChildren();
-  const total = Math.max(d.jobs, d.running.length), head = p.waiting[0], groups = [];
-  $("h-lanes").textContent = "chỗ chạy " + d.running.length + "/" + p.allow;
+  const total = Math.max(d.cap, d.running.length, 1), head = p.waiting[0], groups = [];
+  $("h-lanes").textContent = "chỗ chạy " + d.running.length + (d.cap > d.running.length ? " · nhận thêm được " + (d.cap - d.running.length) : "");
   for (let i = 0; i < d.running.length; i++) box.append(laneRun(d.running[i], i, d));
   // Các chỗ trống cùng trạng thái gộp thành một dòng để không lặp lại cùng một câu.
   for (let i = d.running.length; i < total; i++) {
@@ -338,10 +338,10 @@ function renderTab(d) {
   if (lastIcon === state) return; lastIcon = state;
   $("icon").href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' fill='" + COLORS[state] + "'/%3E%3C/svg%3E";
 }
-// Mô phỏng dạng đường ống: lệnh chờ chảy qua van và ống dẫn vào máy, mỗi máy có vòng thời gian, nước RAM và bánh răng CPU, lệnh xong chạy theo ống ra khay kết quả. Dữ liệu chỉ đến 3 giây một lần nên vật thể tự chạy theo đường ống tới vị trí đích; hoạt ảnh không phụ thuộc nhịp dữ liệu.
+// Mô phỏng dạng bãi đỗ xe thông minh: lệnh là xe (lệnh nặng là xe tải), xe chờ trước rào chắn, rào mở thì xe chạy theo đường nhựa vào chỗ đỗ và đỗ lại cho tới khi xong rồi chạy ra bãi xe ra. Số chỗ đỗ là hạn mức động lấy từ CPU và RAM trống, mưa rơi theo áp lực RAM. Dữ liệu chỉ đến 3 giây một lần nên xe tự chạy tới đích; hoạt ảnh không phụ thuộc nhịp dữ liệu.
 const SIM_FPS = 24; // máy yếu: 24 khung/giây là đủ mượt
 let view = "list", simFirst = true, simSel = "", simSig = "";
-const simSlot = new Map(), sim = { ents: new Map(), parts: [], podAng: [], podFx: {}, cv: null, cx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", smokeAt: 0, waiting: 0, running: 0, valve: 0, trayAt: -9 };
+const simSlot = new Map(), sim = { ents: new Map(), parts: [], rain: [], podAng: [], podFx: {}, bayA: [], cv: null, cx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", smokeAt: 0, waiting: 0, running: 0, extra: 0, pressure: 1, valve: 0, trayAt: -9 };
 function simColors() {
   const probe = el("i"); probe.style.cssText = "position:absolute;visibility:hidden"; document.body.append(probe); const c = {};
   for (const n of ["panel", "text", "muted", "faint", "line", "track", "accent", "warn", "bad"]) { probe.style.color = "var(--" + n + ")"; c[n] = getComputedStyle(probe).color; }
@@ -353,24 +353,27 @@ function pathAt(p, u) {
   let L = pathLen(p) * u;
   for (let i = 1; i < p.length; i++) { const s = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); if (L <= s || i === p.length - 1) { const f = s ? Math.min(1, L / s) : 0; return [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * f, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * f]; } L -= s; }
 }
-function strokePath(cx, p) { cx.beginPath(); cx.moveTo(p[0][0], p[0][1]); for (let i = 1; i < p.length - 1; i++) cx.arcTo(p[i][0], p[i][1], p[i + 1][0], p[i + 1][1], 8); cx.lineTo(p[p.length - 1][0], p[p.length - 1][1]); }
+function strokePath(cx, p) { cx.beginPath(); cx.moveTo(p[0][0], p[0][1]); for (let i = 1; i < p.length - 1; i++) cx.arcTo(p[i][0], p[i][1], p[i + 1][0], p[i + 1][1], 12); cx.lineTo(p[p.length - 1][0], p[p.length - 1][1]); }
+const simClock = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60, p2 = (n) => String(n).padStart(2, "0"); return h ? h + ":" + p2(m) + ":" + p2(r) : p2(m) + ":" + p2(r); };
+const simQueueLabel = () => "xe chờ " + sim.waiting + (sim.g && sim.waiting > sim.g.qrows ? " (hiện " + sim.g.qrows + ")" : "");
+const simRunLabel = () => "chỗ đỗ đang dùng " + sim.running + (sim.extra > 0 ? " · nhận thêm được " + sim.extra : "");
 function simGeo(d, W, H) {
-  const n = Math.max(d.jobs, d.running.length), zq = Math.max(150, Math.round(W * 0.2)), zd = Math.max(110, Math.round(W * 0.12)), top = 60, ch = 56;
+  const n = Math.max(d.cap, d.running.length, 1), zq = Math.max(150, Math.round(W * 0.2)), zd = Math.max(110, Math.round(W * 0.12)), top = 64, ch = 56, inY = 24, outY = 46;
   const px = zq + 52, pw = Math.max(200, W - px - zd - 40), cols = Math.min(n, pw >= 760 ? 3 : pw >= 420 ? 2 : 1), rows = Math.ceil(n / cols);
   const podW = (pw - (cols - 1) * ch) / cols, podH = Math.min(124, (H - top - (rows - 1) * 10) / rows), qh = 48, qrows = Math.max(1, Math.floor((H - top - 8) / (qh + 8)));
   const tx0 = W - zd, dcols = Math.max(1, Math.floor((zd - 12) / 26)), drows = Math.max(1, Math.floor((H - top - 8 - 40) / 26));
   const pod = (i) => ({ x: px + (i % cols) * (podW + ch), y: top + Math.floor(i / cols) * (podH + 10) });
   const que = (k) => ({ x: 0, y: top + Math.min(k, qrows - 1) * (qh + 8) });
   const done = (m) => ({ x: tx0 + 8 + (m % dcols) * 26, y: top + 8 + Math.floor(m / dcols) * 26 });
-  const ptIn = (i) => { const a = pod(i), ym = a.y + podH / 2, h = top + qh / 2; return [[zq, h], [zq + 14, h], [zq + 14, 22], [a.x - 14, 22], [a.x - 14, ym], [a.x, ym]]; };
-  const ptOut = (i, c) => { const a = pod(i), ym = a.y + podH / 2, xo = a.x + podW + 14, bus = tx0 - 6, cell = c || done(0); return [[a.x + podW, ym], [xo, ym], [xo, 42], [bus, 42], [bus, cell.y + 10], [cell.x + 10, cell.y + 10]]; };
+  const ptIn = (i) => { const a = pod(i), ym = a.y + podH / 2, h = top + qh / 2; return [[zq, h], [zq + 14, h], [zq + 14, inY], [a.x - 16, inY], [a.x - 16, ym], [a.x, ym]]; };
+  const ptOut = (i, c) => { const a = pod(i), ym = a.y + podH / 2, xo = a.x + podW + 16, bus = tx0 - 6, cell = c || done(0); return [[a.x + podW, ym], [xo, ym], [xo, outY], [bus, outY], [bus, cell.y + 10], [cell.x + 11, cell.y + 10]]; };
   return { n, zq, zd, px, cols, podW, podH, qh, qrows, dsz: 20, dcap: dcols * drows, tx0, top, H, pod, que, done, ptIn, ptOut };
 }
 function simPut(key, state, tg, alpha, job, extra) {
   let e = sim.ents.get(key); const now = performance.now() / 1000, g = sim.g;
   if (!e) {
-    e = { key, state, x: tg.x, y: tg.y, w: tg.w, h: tg.h, a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now, trail: [] };
-    if (!simFirst) e.y = tg.y - (state === "d" ? 30 : 56); // lệnh mới rơi từ trên xuống
+    e = { key, state, x: tg.x, y: tg.y, w: tg.w, h: tg.h, a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now, trail: [], ang: state === "q" ? -Math.PI / 2 : 0, hue: [...key].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7) };
+    if (!simFirst) e.y = tg.y - (state === "d" ? 30 : 56); // xe mới rơi vào từ trên xuống
     sim.ents.set(key, e);
   } else if (e.state !== state && !simFirst) {
     if (state === "r") startFlow(e, g.ptIn(extra.slot), "in");
@@ -380,7 +383,7 @@ function simPut(key, state, tg, alpha, job, extra) {
   if (simFirst) { e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.a = alpha; }
   return e;
 }
-function startFlow(e, pts, kind) { e.flow = { pts, u: 0, dur: Math.max(0.9, pathLen(pts) / 380), kind }; e.trail = []; e.a = 1; }
+function startFlow(e, pts, kind) { e.flow = { pts, u: 0, dur: Math.max(0.9, pathLen(pts) / 300), kind }; e.trail = []; e.a = 1; }
 const burst = (x, y, color, n) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = 40 + Math.random() * 110; sim.parts.push({ k: "spark", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, life: 0.7, max: 0.7, s: 2 + Math.random() * 2, c: color }); } };
 const ring = (x, y, color) => sim.parts.push({ k: "ring", x, y, vx: 0, vy: 0, life: 0.7, max: 0.7, s: 6, c: color });
 function renderSim(d, p) {
@@ -389,18 +392,19 @@ function renderSim(d, p) {
   if (!sim.cv) { sim.cv = $("simCv"); sim.cx = sim.cv.getContext("2d"); }
   const dpr = devicePixelRatio || 1; if (sim.cv.width !== Math.round(W * dpr) || sim.cv.height !== Math.round(H * dpr)) { sim.cv.width = Math.round(W * dpr); sim.cv.height = Math.round(H * dpr); }
   sim.cv.style.width = W + "px"; sim.cv.style.height = H + "px"; sim.W = W; sim.H = H; sim.dpr = dpr; sim.C = simColors();
-  const g = simGeo(d, W, H - 64), seen = new Set(); sim.g = g; sim.waiting = p.waiting.length; sim.running = d.running.length; sim.head = p.waiting[0] || null;
+  const g = simGeo(d, W, H - 64), seen = new Set(); sim.g = g; sim.waiting = p.waiting.length; sim.running = d.running.length; sim.extra = Math.max(0, d.cap - d.running.length); sim.head = p.waiting[0] || null; sim.pressure = d.pressure;
   for (const [pid] of simSlot) if (!d.running.some((j) => j.pid === pid)) simSlot.delete(pid);
   const used = new Set(simSlot.values());
   d.running.forEach((j) => { if (!simSlot.has(j.pid)) { let s = 0; while (used.has(s)) s++; simSlot.set(j.pid, s); used.add(s); } });
   sim.used = used; sim.free = g.n - used.size;
+  for (let i = 0; i < g.n; i++) if (sim.bayA[i] === undefined) sim.bayA[i] = simFirst ? 1 : 0;
   d.running.forEach((j) => { const slot = simSlot.get(j.pid), a = g.pod(slot), k = "p" + j.pid; seen.add(k); simPut(k, "r", { x: a.x + 6, y: a.y + 24, w: g.podW - 12, h: Math.max(44, g.podH - 30) }, 1, j, { slot }); });
   p.waiting.forEach((j, i) => { const k = "p" + j.pid; seen.add(k); simPut(k, "q", { ...g.que(i), w: g.zq, h: g.qh }, i < g.qrows ? 1 : 0, j, { idx: i }); });
   let m = 0;
   for (const r of d.history) {
     if (r.rc == null || m >= g.dcap) continue;
     const k = "p" + parseInt(r.id.split("-")[1], 10); if (seen.has(k)) continue; seen.add(k);
-    simPut(k, "d", { ...g.done(m++), w: g.dsz, h: g.dsz }, 1, r, { fail: r.rc !== 0 });
+    simPut(k, "d", { ...g.done(m++), w: 22, h: 14 }, 1, r, { fail: r.rc !== 0 });
   }
   sim.okN = d.history.filter((r) => r.rc === 0).length; sim.failN = d.history.filter((r) => r.rc != null && r.rc !== 0).length;
   for (const [k, e] of sim.ents) if (!seen.has(k) && !e.flow) { e.ta = 0; e.tw = e.w; e.th = e.h; e.tx = e.x; e.ty = e.y; }
@@ -413,10 +417,11 @@ function simStep(dt, t) {
   for (const [key, e] of sim.ents) {
     const f = e.flow;
     if (f) {
-      f.u += dt / f.dur; const u = Math.min(1, f.u), s = u * u * (3 - 2 * u), [x, y] = pathAt(f.pts, s), sw = f.kind === "in" ? 22 : 16, sh = f.kind === "in" ? 14 : 16;
+      f.u += dt / f.dur; const u = Math.min(1, f.u), s = u * u * (3 - 2 * u), [x, y] = pathAt(f.pts, s), [x2, y2] = pathAt(f.pts, Math.min(1, s + 0.02)), sw = f.kind === "in" ? 44 : 30, sh = f.kind === "in" ? 26 : 18;
+      if (Math.hypot(x2 - x, y2 - y) > 0.01) e.ang = Math.atan2(y2 - y, x2 - x);
       e.x = x - sw / 2; e.y = y - sh / 2; e.w = sw; e.h = sh; e.trail.push([x, y]); if (e.trail.length > 7) e.trail.shift();
       if (f.u >= 1) {
-        e.flow = null; e.trail = [];
+        e.flow = null; e.trail = []; e.ang = 0;
         if (f.kind === "in") { ring(x, y, sim.C.accent); e.x = x - 4; e.y = y - 7; e.w = 12; e.h = 14; }
         else { e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.born = now; sim.trayAt = now; burst(x, y, e.fail ? sim.C.bad : sim.C.accent, e.fail ? 16 : 9); ring(x, y, e.fail ? sim.C.bad : sim.C.accent); }
       }
@@ -425,18 +430,23 @@ function simStep(dt, t) {
     e.x += (e.tx - e.x) * k; e.y += (e.ty - e.y) * k; e.w += (e.tw - e.w) * k; e.h += (e.th - e.h) * k; e.a += (e.ta - e.a) * ka;
     if (e.ta === 0 && e.a < 0.02) { sim.ents.delete(key); if (simSel === key) simSel = ""; }
   }
-  const blocked = sim.waiting > 0 && sim.free > 0; sim.valve += ((blocked ? 1 : 0) - sim.valve) * (1 - Math.exp(-dt * 8));
+  sim.valve += ((sim.waiting > 0 ? 1 : 0) - sim.valve) * (1 - Math.exp(-dt * 8));
+  for (let i = 0; i < sim.bayA.length; i++) sim.bayA[i] += ((i < g.n ? 1 : 0) - sim.bayA[i]) * (1 - Math.exp(-dt * 5));
+  const want = sim.pressure >= 4 ? 90 : sim.pressure >= 2 ? 36 : 0; // mưa theo áp lực RAM
+  while (sim.rain.length < want) sim.rain.push({ x: Math.random() * sim.W, y: Math.random() * sim.H, v: 320 + Math.random() * 160 });
+  if (sim.rain.length > want) sim.rain.length = want;
+  for (const r of sim.rain) { r.y += r.v * dt; r.x += 70 * dt; if (r.y > sim.H) { r.y = -10; r.x = Math.random() * sim.W; } if (r.x > sim.W) r.x = 0; }
   const parts = sim.parts;
   for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.life -= dt; if (q.life <= 0) { parts.splice(i, 1); continue; } q.x += q.vx * dt; q.y += q.vy * dt; if (q.k === "spark") q.vy += 220 * dt; if (q.k === "smoke") q.vx += Math.sin(t * 3 + q.s) * 6 * dt; }
   sim.d && sim.d.running.forEach((j) => {
-    const slot = simSlot.get(j.pid), lvl = Math.min(1, j.cpu / 200); sim.podAng[slot] = (sim.podAng[slot] || 0) + dt * (1 + 5 * lvl);
-    if (lvl > 0.45 && t - sim.smokeAt > 0.35 * (1.6 - lvl)) { sim.smokeAt = t; const a = g.pod(slot); parts.push({ k: "smoke", x: a.x + g.podW * 0.3 + Math.random() * 8, y: a.y - 2, vx: 0, vy: -26 - 14 * lvl, life: 1.4, max: 1.4, s: 3 + Math.random() * 3, c: sim.C.faint }); }
+    const slot = simSlot.get(j.pid), lvl = Math.min(1, j.cpu / 200);
+    if (lvl > 0.45 && t - sim.smokeAt > 0.35 * (1.6 - lvl)) { sim.smokeAt = t; const a = g.pod(slot); parts.push({ k: "smoke", x: a.x + 14 + Math.random() * 6, y: a.y + 40 + Math.random() * 6, vx: -10, vy: -24 - 14 * lvl, life: 1.4, max: 1.4, s: 3 + Math.random() * 3, c: sim.C.faint }); }
   });
 }
 function simBusy() {
-  if (sim.running || sim.parts.length) return true;
+  if (sim.running || sim.parts.length || sim.rain.length) return true;
   for (const e of sim.ents.values()) if (e.flow || Math.abs(e.tx - e.x) + Math.abs(e.ty - e.y) + Math.abs(e.tw - e.w) > 0.6 || Math.abs(e.ta - e.a) > 0.02) return true;
-  return false;
+  return Math.abs(sim.valve - (sim.waiting > 0 ? 1 : 0)) > 0.02;
 }
 function simFrame(now) {
   sim.raf = 0; if (view !== "sim" || document.hidden) return;
@@ -445,90 +455,105 @@ function simFrame(now) {
   const tt = performance.now() / 1000; simStep(dt, tt); simDraw(tt); if (simBusy()) sim.raf = requestAnimationFrame(simFrame); else sim.last = 0;
 }
 function simKick() {
-  if (reduceMotion()) { for (const e of sim.ents.values()) { e.flow = null; e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.a = e.ta; } sim.parts.length = 0; simDraw(performance.now() / 1000); return; }
+  if (reduceMotion()) { for (const e of sim.ents.values()) { e.flow = null; e.x = e.tx; e.y = e.ty; e.w = e.tw; e.h = e.th; e.a = e.ta; } sim.parts.length = 0; sim.rain.length = 0; sim.valve = sim.waiting > 0 ? 1 : 0; simDraw(performance.now() / 1000); return; }
   simDraw(performance.now() / 1000); if (!sim.raf && !document.hidden) sim.raf = requestAnimationFrame(simFrame);
 }
-function gear(cx, x, y, r, ang, color) {
-  cx.beginPath(); for (let i = 0; i < 16; i++) { const a = ang + (i * Math.PI) / 8, rr = i % 2 ? r * 0.72 : r; cx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
-  cx.closePath(); cx.fillStyle = color; cx.fill(); cx.fillStyle = sim.C.panel; cx.beginPath(); cx.arc(x, y, r * 0.3, 0, 6.3); cx.fill();
+const rr = (cx, x, y, w, h, r) => { cx.beginPath(); if (cx.roundRect) cx.roundRect(x, y, w, h, r); else cx.rect(x, y, w, h); };
+// Xe nhìn từ trên xuống, tâm (x, y), đầu xe quay về góc ang; truck vẽ xe tải có thùng.
+function car(cx, x, y, len, wid, ang, hue, o) {
+  const L = len / 2, Wd = wid / 2, body = "hsl(" + hue + ",62%,54%)", dark = "hsl(" + hue + ",55%,36%)";
+  cx.save(); cx.translate(x, y); cx.rotate(ang);
+  if (o.beam) { const gr = cx.createLinearGradient(L, 0, L + len * 1.2, 0); gr.addColorStop(0, "rgba(255,236,160,0.38)"); gr.addColorStop(1, "rgba(255,236,160,0)"); cx.fillStyle = gr; cx.beginPath(); cx.moveTo(L, -Wd * 0.6); cx.lineTo(L + len * 1.2, -Wd * 1.7); cx.lineTo(L + len * 1.2, Wd * 1.7); cx.lineTo(L, Wd * 0.6); cx.fill(); }
+  cx.fillStyle = "rgba(0,0,0,0.5)"; for (const sx of [-L * 0.62, L * 0.5]) { cx.fillRect(sx - len * 0.08, -Wd - 1.5, len * 0.16, 3); cx.fillRect(sx - len * 0.08, Wd - 1.5, len * 0.16, 3); }
+  if (o.truck) { cx.fillStyle = dark; rr(cx, -L, -Wd, len * 0.62, wid, 2); cx.fill(); cx.fillStyle = body; rr(cx, -L + len * 0.66, -Wd + 1, len * 0.34, wid - 2, 3); cx.fill(); cx.fillStyle = "rgba(20,30,40,0.78)"; cx.fillRect(L - len * 0.14, -Wd * 0.7, len * 0.1, Wd * 1.4); }
+  else { cx.fillStyle = body; rr(cx, -L, -Wd, len, wid, 4); cx.fill(); cx.fillStyle = "rgba(20,30,40,0.78)"; cx.fillRect(L * 0.12, -Wd * 0.7, L * 0.5, Wd * 1.4); cx.fillRect(-L * 0.7, -Wd * 0.62, L * 0.28, Wd * 1.24); cx.fillStyle = "rgba(255,255,255,0.22)"; cx.fillRect(-L * 0.38, -Wd * 0.6, L * 0.48, Wd * 1.2); }
+  cx.fillStyle = "#fff4c2"; cx.fillRect(L - 2.5, -Wd + 1.5, 2.5, 4); cx.fillRect(L - 2.5, Wd - 5.5, 2.5, 4);
+  cx.fillStyle = o.brake ? "#ff3b30" : "#74201e"; cx.fillRect(-L, -Wd + 1.5, 2.5, 4); cx.fillRect(-L, Wd - 5.5, 2.5, 4);
+  if (o.brake) { cx.fillStyle = "rgba(255,59,48,0.25)"; cx.fillRect(-L - 5, -Wd, 5, wid); }
+  if (o.hazard) { cx.fillStyle = "#ffb020"; for (const [hx, hy] of [[-L, -Wd], [-L, Wd - 3], [L - 3, -Wd], [L - 3, Wd - 3]]) cx.fillRect(hx, hy, 3, 3); }
+  cx.restore();
 }
 function simDraw(t) {
   const cx = sim.cx, C = sim.C, g = sim.g, W = sim.W, H = sim.H, d = sim.d; if (!cx || !g || !d) return;
   cx.setTransform(sim.dpr, 0, 0, sim.dpr, 0, 0); cx.clearRect(0, 0, W, H);
-  const fam = getComputedStyle(document.body).fontFamily, mono = "11px ui-monospace,Menlo,monospace", ents = [...sim.ents.values()], flowing = (kind, i) => ents.some((e) => e.flow && e.flow.kind === kind && e.slot === i);
+  const fam = getComputedStyle(document.body).fontFamily, mono = "12px ui-monospace,Menlo,monospace", ents = [...sim.ents.values()], wet = sim.pressure >= 2;
   const fit = (s, mw) => { if (cx.measureText(s).width <= mw) return s; let x = s; while (x.length > 1 && cx.measureText(x + "…").width > mw) x = x.slice(0, -1); return x + "…"; };
+  const isTruck = (e) => e.job && e.job.mem >= 1500;
   cx.textBaseline = "alphabetic"; cx.font = "600 12px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted;
-  cx.fillText("hàng chờ " + sim.waiting + (sim.waiting > g.qrows ? " (hiện " + g.qrows + ")" : ""), 0, 12); cx.fillText("máy chạy " + sim.running + "/" + g.n, g.px, 12);
-  cx.textAlign = "right"; cx.fillText("kết quả", W, 12); cx.textAlign = "left";
-  // đường ống: ống nào đang có lệnh chạy qua thì sáng và có dòng chảy
-  const nextFree = [...Array(g.n).keys()].find((i) => !sim.used.has(i)), vy = 50;
+  cx.fillText(simQueueLabel(), 0, 12); cx.fillText(simRunLabel(), g.px, 12); cx.textAlign = "right"; cx.fillText("bãi xe ra", W, 12); cx.textAlign = "left";
+  // đường nhựa: làn vào và làn ra, vạch giữa đường chạy khi có xe
+  const busyIn = new Set(ents.filter((e) => e.flow && e.flow.kind === "in").map((e) => e.slot)), busyOut = new Set(ents.filter((e) => e.flow && e.flow.kind === "out").map((e) => e.slot));
   for (let i = 0; i < g.n; i++) {
-    const pin = g.ptIn(i), pout = g.ptOut(i), feed = flowing("in", i), carry = flowing("out", i), busy = sim.used.has(i);
-    for (const [pts, on, soft] of [[pin, feed, busy], [pout, carry, false]]) {
-      cx.save(); cx.lineJoin = "round"; strokePath(cx, pts); cx.strokeStyle = rgba(C.track, 0.9); cx.lineWidth = 8; cx.stroke(); strokePath(cx, pts); cx.strokeStyle = C.panel; cx.lineWidth = 4; cx.stroke();
-      if (on || soft) { strokePath(cx, pts); cx.strokeStyle = rgba(C.accent, on ? 0.95 : 0.35); cx.lineWidth = 2; if (on) { cx.setLineDash([8, 10]); cx.lineDashOffset = -t * 50; cx.shadowColor = C.accent; cx.shadowBlur = 8; } cx.stroke(); }
-      cx.restore();
+    for (const [pts, on] of [[g.ptIn(i), busyIn.has(i)], [g.ptOut(i), busyOut.has(i)]]) {
+      cx.save(); cx.lineJoin = "round"; cx.lineCap = "round"; strokePath(cx, pts); cx.strokeStyle = rgba(C.text, wet ? 0.13 : 0.08); cx.lineWidth = 16; cx.stroke();
+      strokePath(cx, pts); cx.strokeStyle = rgba(C.muted, on ? 0.9 : 0.4); cx.lineWidth = 1; cx.setLineDash([7, 9]); cx.lineDashOffset = on ? -t * 40 : 0; cx.stroke(); cx.restore();
     }
   }
-  const state = sim.waiting && sim.free > 0 ? "blocked" : sim.waiting ? "full" : "idle", vx = g.zq + 14;
-  cx.save(); cx.translate(vx, vy); cx.rotate(Math.PI / 4 + sim.valve * (Math.PI / 4)); cx.fillStyle = C.panel; cx.fillRect(-7, -7, 14, 14);
-  cx.strokeStyle = state === "blocked" ? C.warn : state === "full" ? C.faint : C.accent; cx.lineWidth = 2; cx.strokeRect(-7, -7, 14, 14);
-  if (state === "blocked") { cx.fillStyle = rgba(C.warn, 0.35 + 0.25 * Math.sin(t * 5)); cx.fillRect(-7, -7, 14, 14); }
+  // rào chắn ở đầu hàng chờ: hạ khi có xe chờ mà chưa vào được, nâng khi trống
+  const bx = g.zq + 3, by = 56, free = sim.free > 0;
+  cx.save(); cx.translate(bx, by); cx.fillStyle = C.muted; cx.fillRect(-4, -4, 8, 8); cx.rotate(-(1 - sim.valve) * Math.PI * 0.45);
+  for (let k = 0; k < 4; k++) { cx.fillStyle = k % 2 ? C.panel : (free ? C.warn : C.faint); cx.fillRect(4 + k * 5, -2.5, 5, 5); }
   cx.restore();
-  if (state === "blocked") { cx.strokeStyle = C.warn; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(vx - 6, vy); cx.lineTo(vx + 6, vy); cx.stroke(); }
-  if (sim.waiting && sim.head && nextFree !== undefined && state !== "blocked") { cx.fillStyle = C.accent; cx.beginPath(); const hy = g.top + g.qh / 2, bx = g.zq - 6 + Math.sin(t * 6) * 2; cx.moveTo(bx, hy - 5); cx.lineTo(bx + 7, hy); cx.lineTo(bx, hy + 5); cx.fill(); }
-  // khay kết quả
+  // bãi xe ra
   cx.save(); cx.strokeStyle = performance.now() / 1000 - sim.trayAt < 0.4 ? C.accent : C.line; cx.setLineDash([4, 4]); cx.strokeRect(g.tx0 + 0.5, g.top + 0.5, g.zd - 1, g.H - g.top - 4); cx.restore();
   cx.font = mono; cx.fillStyle = C.muted; cx.fillText("xong " + sim.okN, g.tx0 + 8, g.H - 22); cx.fillStyle = sim.failN ? C.bad : C.muted; cx.fillText("lỗi " + sim.failN, g.tx0 + 8, g.H - 8);
-  // máy
+  // chỗ đỗ: vạch sơn hai bên, thanh chặn bánh ở cuối, đèn báo; chỗ mới mở nhạt dần hiện ra
   for (let i = 0; i < g.n; i++) {
     const a = g.pod(i), busy = sim.used.has(i), fx = sim.podFx[i], run = ents.find((e) => e.state === "r" && e.slot === i), lvl = busy && run ? Math.min(1, run.job.cpu / 200) : 0; let dx = 0;
     if (fx && t - fx.t0 < 0.5) dx = Math.sin(t * 70) * 3 * (1 - (t - fx.t0) / 0.5);
-    cx.save(); cx.translate(dx, 0);
+    cx.save(); cx.globalAlpha = Math.max(0, Math.min(1, sim.bayA[i])); cx.translate(dx, 0);
     if (busy) { cx.shadowColor = rgba(C.warn, 0.9); cx.shadowBlur = lvl * (10 + 10 * Math.sin(t * 3)); }
-    cx.fillStyle = rgba(C.track, busy ? 0.55 : 0.25); cx.fillRect(a.x, a.y, g.podW, g.podH); cx.shadowBlur = 0;
-    cx.strokeStyle = busy ? rgba(C.accent, 0.8) : sim.waiting ? C.faint : C.line; cx.setLineDash(busy || sim.waiting ? [] : [4, 4]); cx.strokeRect(a.x + 0.5, a.y + 0.5, g.podW - 1, g.podH - 1); cx.setLineDash([]);
-    if (!busy && sim.waiting) { cx.save(); cx.beginPath(); cx.rect(a.x, a.y, g.podW, g.podH); cx.clip(); cx.strokeStyle = rgba(C.faint, 0.25); for (let x = -g.podH; x < g.podW; x += 8) { cx.beginPath(); cx.moveTo(a.x + x, a.y + g.podH); cx.lineTo(a.x + x + g.podH, a.y); cx.stroke(); } cx.restore(); }
-    cx.fillStyle = busy ? rgba(C.accent, 0.6 + 0.4 * Math.sin(t * 4)) : sim.waiting ? C.warn : C.faint; cx.beginPath(); cx.arc(a.x + 10, a.y + 12, 4, 0, 6.3); cx.fill();
-    cx.font = mono; cx.fillStyle = C.muted; cx.fillText("máy " + (i + 1), a.x + 20, a.y + 16);
-    for (const px of [a.x, a.x + g.podW]) { cx.fillStyle = C.panel; cx.strokeStyle = busy ? C.accent : C.line; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(px, a.y + g.podH / 2, 4, 0, 6.3); cx.fill(); cx.stroke(); }
+    cx.fillStyle = rgba(C.text, busy ? 0.1 : 0.05); cx.fillRect(a.x, a.y, g.podW, g.podH); cx.shadowBlur = 0;
+    cx.strokeStyle = busy ? rgba(C.accent, 0.8) : C.line; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(a.x, a.y + 1); cx.lineTo(a.x + g.podW, a.y + 1); cx.moveTo(a.x, a.y + g.podH - 1); cx.lineTo(a.x + g.podW, a.y + g.podH - 1); cx.stroke();
+    cx.fillStyle = busy ? C.accent : C.faint; cx.fillRect(a.x + g.podW - 5, a.y + 6, 5, g.podH - 12);
+    cx.fillStyle = busy ? rgba(C.accent, 0.6 + 0.4 * Math.sin(t * 4)) : sim.waiting ? C.warn : C.faint; cx.beginPath(); cx.arc(a.x + 12, a.y + 12, 4, 0, 6.3); cx.fill();
+    cx.font = mono; cx.fillStyle = C.muted; cx.fillText("chỗ " + (i + 1), a.x + 22, a.y + 16);
     cx.restore();
   }
-  // lệnh chờ, ô xong, lệnh đang chạy (lệnh chạy vẽ sau cùng để nằm trên máy)
+  // xe: hàng chờ và xe đã ra vẽ trước, xe đang đỗ vẽ sau cùng để nằm trên chỗ đỗ
   for (const e of ents.sort((p, q) => (p.state === "r") - (q.state === "r"))) {
     if (e.a < 0.02) continue; cx.save(); cx.globalAlpha = Math.min(1, e.a);
-    let x = e.x, y = e.y, w = e.w, h = e.h; const sel = e.key === simSel, hov = e.key === sim.hover;
+    let x = e.x, y = e.y, w = e.w, h = e.h; const sel = e.key === simSel, hov = e.key === sim.hover, truck = isTruck(e);
     if (e.flow) {
-      e.trail.forEach(([tx, ty], i) => { cx.fillStyle = rgba(e.fail ? C.bad : C.accent, (i + 1) / (e.trail.length * 6)); cx.fillRect(tx - w / 2, ty - h / 2, w, h); });
-      cx.shadowColor = e.fail ? C.bad : C.accent; cx.shadowBlur = 10; cx.fillStyle = C.panel; cx.fillRect(x, y, w, h); cx.shadowBlur = 0; cx.lineWidth = 1.5; cx.strokeStyle = e.fail ? C.bad : C.accent; cx.strokeRect(x + 0.75, y + 0.75, w - 1.5, h - 1.5);
+      car(cx, x + w / 2, y + h / 2, truck ? 46 : 36, 18, e.ang, e.hue, { beam: true, truck, hazard: e.fail && e.flow.kind === "out" });
     } else if (e.state === "d") {
-      const age = Math.max(0, t - (e.born || 0)), s = age < 0.6 ? 1 + 0.7 * Math.exp(-age * 7) * Math.cos(age * 14) : 1; x -= (w * s - w) / 2; y -= (h * s - h) / 2; w *= s; h *= s;
-      cx.lineWidth = 1.5; if (e.fail) { cx.fillStyle = C.bad; cx.fillRect(x, y, w, h); } else { cx.strokeStyle = C.faint; cx.strokeRect(x + 0.75, y + 0.75, w - 1.5, h - 1.5); }
+      const age = Math.max(0, t - (e.born || 0)), s = age < 0.6 ? 1 + 0.7 * Math.exp(-age * 7) * Math.cos(age * 14) : 1;
+      car(cx, x + w / 2, y + h / 2, 22 * s, 12 * s, 0, e.fail ? 2 : e.hue, { truck: false, hazard: e.fail && Math.sin(t * 8) > 0 });
+    } else if (e.state === "q") {
+      y += Math.sin(t * 2 + e.seed) * 1.2;
+      car(cx, x + 24, y + h / 2, truck ? 44 : 38, 19, -Math.PI / 2, e.hue, { truck, brake: sim.valve > 0.5 });
+      cx.font = "600 13px " + fam; cx.fillStyle = C.text; cx.fillText(fit(niceTitle(e.job.cmd), w - 50), x + 44, y + 20);
+      cx.font = mono; cx.fillStyle = C.muted; cx.fillText(fit("chờ " + simClock(Date.now() / 1000 - e.job.queued), w - 50), x + 44, y + 38);
+      if (e.idx === 0) { cx.strokeStyle = C.text; cx.lineWidth = 1; cx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); }
     } else {
-      if (e.state === "q") y += Math.sin(t * 2 + e.seed) * 1.5;
-      cx.fillStyle = C.panel; cx.fillRect(x, y, w, h); cx.lineWidth = 1; cx.strokeStyle = e.state === "r" ? C.accent : e.idx === 0 ? C.text : C.line; cx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-      const dial = e.state === "r" && g.podW >= 200, R = dial ? Math.min(30, (h - 10) / 2) : 0;
-      cx.font = "600 13px " + fam; cx.fillStyle = C.text; cx.fillText(fit(niceTitle(e.job.cmd), w - 18 - (dial ? 2 * R + 8 : 0)), x + 8, y + 18);
-      cx.font = mono; cx.fillStyle = C.muted;
-      if (e.state === "q") cx.fillText("chờ " + fmtTime(Date.now() / 1000 - e.job.queued), x + 8, y + 36);
-      else { const age = Date.now() / 1000 - e.job.started; cx.fillText(fmtTime(age), x + 8, y + 34); if (h >= 58) cx.fillText(fit(fmtCpu(e.job.cpu) + " nhân · " + fmtMem(e.job.mem), w - 18 - (dial ? 2 * R + 8 : 0)), x + 8, y + 49); }
+      const dial = g.podW >= 200, R = dial ? Math.min(30, (h - 10) / 2) : 0, tw = w - 18 - (dial ? 2 * R + 8 : 0), age = Date.now() / 1000 - e.job.started, hot = Math.min(1, e.job.cpu / 200);
+      const prog = Math.max(0, Math.min(1, (e.w - 40) / Math.max(1, e.tw - 40)));
+      cx.font = "600 13px " + fam; cx.fillStyle = C.text; cx.fillText(fit(niceTitle(e.job.cmd), w - 16), x + 8, y + 15);
+      const len = truck ? 50 : 40, cyc = y + 15 + (h - 15) / 2;
+      car(cx, x + 12 + len / 2, cyc, len, 22, 0, e.hue, { truck, beam: false });
+      cx.fillStyle = rgba("#ff7a30", 0.15 + 0.35 * hot * (0.6 + 0.4 * Math.sin(t * 9))); cx.fillRect(x + 8, cyc - 4, 4, 8);
+      cx.globalAlpha = Math.min(1, e.a) * prog; cx.font = mono; cx.fillStyle = C.muted; const tx = x + 12 + len + 10;
+      const room = x + w - (dial ? 2 * R + 14 : 8) - tx;
+      if (room > 20) { if (h >= 72) { cx.fillText(fit(simClock(age), room), tx, cyc - 10); cx.fillText(fit(fmtCpu(e.job.cpu) + " nhân", room), tx, cyc + 6); cx.fillText(fit(fmtMem(e.job.mem), room), tx, cyc + 22); } else { cx.fillText(fit(simClock(age), room), tx, cyc - 2); if (h >= 58) cx.fillText(fit(fmtCpu(e.job.cpu) + " nhân", room), tx, cyc + 14); } }
     }
     if (sel || hov) { cx.strokeStyle = C.text; cx.lineWidth = sel ? 2 : 1; cx.strokeRect(x - 1.5, y - 1.5, w + 3, h + 3); }
     cx.restore();
   }
-  // mặt đồng hồ mỗi máy: vòng = thời gian đã chạy, nước = RAM, bánh răng = CPU
+  // đồng hồ xe ở mỗi chỗ đỗ: vòng = thời gian đã chạy, nước = RAM, kim = CPU
   for (let i = 0; i < g.n && g.podW >= 200; i++) {
     const a = g.pod(i), busy = sim.used.has(i), run = ents.find((e) => e.state === "r" && e.slot === i && !e.flow); if (busy && !run) continue;
     const bh = Math.max(44, g.podH - 30), R = Math.min(30, (bh - 10) / 2), x0 = a.x + 6 + g.podW - 12 - 8 - R, y0 = a.y + 24 + bh / 2, job = run && run.job;
     const pct = job ? Math.min(1, (Date.now() / 1000 - job.started) / d.timeout) : 0, col = pct >= 0.95 ? C.bad : pct >= 0.8 ? C.warn : C.accent;
-    cx.save(); cx.lineWidth = 5; cx.strokeStyle = rgba(C.track, 1); cx.setLineDash(busy ? [] : [3, 4]); cx.beginPath(); cx.arc(x0, y0, R - 2, 0, 6.3); cx.stroke(); cx.setLineDash([]);
+    cx.save(); cx.globalAlpha = Math.max(0, Math.min(1, sim.bayA[i])); cx.fillStyle = C.panel; cx.beginPath(); cx.arc(x0, y0, R, 0, 6.3); cx.fill(); cx.lineWidth = busy ? 5 : 2; cx.strokeStyle = rgba(busy ? C.track : C.faint, 1); cx.setLineDash(busy ? [] : [3, 4]); cx.beginPath(); cx.arc(x0, y0, R - 2, 0, 6.3); cx.stroke(); cx.setLineDash([]);
     if (job) {
       cx.strokeStyle = col; cx.beginPath(); cx.arc(x0, y0, R - 2, -Math.PI / 2, -Math.PI / 2 + pct * 6.2832); cx.stroke();
-      const lvl = Math.max(0.08, Math.min(1, job.mem / Math.max(500, d.mem / Math.max(1, d.jobs)))), top = y0 + R - 7 - lvl * (2 * R - 14);
+      cx.save(); const lvl = Math.max(0.08, Math.min(1, job.mem / Math.max(500, d.totalMb / Math.max(2, d.cap)))), top = y0 + R - 7 - lvl * (2 * R - 14);
       cx.beginPath(); cx.arc(x0, y0, R - 6, 0, 6.3); cx.clip(); cx.fillStyle = rgba(lvl > 0.9 ? C.warn : C.accent, 0.4); cx.beginPath(); cx.moveTo(x0 - R, y0 + R);
-      for (let wx = -R; wx <= R; wx += 3) cx.lineTo(x0 + wx, top + Math.sin(wx * 0.3 + t * 3) * 2); cx.lineTo(x0 + R, y0 + R); cx.fill();
+      for (let wx = -R; wx <= R; wx += 3) cx.lineTo(x0 + wx, top + Math.sin(wx * 0.3 + t * 3) * 2); cx.lineTo(x0 + R, y0 + R); cx.fill(); cx.restore();
+      const na = (-225 + 270 * Math.min(1, job.cpu / 200)) * Math.PI / 180 + Math.sin(t * 13) * 0.04;
+      cx.strokeStyle = C.text; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(x0, y0); cx.lineTo(x0 + Math.cos(na) * (R - 8), y0 + Math.sin(na) * (R - 8)); cx.stroke(); cx.fillStyle = C.text; cx.beginPath(); cx.arc(x0, y0, 2.5, 0, 6.3); cx.fill();
     }
-    cx.restore(); gear(cx, x0, y0, R * 0.5, busy ? sim.podAng[i] || 0 : 0, busy ? rgba(C.text, 0.85) : rgba(C.faint, 0.5));
+    cx.restore();
   }
   for (const q of sim.parts) {
     const f = q.life / q.max; cx.save();
@@ -537,9 +562,10 @@ function simDraw(t) {
     else { cx.fillStyle = rgba(q.c, f); cx.fillRect(q.x, q.y, q.s, q.s); }
     cx.restore();
   }
-  // đường tải máy chạy như máy đo nhịp tim, kèm chú giải
+  if (sim.rain.length) { cx.save(); cx.strokeStyle = rgba(C.text, 0.32); cx.lineWidth = 1; cx.beginPath(); for (const r of sim.rain) { cx.moveTo(r.x, r.y); cx.lineTo(r.x - 3, r.y - 9); } cx.stroke(); cx.restore(); }
+  // đường tải CPU ở đáy như máy đo nhịp tim, kèm chú giải
   const y0 = H - 40, y1 = H - 6;
-  cx.font = mono; cx.fillStyle = C.muted; cx.fillText("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6); cx.fillText("vòng = thời gian · nước = RAM · bánh răng = CPU", 130, y0 - 6);
+  cx.font = mono; cx.fillStyle = C.muted; cx.fillText("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6); cx.fillText("vòng = thời gian · nước = RAM · kim = CPU · mưa = RAM căng", 130, y0 - 6);
   const top = Math.max(d.maxLoad * 1.25, ...loads, 1), yy = (v) => y1 - (Math.min(v, top) / top) * (y1 - y0);
   cx.save(); cx.setLineDash([3, 4]); cx.strokeStyle = rgba(C.faint, 0.6); cx.beginPath(); cx.moveTo(0, yy(d.maxLoad)); cx.lineTo(W, yy(d.maxLoad)); cx.stroke(); cx.restore();
   if (loads.length > 1) { cx.strokeStyle = loads[loads.length - 1] >= d.maxLoad ? C.bad : C.accent; cx.lineWidth = 1.5; cx.beginPath(); loads.forEach((v, i) => { const x = (i / (loads.length - 1)) * W; i ? cx.lineTo(x, yy(v)) : cx.moveTo(x, yy(v)); }); cx.stroke(); const lv = loads[loads.length - 1]; cx.fillStyle = cx.strokeStyle; cx.beginPath(); cx.arc(W - 2, yy(lv), 3 + Math.sin(t * 5), 0, 6.3); cx.fill(); }
@@ -549,7 +575,7 @@ function simHit(x, y) {
   for (const e of sim.ents.values()) if (e.ta > 0 && e.a > 0.4 && x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h && (!best || (e.state === "r") > (best.state === "r"))) best = e;
   return best;
 }
-const simValveAt = (x, y) => sim.g && Math.hypot(x - (sim.g.zq + 14), y - 50) < 12;
+const simValveAt = (x, y) => sim.g && Math.hypot(x - (sim.g.zq + 14), y - 56) < 14;
 function simClickAt(x, y) { const e = simHit(x, y); if (e) selectSim(e.key); return !!e; }
 const simKeys = () => [...sim.ents.values()].filter((e) => e.ta > 0).map((e) => ({ key: e.key, state: e.state }));
 const simPoint = (key) => { const e = sim.ents.get(key); return { x: e.tx + e.tw / 2, y: e.ty + e.th / 2 }; };
@@ -571,11 +597,11 @@ function simAudit() {
   const g = sim.g, cx = sim.cx, W = sim.W, H = sim.H, bad = [];
   cx.font = "600 12px ui-monospace,Menlo,monospace"; const tw = (t) => cx.measureText(t).width;
   const R = (n, x, y, w, h) => ({ n, x, y, w, h }), hit = (a, b, pad) => a.x < b.x + b.w - pad && b.x < a.x + a.w - pad && a.y < b.y + b.h - pad && b.y < a.y + a.h - pad;
-  const items = [R("nhãn hàng chờ", 0, 0, tw("hàng chờ " + sim.waiting + (sim.waiting > g.qrows ? " (hiện " + g.qrows + ")" : "")), 14), R("nhãn máy", g.px, 0, tw("máy chạy " + sim.running + "/" + g.n), 14), R("nhãn kết quả", W - tw("kết quả"), 0, tw("kết quả"), 14)];
+  const items = [R("nhãn hàng chờ", 0, 0, tw(simQueueLabel()), 14), R("nhãn chỗ đỗ", g.px, 0, tw(simRunLabel()), 14), R("nhãn bãi xe ra", W - tw("bãi xe ra"), 0, tw("bãi xe ra"), 14)];
   for (let i = 0; i < g.n; i++) { const a = g.pod(i); items.push(R("máy " + (i + 1), a.x, a.y, g.podW, g.podH)); }
   for (let k = 0; k < g.qrows; k++) items.push(R("ô chờ " + (k + 1), 0, g.que(k).y, g.zq, g.qh));
   const dcols = Math.max(1, Math.floor((g.zd - 12) / 26)), drows = Math.max(1, Math.floor((g.H - g.top - 8 - 40) / 26));
-  items.push(R("khay", g.tx0, g.top, g.zd, g.H - g.top - 4), R("van", g.zq + 4, 40, 20, 20));
+  items.push(R("khay", g.tx0, g.top, g.zd, g.H - g.top - 4), R("rào chắn", g.zq + 1, 44, 28, 24));
   for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) { const a = items[i], b = items[j]; if (a.n === "khay" && b.n.startsWith("nhãn")) continue; if (hit(a, b, 1)) bad.push(a.n + " đè " + b.n); }
   const bottom = [R("chữ tải máy", 0, H - 58, 440, 14), R("đường tải", 0, H - 40, W, 34)];
   for (const a of items.concat([R("lưới xong", g.tx0 + 8, g.top + 8, dcols * 26, drows * 26), R("bộ đếm khay", g.tx0 + 8, g.H - 36, g.zd - 16, 32)])) for (const b of bottom) if (hit(a, b, 1) && a.n !== "khay") bad.push(a.n + " đè " + b.n);
@@ -583,7 +609,7 @@ function simAudit() {
   const segs = [];
   for (let i = 0; i < g.n; i++) for (const [kind, pts] of [["vào", g.ptIn(i)], ["ra", g.ptOut(i)]]) for (let k = 1; k < pts.length; k++) segs.push({ kind, i, a: pts[k - 1], b: pts[k] });
   for (const sg of segs) {
-    const r = R("ống " + sg.kind + " máy " + (sg.i + 1), Math.min(sg.a[0], sg.b[0]) - 4, Math.min(sg.a[1], sg.b[1]) - 4, Math.abs(sg.a[0] - sg.b[0]) + 8, Math.abs(sg.a[1] - sg.b[1]) + 8);
+    const r = R("ống " + sg.kind + " máy " + (sg.i + 1), Math.min(sg.a[0], sg.b[0]) - 8, Math.min(sg.a[1], sg.b[1]) - 8, Math.abs(sg.a[0] - sg.b[0]) + 16, Math.abs(sg.a[1] - sg.b[1]) + 16);
     for (const it of items) { const blocks = it.n.startsWith("máy ") ? it.n !== "máy " + (sg.i + 1) && hit(r, it, 3) : it.n.startsWith("nhãn") ? hit(r, it, 1) : false; if (blocks) bad.push(r.n + " xuyên " + it.n); }
   }
   const hz = (sg) => sg.a[1] === sg.b[1], lo = (a, b) => Math.min(a, b), hi = (a, b) => Math.max(a, b);
@@ -627,7 +653,7 @@ function renderSimDetail(d, p) {
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && simSel) selectSim(simSel); });
 const cvEl = $("simCv"), cvAt = (ev) => { const r = cvEl.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
 cvEl.addEventListener("click", (ev) => simClickAt(...cvAt(ev)));
-cvEl.addEventListener("mousemove", (ev) => { const pt = cvAt(ev), e = simHit(...pt), k = e ? e.key : ""; if (!e) cvEl.title = simValveAt(...pt) ? "Van ở đầu ống: " + sim.note : ""; else cvEl.title = e.job.cmd || ""; if (k !== sim.hover) { sim.hover = k; cvEl.style.cursor = k ? "pointer" : ""; simKick(); } });
+cvEl.addEventListener("mousemove", (ev) => { const pt = cvAt(ev), e = simHit(...pt), k = e ? e.key : ""; if (!e) cvEl.title = simValveAt(...pt) ? "Rào chắn: " + sim.note : ""; else cvEl.title = e.job.cmd || ""; if (k !== sim.hover) { sim.hover = k; cvEl.style.cursor = k ? "pointer" : ""; simKick(); } });
 cvEl.addEventListener("mouseleave", () => { sim.hover = ""; cvEl.style.cursor = ""; simKick(); });
 cvEl.addEventListener("keydown", (ev) => { // phím mũi tên đi qua các lệnh theo thứ tự đang chạy, đang chờ, đã xong
   if (ev.key !== "ArrowRight" && ev.key !== "ArrowDown" && ev.key !== "ArrowLeft" && ev.key !== "ArrowUp") return;
