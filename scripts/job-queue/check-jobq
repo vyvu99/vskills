@@ -5,7 +5,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 # chạy qua hàng đợi thì JOBQ_ACTIVE làm jobq lồng chạy thẳng, bài kiểm tra sẽ không đo được hàng đợi
 unset JOBQ_ACTIVE
-export JOBQ_COOLDOWN_SEC=0 JOBQ_SWAP_GROWTH_MB=999999 JOBQ_BUDGET_CPU=4 JOBQ_MAX_PRESSURE=99 JOBQ_DIR="$T/q" JOBQ_SLOTS=2 JOBQ_MAX_CPU=999 JOBQ_MAX_PAGEOUT=999999999 JOBQ_MIN_FREE_MB=0
+export JOBQ_COOLDOWN_SEC=0 JOBQ_SWAP_GROWTH_MB=999999 JOBQ_BUDGET_CPU=4 JOBQ_MAX_PRESSURE=99 JOBQ_DIR="$T/q" JOBQ_SLOTS=2 JOBQ_MAX_CPU=999 JOBQ_MAX_PAGEOUT=999999999 JOBQ_FAKE_MACHINE="0 0 0" JOBQ_MIN_FREE_MB=0
 fail() { echo "FAIL: $1"; exit 1; }
 
 bash -n "$HERE/jobq" || fail "cú pháp"

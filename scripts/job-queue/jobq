@@ -113,13 +113,15 @@ sample() { # $1 pgid $2 tệp ra: mỗi 2s ghi "mem_mb centi_cpu" của cả nh�
 pressure() { sysctl -n kern.memorystatus_vm_pressure_level 2>/dev/null || echo 1; } # Linux không có: coi như bình thường
 
 pageouts() { vm_stat 2>/dev/null | awk '/^Pageouts/{gsub(/\./,"",$2); print $2+0}'; }
-measure_machine() { # in "cpu_% pageouts giây_không_đụng_máy" từ số đo mới nhất; chỉ một tiến trình đo mỗi 3 giây, các lệnh đang chờ đọc kết quả đó nên hàng chờ dài không gọi top liên tục
+measure_machine() { # in "cpu_% pageouts giây_không_đụng_máy" từ số đo mới nhất; chỉ một tiến trình đo mỗi 3 giây, các lệnh đang chờ đọc kết quả đó nên hàng chờ dài không gọi top liên tục; JOBQ_FAKE_MACHINE dùng cho kiểm thử
+  [ -n "${JOBQ_FAKE_MACHINE:-}" ] && { echo "$JOBQ_FAKE_MACHINE"; return; }
   local f="$Q_DIR/machine" ts=0 cpu=0 po=0 idle=0 t; t=$(now)
   read -r ts cpu po idle 2>/dev/null < "$f" || true
   if [ $(( t - ${ts:-0} )) -ge 3 ]; then
-    [ -d "$Q_DIR/machine.lock" ] && [ $(( t - ${ts:-0} )) -ge 20 ] && rm -rf "$Q_DIR/machine.lock" # khoá mồ côi do tiến trình đo bị giết giữa chừng
     if mkdir "$Q_DIR/machine.lock" 2>/dev/null; then
-      read -r cpu po idle <<< "$(measure_machine)"; echo "$(now) ${cpu:-0} ${po:-0} ${idle:-0}" > "$f.tmp" && mv "$f.tmp" "$f"; rmdir "$Q_DIR/machine.lock"
+      read -r cpu po idle <<< "$(measure_machine)"; echo "$(now) ${cpu:-0} ${po:-0} ${idle:-0}" > "$f.tmp" && mv "$f.tmp" "$f"; rmdir "$Q_DIR/machine.lock" 2>/dev/null
+    elif [ -n "$(find "$Q_DIR/machine.lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+      rm -rf "$Q_DIR/machine.lock" # khoá mồ côi do tiến trình đo bị giết giữa chừng: quá một phút mà chưa ai trả
     fi
   fi
   echo "${cpu:-0} ${po:-0} ${idle:-0}"
