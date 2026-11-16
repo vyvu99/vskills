@@ -33,7 +33,7 @@ jobq run -t 1800 -- pnpm test:e2e         # nới timeout lên 30 phút
 jobq run --cost cpu=3,mem=2000 -- <lệnh>  # khai sẵn mức nặng cho lệnh chưa có lịch sử
 jobq status                               # lệnh đang chạy và đang chờ (lệnh chờ giống nhau gộp một dòng), giới hạn đang áp dụng, tải máy
 jobq stats                                # lệnh nào nặng nhất: số lần, CPU/RAM lớn nhất, thời gian
-jobq web                                  # mở trang theo dõi (xem dạng danh sách hoặc mô phỏng 3D căn bếp: lệnh chờ là phiếu gọi món treo trên ray, phiếu bay xuống bếp rồi nồi đặt lên (lửa theo CPU, nước trong nồi theo RAM, vòng quanh là thời gian đã nấu), lệnh xong thành đĩa ra quầy; số bếp mở theo hạn mức động, hơi nước phủ bếp khi RAM căng, kéo chuột để xoay camera)
+jobq web                                  # mở trang theo dõi (xem dạng danh sách hoặc mô phỏng quán ăn nhanh pixel-art: lệnh chờ là khách vào cửa, xếp hàng, gọi món và trả tiền ở quầy thanh toán rồi ngồi một trong nhiều loại bàn; lệnh đang chạy là đầu bếp trong nhà bếp riêng có kính nấu một trong 12 món, robot phục vụ chở khay tới bàn, khách ăn, dọn khay rồi ra về kèm sao đánh giá (món cháy thì khách giận, khiếu nại và được hoàn tiền); ông chủ báo tình hình máy, sổ sách hiện doanh thu, chi phí, lãi và đánh giá của 50 lệnh gần nhất, số bếp mở theo hạn mức động, ngoài trời mưa khi RAM căng, kéo chuột để xoay camera)
 jobq clean                                # dọn chỗ của tiến trình đã chết, cắt lịch sử còn 2000 dòng
 ```
 

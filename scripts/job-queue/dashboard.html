@@ -91,7 +91,7 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 .out{margin:4px 0 12px 20px;padding:8px 10px;background:var(--bg);font:12px/1.5 var(--mono);max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);border:1px solid var(--line)}
 [role="tabpanel"][hidden]{display:none}
 .p-sim{display:none;grid-column:2/-1}
-.grid.sim .mid,.grid.sim .p-info{display:none}.grid.sim .p-sim{display:flex}
+.grid.sim .mid,.grid.sim .p-info,.grid.sim .left{display:none}.grid.sim .p-sim{grid-column:1/-1}.grid.sim .p-sim{display:flex}
 .simbody{display:flex;flex-direction:column;gap:8px;overflow:auto;padding:16px 12px 12px}
 .simnote{font-size:12px;color:var(--muted);min-height:18px}.simhint{display:none}
 @media (max-width:760px){.simhint{display:block}}.simnote.warn{color:var(--warn)}
@@ -338,10 +338,10 @@ function renderTab(d) {
   if (lastIcon === state) return; lastIcon = state;
   $("icon").href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' fill='" + COLORS[state] + "'/%3E%3C/svg%3E";
 }
-// Mô phỏng 3D bếp nhà hàng: bộ chiếu phối cảnh tự viết trên canvas 2D (không thêm thư viện). Phiếu gọi món treo trên ray phía sau, nồi hình trụ trên các bếp ở giữa, quầy lấy món phía trước. Lệnh đến lượt thì phiếu bay theo vòng cung xuống bếp, nồi đặt lên và lửa bùng (lửa theo CPU, nước trong nồi theo RAM, vòng quanh nồi là thời gian đã nấu); xong thì đĩa bay ra quầy. Số bếp mở là hạn mức động. Camera lắc nhẹ, kéo chuột để xoay, nhấp đúp để đặt lại. Dữ liệu chỉ đến 3 giây một lần nên mọi thứ tự bay tới đích; hoạt ảnh không phụ thuộc nhịp dữ liệu.
-const SIM_FPS = 24; // máy yếu: 24 khung/giây là đủ mượt
+// Mô phỏng quán ăn nhanh pixel-art: nhà bếp riêng có kính với đầu bếp (mỗi lệnh đang chạy là một đầu bếp), quầy thanh toán có thu ngân và ông chủ, đại sảnh nhiều loại bàn (bàn tròn, ghế bar cao, bàn dài, ghế bành), robot phục vụ chở khay từ cửa sổ bếp tới bàn khách. Khách vào cửa, xếp hàng trả tiền, chọn bàn ngồi chờ, robot mang món tới thì ăn thật (cầm đồ ăn, nhai, uống) rồi dọn khay ra về; món cháy thì khách giận bỏ đi. Cửa sổ nhìn ra phố có xe và người đi bộ, ngày đêm theo giờ thật, mưa khi RAM căng, đồng hồ treo tường chạy giờ thật. Cả cảnh vẽ ở độ phân giải thấp rồi phóng to: đa giác tô theo từng dòng điểm ảnh nên cạnh sắc nét. Chữ chỉ nằm ở cột danh sách, bong bóng ông chủ và các dòng nhãn, đã được kiểm tra không đè lên nhau hay lên hình. Dữ liệu chỉ đến 3 giây một lần nên mọi thứ tự đi tới đích; hoạt ảnh không phụ thuộc nhịp dữ liệu.
+const SIM_FPS = 24, PX = 2, U = 2; // máy yếu: 24 khung/giây; mỗi "điểm ảnh" nhân vật là 2px màn hình
 let view = "list", simFirst = true, simSel = "", simSig = "";
-const simSlot = new Map(), sim = { ents: new Map(), parts: [], fog: [], podFx: {}, bayA: [], cv: null, cx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", smokeAt: 0, waiting: 0, running: 0, extra: 0, pressure: 1, bell: -9, trayAt: -9, yaw: 0, pitchUser: null, drag: null, dragged: false };
+const simSlot = new Map(), sim = { ents: new Map(), parts: [], podFx: {}, bayA: [], cv: null, cx: null, lo: null, lx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", smokeAt: 0, waiting: 0, running: 0, extra: 0, pressure: 1, yaw: 0, pitchUser: null, drag: null, dragged: false, yawFix: null, texts: [], rects: [], rows: [], idle: 0, seatBy: {}, lastNo: 0, bell: -9, trayAt: -9 };
 function simColors() {
   const probe = el("i"); probe.style.cssText = "position:absolute;visibility:hidden"; document.body.append(probe); const c = {};
   for (const n of ["panel", "text", "muted", "faint", "line", "track", "accent", "warn", "bad"]) { probe.style.color = "var(--" + n + ")"; c[n] = getComputedStyle(probe).color; }
@@ -353,242 +353,432 @@ function path3At(p, u) {
   let L = path3Len(p) * u;
   for (let i = 1; i < p.length; i++) { const s = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1], p[i][2] - p[i - 1][2]); if (L <= s || i === p.length - 1) { const f = s ? Math.min(1, L / s) : 0; return [0, 1, 2].map((k) => p[i - 1][k] + (p[i][k] - p[i - 1][k]) * f); } L -= s; }
 }
-const arc3 = (a, b, lift) => { const pts = []; for (let i = 0; i <= 16; i++) { const u = i / 16; pts.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u + lift * 4 * u * (1 - u), a[2] + (b[2] - a[2]) * u]); } return pts; };
-const simQueueLabel = () => "phiếu chờ " + sim.waiting + (sim.g && sim.waiting > sim.g.qvis ? " (hiện " + sim.g.qvis + ")" : "");
-const simRunLabel = () => "bếp đang dùng " + sim.running + (sim.extra > 0 ? " · nhận thêm được " + sim.extra : "");
+const arc3 = (a, b, lift) => { const pts = []; for (let i = 0; i <= 12; i++) { const u = i / 12; pts.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u + lift * 4 * u * (1 - u), a[2] + (b[2] - a[2]) * u]); } return pts; };
 const simClock = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60, p2 = (n) => String(n).padStart(2, "0"); return h ? h + ":" + p2(m) + ":" + p2(r) : p2(m) + ":" + p2(r); };
-// Chiếu điểm thế giới (x sang phải, y lên, z về phía người xem) ra màn hình: xoay quanh trục đứng rồi nghiêng xuống, chia cho độ sâu.
+const simQueueLabel = () => "khách chờ " + sim.waiting + (sim.g && sim.waiting > sim.g.qvis ? " (hiện " + sim.g.qvis + ")" : "");
+const simRunLabel = () => "bếp đang dùng " + sim.running + (sim.extra > 0 ? " · nhận thêm được " + sim.extra : "");
+const hueOf = (key) => [...key].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 function proj3(p, cam, fit) {
   const x = p[0], y = p[1] - 20, z = p[2], cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), x1 = x * cy + z * sy, z1 = -x * sy + z * cy, cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
   const depth = fit.dist - (y * sp + z1 * cp), k = fit.F / depth;
   return [fit.ox + fit.s * x1 * k, fit.oy - fit.s * (y * cp - z1 * sp) * k, depth, fit.s * k];
 }
+// Bố cục thế giới (x sang phải, y lên, z về phía người xem): nhà bếp ở góc sau bên trái, quầy thanh toán sau bên phải, đại sảnh nhiều loại bàn ở phía trước, cửa vào bên phải, cửa ra bên trái.
 function simGeo(d, W, H) {
-  const n = Math.max(d.cap, d.running.length, 1), rows = Math.ceil(n / 6), cols = Math.ceil(n / rows), S = 124, RZ = 170, TW = 112, pitch0 = rows > 1 ? 0.95 : 0.72;
-  const qvis = Math.min(8, Math.max(cols + 1, 4)), pcols = 8, zRail = -((rows - 1) * RZ) / 2 - 120, zPass = ((rows - 1) * RZ) / 2 + 150, railY = 130;
-  const pod = (i) => [((i % cols) - (cols - 1) / 2) * S, 0, Math.floor(i / cols) * RZ - ((rows - 1) * RZ) / 2];
-  const que = (k) => [(Math.min(k, qvis - 1) - (qvis - 1) / 2) * TW, railY - 34, zRail];
-  const done = (m) => [(m % pcols - (pcols - 1) / 2) * 38, 2, zPass];
-  const sceneW = Math.max(cols * S, qvis * TW, pcols * 38) + 60, g = { n, rows, cols, S, RZ, TW, qvis, pcols, zRail, zPass, railY, sceneW, pitch0, pod, que, done, dcap: pcols, W, H };
-  // khung nhìn tự co giãn cho vừa canvas: chiếu các góc cảnh với camera chuẩn rồi tính tỉ lệ và vị trí
-  const fit = { F: 900, dist: sceneW * 1.1, s: 1, ox: 0, oy: 0 }, cam = { yaw: 0, pitch: pitch0 }, pts = [], hx = sceneW / 2;
-  for (const sx of [-hx, hx]) pts.push([sx, railY + 30, zRail], [sx, -40, zPass + 40], [sx, -40, zRail]);
+  const n = Math.max(d.cap, d.running.length, 1), nv = Math.min(n, 12), RW = W >= 900 ? 210 : 176, Ws = W - RW, S = Math.min(86, 430 / nv), qvis = 6, dcap = 6, pitch0 = 0.4;
+  const pod = (i) => [-520 + S / 2 + i * S, 0, -165], pan = (i) => [-520 + S / 2 + i * S, 42, -108], shelf = [-310, 44, -80], dock = [-310, 0, -40], pay = [150, 0, 16];
+  const que = (k) => [190 + Math.min(k, qvis - 1) * 52, 0, 22], door = [540, 0, 80], exitP = [-540, 0, 140], bin = [-500, 0, 90], wait = (i) => [60 + i * 36, 0, 30];
+  // bàn và ghế: mỗi ghế là chỗ ngồi hướng về phía người xem, phía xa của bàn
+  const tables = [{ t: "round", x: -400, z: 112, seats: [[-424, 92], [-376, 92]] }, { t: "round", x: -280, z: 112, seats: [[-304, 92], [-256, 92]] }, { t: "round", x: -160, z: 112, seats: [[-184, 92], [-136, 92]] }, { t: "high", x: -40, z: 112, seats: [[-56, 92], [-24, 92]] }, { t: "long", x: 90, z: 120, seats: [[30, 100], [70, 100], [110, 100], [150, 100]] }, { t: "booth", x: 290, z: 112, seats: [[270, 92], [310, 92]] }, { t: "booth", x: 400, z: 112, seats: [[380, 92], [420, 92]] }];
+  const seats = []; tables.forEach((tb, ti) => tb.seats.forEach(([x, z]) => seats.push({ x, z, ti, high: tb.t === "high" })));
+  const done = (m) => [-500 + (m + 0.5) * 70, 142, -198];
+  const g = { n, nv, RW, Ws, S, qvis, dcap, pitch0, pod, pan, shelf, dock, pay, que, door, exitP, bin, wait, tables, seats, done, W, H };
+  const fit = { F: 900, dist: 1500, s: 1, ox: 0, oy: 0 }, cam = { yaw: 0, pitch: pitch0 }, pts = [];
+  for (const sx of [-560, 560]) pts.push([sx, 235, -200], [sx, 0, 175], [sx, 0, -200]);
   const raw = pts.map((p) => proj3(p, cam, fit)), x0 = Math.min(...raw.map((r) => r[0])), x1 = Math.max(...raw.map((r) => r[0])), y0 = Math.min(...raw.map((r) => r[1])), y1 = Math.max(...raw.map((r) => r[1]));
-  const topM = 40, botM = 34; fit.s = Math.min((W - 24) / (x1 - x0), (H - topM - botM) / (y1 - y0)); fit.ox = W / 2 - fit.s * (x0 + x1) / 2; fit.oy = topM + (H - topM - botM) / 2 - fit.s * (y0 + y1) / 2;
+  const topM = 40, botM = 34, sideM = 14; fit.s = Math.min((Ws - 2 * sideM) / (x1 - x0), (H - topM - botM) / (y1 - y0)); fit.ox = Ws / 2 - fit.s * (x0 + x1) / 2; fit.oy = topM + (H - topM - botM) / 2 - fit.s * (y0 + y1) / 2;
   g.fit = fit; return g;
 }
-const simCam = (t) => ({ yaw: sim.yaw + (sim.drag ? 0 : Math.sin(t * 0.18) * 0.08), pitch: sim.pitchUser == null ? sim.g.pitch0 : sim.pitchUser });
+const simCam = (t) => ({ yaw: sim.yawFix != null ? sim.yawFix : sim.yaw + (sim.drag ? 0 : Math.sin(t * 0.18) * 0.05), pitch: sim.pitchUser == null ? sim.g.pitch0 : sim.pitchUser });
+function takeSeat(key) { const g = sim.g; for (let i = 0; i < g.seats.length; i++) if (!sim.seatBy[i]) { sim.seatBy[i] = key; return i; } return -1; }
+function freeSeat(key) { for (const i in sim.seatBy) if (sim.seatBy[i] === key) delete sim.seatBy[i]; }
 function simPut(key, state, tp, alpha, job, extra) {
   let e = sim.ents.get(key); const now = performance.now() / 1000, g = sim.g;
   if (!e) {
-    e = { key, state, p: tp.slice(), a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now, landed: simFirst ? -9 : now, hue: [...key].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7), sb: null };
-    if (!simFirst) e.p[1] += state === "d" ? 40 : 60; // vật mới rơi vào từ phía trên
+    e = { key, state, p: tp.slice(), a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now, landed: simFirst ? -9 : now, hue: hueOf(key), sb: null, hits: [], seat: -2 };
+    if (!simFirst && state === "q") { e.p = g.door.slice(); legsFlow(e, [walkLeg(g.door, tp, "walk")], "enter"); }
+    else if (!simFirst) e.p[1] += state === "d" ? 20 : 0;
     sim.ents.set(key, e);
   } else if (e.state !== state && !simFirst) {
-    if (state === "r") { startFlow(e, arc3(e.p, [tp[0], 40, tp[2]], 110), "in"); sim.bell = now; ring3(e.p, sim.C.warn); }
-    if (state === "d") { startFlow(e, arc3([e.p[0], 36, e.p[2]], tp, 130), "out"); ring3([e.p[0], 36, e.p[2]], sim.C.warn); if (extra.fail) sim.podFx[e.slot] = { t0: now, kind: "fail" }; }
+    if (state === "r") { const sp = extra.seatP, aisle = [sp[0], 0, 52]; legsFlow(e, [walkLeg(e.p, g.pay, "walk"), stayLeg(g.pay, 1.3, "order"), stayLeg(g.pay, 1.1, "pay"), walkLeg(g.pay, aisle, "walk"), walkLeg(aisle, sp, "walk")], "in"); sim.bell = now; }
+    if (state === "d") { const sp = e.seatP || tp, d0 = g.pan(Math.min(e.slot, g.nv - 1)), a1 = [g.dock[0], 0, 52], a2 = [sp[0], 0, 52], a3 = [sp[0], 0, sp[2] + 40]; legsFlow(e, [{ a: d0.slice(), b: g.shelf.slice(), dur: 0.9, tag: "dish" }, stayLeg(g.dock, 0.5, "robot"), walkLeg(g.dock, a1, "robot", 120), walkLeg(a1, a2, "robot", 120), walkLeg(a2, a3, "robot", 120)], "out"); }
   }
   e.state = state; e.tp = tp; e.ta = alpha; e.job = job; Object.assign(e, extra);
   if (simFirst) { e.p = tp.slice(); e.a = alpha; }
   return e;
 }
-function startFlow(e, pts, kind) { e.flow = { pts, u: 0, dur: Math.max(1, path3Len(pts) / 240), kind }; e.trail = []; e.a = 1; }
+function startFlow(e, pts, kind) { e.flow = { pts, u: 0, dur: Math.max(1, path3Len(pts) / 110), kind }; e.trail = []; e.a = 1; }
 const burst3 = (p, color, n) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = 40 + Math.random() * 90; sim.parts.push({ k: "spark", p: p.slice(), v: [Math.cos(a) * v, 60 + Math.random() * 80, Math.sin(a) * v], life: 0.8, max: 0.8, s: 2 + Math.random() * 2, c: color }); } };
-const ring3 = (p, color) => sim.parts.push({ k: "ring", p: [p[0], 1, p[2]], v: [0, 0, 0], life: 0.8, max: 0.8, s: 8, c: color });
+const emote = (p, kind) => sim.parts.push({ k: kind, p: [p[0], p[1] + 56, p[2]], v: [0, 24, 0], life: 1.4, max: 1.4, s: 0, c: "" });
 function renderSim(d, p) {
   const stage = $("stage"), H = stage.clientHeight, W = Math.max(stage.clientWidth, 720); // màn hẹp: cảnh giữ chiều rộng tối thiểu và cuộn ngang trong khung
   if (stage.clientWidth < 80 || H < 80) return; // trang đang ẩn: chưa đo được
-  if (!sim.cv) { sim.cv = $("simCv"); sim.cx = sim.cv.getContext("2d"); }
+  if (!sim.cv) { sim.cv = $("simCv"); sim.cx = sim.cv.getContext("2d"); sim.lo = document.createElement("canvas"); sim.lx = sim.lo.getContext("2d"); }
   const dpr = devicePixelRatio || 1; if (sim.cv.width !== Math.round(W * dpr) || sim.cv.height !== Math.round(H * dpr)) { sim.cv.width = Math.round(W * dpr); sim.cv.height = Math.round(H * dpr); }
+  const lw = Math.ceil(W / PX), lh = Math.ceil(H / PX); if (sim.lo.width !== lw || sim.lo.height !== lh) { sim.lo.width = lw; sim.lo.height = lh; }
   sim.cv.style.width = W + "px"; sim.cv.style.height = H + "px"; sim.W = W; sim.H = H; sim.dpr = dpr; sim.C = simColors();
-  const g = simGeo(d, W, H - 64), seen = new Set(); sim.g = g; sim.waiting = p.waiting.length; sim.running = d.running.length; sim.extra = Math.max(0, d.cap - d.running.length); sim.head = p.waiting[0] || null; sim.pressure = d.pressure;
+  const g = simGeo(d, W, H - 64), seen = new Set(); sim.g = g; sim.waiting = p.waiting.length; sim.running = d.running.length; sim.extra = Math.max(0, d.cap - d.running.length); sim.head = p.waiting[0] || null; sim.pressure = d.pressure; sim.idle = d.idle || 0;
   for (const [pid] of simSlot) if (!d.running.some((j) => j.pid === pid)) simSlot.delete(pid);
   const used = new Set(simSlot.values());
   d.running.forEach((j) => { if (!simSlot.has(j.pid)) { let s = 0; while (used.has(s)) s++; simSlot.set(j.pid, s); used.add(s); } });
-  sim.used = used; sim.free = g.n - used.size;
-  for (let i = 0; i < g.n; i++) if (sim.bayA[i] === undefined) sim.bayA[i] = simFirst ? 1 : 0;
-  d.running.forEach((j) => { const slot = simSlot.get(j.pid), k = "p" + j.pid; seen.add(k); simPut(k, "r", g.pod(slot), 1, j, { slot }); });
+  sim.used = used; sim.free = g.nv - used.size;
+  for (let i = 0; i < g.nv; i++) if (sim.bayA[i] === undefined) sim.bayA[i] = simFirst ? 1 : 0;
+  d.running.forEach((j) => {
+    const slot = Math.min(simSlot.get(j.pid), g.nv - 1), k = "p" + j.pid, old = sim.ents.get(k); seen.add(k);
+    let seat = old && old.seat !== -2 ? old.seat : takeSeat(k); const sp = seat >= 0 ? [g.seats[seat].x, 0, g.seats[seat].z] : g.wait(slot);
+    simPut(k, "r", sp, 1, j, { slot, seat, seatP: sp });
+  });
   p.waiting.forEach((j, i) => { const k = "p" + j.pid; seen.add(k); simPut(k, "q", g.que(i), i < g.qvis ? 1 : 0, j, { idx: i }); });
   let m = 0;
   for (const r of d.history) {
     if (r.rc == null || m >= g.dcap) continue;
     const k = "p" + parseInt(r.id.split("-")[1], 10); if (seen.has(k)) continue; seen.add(k);
-    simPut(k, "d", g.done(m++), 1, r, { fail: r.rc !== 0 });
+    const old = sim.ents.get(k); simPut(k, "d", g.done(m++), 1, r, { fail: r.rc !== 0, slot: old ? old.slot : 0 });
   }
   sim.okN = d.history.filter((r) => r.rc === 0).length; sim.failN = d.history.filter((r) => r.rc != null && r.rc !== 0).length;
-  for (const [k, e] of sim.ents) if (!seen.has(k) && !e.flow) { e.ta = 0; e.tp = e.p.slice(); }
-  sim.note = p.waiting.length ? (p.cause ? "Phiếu đang chờ vì " + p.cause + "." : waitReason(p.waiting[0], 0, d, p).text) : "Không có phiếu nào đang chờ.";
+  for (const [k, e] of sim.ents) if (!seen.has(k) && !e.flow) { freeSeat(k); e.ta = 0; e.tp = e.p.slice(); }
+  sim.note = p.waiting.length ? (p.cause ? "Khách đang chờ vì " + p.cause + "." : waitReason(p.waiting[0], 0, d, p).text) : "Không có khách nào đang chờ.";
   $("simNote").textContent = sim.note; $("simNote").className = "simnote" + (p.waiting.length && p.cause ? " warn" : "");
   renderSimDetail(d, p); simFirst = false; sim.d = d; simKick();
+}
+const snap = (v) => Math.round(v / PX) * PX;
+// ===== Hệ sprite: lưới ký tự + bảng màu có dải ba tông (sáng ấm, nền, tối lạnh), tự đổ bóng theo hướng sáng trên-trái, tự viền chọn lọc =====
+const hslHex = (h, s, l) => { h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(100, s)) / 100; l = Math.max(0, Math.min(100, l)) / 100; const a = s * Math.min(l, 1 - l), f = (n) => { const k = (n + h / 30) % 12, c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return Math.round(255 * c).toString(16).padStart(2, "0"); }; return "#" + f(0) + f(8) + f(4); };
+const RAMP = (h, s, l) => [hslHex(h + 8, s - 8, l + 13), hslHex(h, s, l), hslHex(h - 14, s + 8, l - 17)];
+const OUT = "#1d1630", mixHex = (a, b, t) => { const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16)); return "#" + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, "0")).join(""); };
+const spriteCache = new Map();
+function makeSprite(rows, pal) {
+  const H = rows.length, W = Math.max(...rows.map((r) => r.length)), cv = document.createElement("canvas"); cv.width = W + 2; cv.height = H + 2; const c = cv.getContext("2d");
+  const at = (x, y) => (y >= 0 && y < H && x >= 0 && x < rows[y].length && rows[y][x] !== "." && pal[rows[y][x]]) ? rows[y][x] : null;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const ch = at(x, y); if (!ch) continue; const p = pal[ch]; let col = p;
+    if (Array.isArray(p)) { const hi = at(x, y - 1) !== ch || at(x - 1, y) !== ch, lo = at(x, y + 1) !== ch || at(x + 1, y) !== ch; col = hi && !lo ? p[0] : lo && !hi ? p[2] : p[1]; }
+    c.fillStyle = col; c.fillRect(x + 1, y + 1, 1, 1);
+  }
+  for (let y = -1; y <= H; y++) for (let x = -1; x <= W; x++) { // viền chọn lọc: điểm trống sát hình lấy màu tối pha từ chính hình đó
+    if (at(x, y)) continue; let nb = at(x, y - 1) || at(x - 1, y) || at(x + 1, y) || at(x, y + 1); if (!nb) continue; const p = pal[nb], base = Array.isArray(p) ? p[2] : p; c.fillStyle = mixHex(base, OUT, 0.7); c.fillRect(x + 1, y + 1, 1, 1);
+  }
+  return cv;
+}
+const sprite = (key, build) => { let s = spriteCache.get(key); if (!s) { const [rows, pal] = build(); s = makeSprite(rows, pal); spriteCache.set(key, s); } return s; };
+function blit(cx, cv, sx, feetY, flip) { const w = cv.width * U, h = cv.height * U, x = snap(sx - w / 2), y = snap(feetY - h + U); cx.imageSmoothingEnabled = false; if (flip) { cx.save(); cx.translate(x + w, y); cx.scale(-1, 1); cx.drawImage(cv, 0, 0, w, h); cx.restore(); } else cx.drawImage(cv, x, y, w, h); return [x, y, x + w, y + h]; }
+function grid(W, H) { const g = Array.from({ length: H }, () => Array(W).fill(".")); return { g, put(x, y, w, h, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (y + j >= 0 && y + j < H && x + i >= 0 && x + i < W) g[y + j][x + i] = c; }, px(x, y, c) { if (y >= 0 && y < H && x >= 0 && x < W) g[y][x] = c; }, rows() { return g.map((r) => r.join("")); } }; }
+const SKINS = [[28, 58, 82], [24, 50, 68], [22, 42, 52], [20, 38, 36]], HAIRS = [[22, 35, 18], [28, 45, 28], [42, 70, 56], [235, 12, 16], [350, 55, 42], [0, 0, 78]];
+// 8 kiểu khách, mỗi kiểu có dáng, tóc, mũ và phụ kiện riêng
+const ARCH = [{ n: "sinh viên", hat: "cap", hair: 0, acc: "pack", shirt: [205, 55, 48], pants: [220, 35, 30] }, { n: "bà cụ", hair: "bun", hairC: 5, acc: "glasses", shirt: [285, 40, 46], pants: [270, 20, 30] }, { n: "dân văn phòng", hair: 1, acc: "tie", shirt: [215, 30, 28], pants: [220, 25, 22], tone: 2 }, { n: "bé con", kid: true, hair: 2, shirt: [48, 85, 56], pants: [200, 60, 40] }, { n: "du khách", hat: "cap", hair: 1, acc: "camera", shirt: [168, 55, 40], pants: [38, 40, 50] }, { n: "dân chơi", hair: "mohawk", hairC: 3, shirt: [260, 15, 18], pants: [0, 0, 16] }, { n: "shipper", hat: "helmet", hair: 0, shirt: [8, 78, 50], pants: [220, 20, 24] }, { n: "game thủ", hair: 4, acc: "phones", shirt: [140, 45, 32], pants: [215, 30, 26] }];
+function personGrid(o) { // o: role (cook|cust|boss|cashier), pose, frame, mood, arch
+  const G = grid(16, 30), kid = o.kid, top = kid ? 8 : 0, torsoH = kid ? 6 : 9, legH = kid ? 3 : 6, ty = top + 13, ly = ty + torsoH, sit = o.pose === "sit" || o.pose === "eat";
+  const hatTop = top + 3;
+  // tóc hoặc mũ
+  if (o.hat === "paper") { G.put(4, top + 1, 8, 3, "W"); G.put(4, top + 3, 8, 1, "A"); G.put(5, top, 6, 1, "W"); }
+  else if (o.hat === "toque") { G.put(3, top - 1, 10, 3, "W"); G.put(4, top + 2, 8, 2, "W"); G.put(4, top + 3, 8, 1, "A"); }
+  else if (o.hat === "cap") { G.put(4, top + 2, 8, 3, "C"); G.put(10, top + 4, 5, 1, "C"); }
+  else if (o.hat === "helmet") { G.put(3, top + 1, 10, 4, "C"); G.put(4, top, 8, 1, "C"); G.put(4, top + 3, 8, 1, "A"); }
+  else if (o.hair === "mohawk") { G.put(7, top - 3, 2, 7, "h"); G.put(5, top + 3, 6, 1, "h"); }
+  else if (o.hair === "bun") { G.put(6, top, 4, 3, "h"); G.put(4, top + 3, 8, 2, "h"); G.put(3, top + 4, 1, 4, "h"); G.put(12, top + 4, 1, 4, "h"); }
+  else { G.put(4, top + 2, 8, 3, "h"); G.put(3, top + 4, 1, 4, "h"); G.put(12, top + 4, 1, 4, "h"); }
+  // mặt
+  G.put(4, top + 5, 8, 6, "S"); G.put(5, top + 11, 6, 1, "S"); G.px(7, top + 12, "S"); G.px(8, top + 12, "S");
+  G.px(6, top + 7, "e"); G.px(9, top + 7, "e");
+  if (o.mood === "happy") { G.px(6, top + 9, "m"); G.px(9, top + 9, "m"); G.put(7, top + 10, 2, 1, "m"); G.px(5, top + 8, "k"); G.px(10, top + 8, "k"); }
+  else if (o.mood === "angry") { G.put(5, top + 6, 3, 1, "e"); G.put(8, top + 6, 3, 1, "e"); G.put(6, top + 10, 4, 1, "m"); G.px(5, top + 11, "m"); G.px(10, top + 11, "m"); }
+  else if (o.mood === "chew") { G.put(7, top + 9, 2, 2, "m"); }
+  else G.put(7, top + 10, 2, 1, "m");
+  if (o.acc === "glasses") { G.put(5, top + 6, 3, 3, "e"); G.put(8, top + 6, 3, 3, "e"); G.put(6, top + 7, 1, 1, "S"); G.put(9, top + 7, 1, 1, "S"); }
+  if (o.acc === "stache") G.put(6, top + 9, 4, 1, "h");
+  if (o.acc === "phones") { G.put(3, top + 5, 1, 4, "A"); G.put(12, top + 5, 1, 4, "A"); G.put(4, top + 3, 8, 1, "A"); }
+  if (o.acc === "headset") { G.put(3, top + 5, 1, 3, "A"); G.put(12, top + 5, 1, 3, "A"); G.put(4, top + 3, 8, 1, "A"); G.put(10, top + 8, 3, 1, "A"); }
+  // thân
+  G.put(4, ty, 8, torsoH, "T");
+  if (o.role === "cook") { G.put(5, ty + 1, 6, torsoH - 1, "W"); G.put(6, ty + 3, 2, 1, "A"); G.put(4, ty, 8, 1, "T"); }
+  if (o.role === "boss") { G.put(4, ty, 2, torsoH, "V"); G.put(10, ty, 2, torsoH, "V"); G.put(7, ty, 2, torsoH - 1, "A"); }
+  if (o.acc === "tie") G.put(7, ty, 2, torsoH - 1, "A");
+  if (o.acc === "pack") { G.put(4, ty, 1, torsoH - 2, "B"); G.put(11, ty, 1, torsoH - 2, "B"); }
+  if (o.acc === "camera") { G.put(5, ty + 2, 6, 1, "B"); G.put(6, ty + 3, 3, 2, "k"); }
+  // tay theo tư thế
+  const f = o.frame || 0;
+  if (o.pose === "stir") { G.put(2, ty, 2, torsoH - 1, "T"); G.px(2, ty + torsoH - 1, "S"); G.px(3, ty + torsoH - 1, "S"); G.put(12, ty, 2, 4 + f, "T"); G.put(14, ty + 3 + f, 2, 2, "T"); G.put(15, ty + 3 + f, 1, 2, "S"); }
+  else if (o.pose === "wave") { G.put(2, ty, 2, torsoH - 1, "T"); G.put(12, ty - 5 - f, 2, 6 + f, "T"); G.put(12, ty - 7 - f, 2, 2, "S"); }
+  else if (o.pose === "up") { G.put(2, ty - 5 - f, 2, 6 + f, "T"); G.put(12, ty - 5 - f, 2, 6 + f, "T"); G.put(2, ty - 7 - f, 2, 2, "S"); G.put(12, ty - 7 - f, 2, 2, "S"); }
+  else if (o.pose === "eat") { G.put(2, ty, 2, torsoH - 2, "T"); G.px(2, ty + torsoH - 2, "S"); G.put(12, ty, 2, 2, "T"); G.put(11 - f, ty - 3 + f, 2, 4, "T"); G.put(10 - f, ty - 5 + f, 2, 2, "S"); }
+  else if (o.pose === "sit") { G.put(2, ty, 2, torsoH - 2, "T"); G.put(12, ty, 2, torsoH - 2, "T"); G.px(3, ty + torsoH - 2, "S"); G.px(12, ty + torsoH - 2, "S"); }
+  else { const sw = o.pose === "walk" ? (f ? 1 : -1) : 0; G.put(2, ty + sw, 2, torsoH - 1, "T"); G.put(12, ty - sw, 2, torsoH - 1, "T"); G.px(2, ty + torsoH - 1 + sw, "S"); G.px(3, ty + torsoH - 1 + sw, "S"); G.px(12, ty + torsoH - 1 - sw, "S"); G.px(13, ty + torsoH - 1 - sw, "S"); }
+  // chân và giày (người ngồi bị bàn che nên bỏ chân)
+  if (!sit) { const l1 = o.pose === "walk" && f ? legH - 1 : legH, l2 = o.pose === "walk" && !f ? legH - 1 : legH; G.put(5, ly, 3, l1, "P"); G.put(8, ly, 3, l2, "P"); G.put(4, ly + l1 - 1, 4, 1, "o"); G.put(8, ly + l2 - 1, 4, 1, "o"); }
+  return G.rows();
+}
+function personPal(o) {
+  const a = o.arch || ARCH[0], sk = SKINS[o.look % 4] , hr = HAIRS[a.hairC != null ? a.hairC : (o.look >> 2) % 5];
+  const shirt = o.role === "cook" ? [3, 72, 46] : o.role === "boss" ? [0, 0, 94] : o.role === "cashier" ? [350, 60, 46] : a.shirt, pants = o.role === "boss" ? [225, 35, 22] : o.role === "cook" ? [222, 18, 26] : a.pants;
+  return { S: RAMP(...sk), h: RAMP(...hr), T: RAMP(shirt[0] + (o.shift || 0), shirt[1], shirt[2]), P: RAMP(...pants), W: RAMP(210, 14, 94), A: RAMP(o.role === "cook" ? 3 : 46, 85, 52), C: RAMP(o.role === "cust" ? shirt[0] + 20 : 3, 70, 48), V: RAMP(225, 45, 24), B: RAMP(30, 45, 34), o: "#2a2433", e: "#1d1630", m: "#8a2b3a", k: "#1d1630" };
+}
+function person(cx, sx, sy, o) { // vẽ người đứng chân tại (sx, sy); trả về khung bao
+  const key = ["p", o.role, o.pose || "stand", o.frame || 0, o.mood || "n", o.hat || "", o.acc || "", o.kid ? "k" : "", o.arch ? o.arch.n : "", o.look % 4, (o.look >> 2) % 5, o.shift || 0].join("|");
+  const cv = sprite(key, () => [personGrid(Object.assign({}, o.arch || {}, o)), personPal(o)]);
+  cx.fillStyle = "rgba(20,16,40,0.32)"; cx.fillRect(snap(sx - 7 * U), snap(sy), 14 * U, U); cx.fillRect(snap(sx - 5 * U), snap(sy + U), 10 * U, U);
+  return blit(cx, cv, sx, sy + U, false);
+}
+// ===== món ăn: 12 sprite vẽ tay, mỗi chất liệu có dải ba tông =====
+const DISHES = ["burger", "fries", "nuggets", "hotdog", "cola", "icecream", "pizza", "chicken", "taco", "donut", "shake", "salad"];
+const DISH_ART = {
+  burger: [["...bbbbbb...", "..bbbsbbsb..", ".bbbbbbbbbb.", "gggggggggggg", ".mmmmmmmmmm.", "yyyyyyyyyyyy", ".rrrrrrrrrr.", ".bbbbbbbbbb.", "..bbbbbbbb.."], { b: RAMP(33, 78, 54), s: "#fff1c2", g: RAMP(105, 55, 40), m: RAMP(18, 52, 28), y: RAMP(48, 95, 60), r: RAMP(5, 72, 48) }],
+  fries: [["..y.y.y.y...", ".y.y.y.y.y..", ".yyyyyyyyyy.", "..rrrrrrrr..", "..rwwwwwwr..", "..rwwrrwwr..", "..rrrrrrrr..", "..rrrrrrrr.."], { y: RAMP(48, 95, 58), r: RAMP(358, 72, 46), w: "#fff4d6" }],
+  nuggets: [["...nn..nn...", "..nnnnnnnn..", ".nnnnnnnnnn.", "..rrrrrrrr..", "..rrwwwwrr..", "..rrrrrrrr.."], { n: RAMP(34, 70, 52), r: RAMP(358, 72, 46), w: "#fff4d6" }],
+  hotdog: [["bbbbbbbbbbbb", "bssssssssssb", "bsmsmsmsmssb", "bssssssssssb", ".bbbbbbbbbb."], { b: RAMP(34, 62, 62), s: RAMP(8, 70, 44), m: RAMP(50, 95, 58) }],
+  cola: [["......ww....", "......w.....", ".wwwwwwwwww.", "..rrrrrrrr..", "..rwwwwwwr..", "..rwrrrrwr..", "..rwwwwwwr..", "...rrrrrr..."], { w: "#fdf7ec", r: RAMP(358, 75, 46) }],
+  icecream: [["....pppp....", "...pppppp...", "..wwwwwwww..", "...cccccc...", "....cccc....", ".....cc.....", ".....cc....."], { p: RAMP(338, 70, 74), w: "#fff1de", c: RAMP(32, 62, 56) }],
+  pizza: [["cccccccccccc", ".ccrccccrcc.", "..cccrcccc..", "...ccccrc...", "....cccc....", ".....cc....."], { c: RAMP(46, 85, 58), r: RAMP(358, 70, 42) }],
+  chicken: [["..cccccc....", ".ccccccccc..", ".cccccccccc.", "..cccccccc..", "....cc.bb...", ".....wwbbw.."], { c: RAMP(28, 72, 50), b: "#fdf7ec", w: "#fdf7ec" }],
+  taco: [["..gggggggg..", ".ytytytytyt.", "mmmmmmmmmmmm", "sssssssssss.", ".ssssssssss.", "..ssssssss.."], { g: RAMP(105, 55, 40), y: RAMP(48, 95, 60), t: RAMP(5, 72, 48), m: RAMP(20, 48, 32), s: RAMP(40, 70, 60) }],
+  donut: [["...pppppp...", "..pppppppp..", ".pppwppwppp.", ".ppp....ppp.", ".pppwppwppp.", "..pppppppp..", "...pppppp..."], { p: RAMP(335, 72, 72), w: "#fff1de" }],
+  shake: [["....rr......", "....r.......", ".wwwwwwwwww.", "..pppppppp..", "..ppwwwwpp..", "..pppppppp..", "...pppppp..."], { w: "#fdf7ec", r: RAMP(358, 75, 46), p: RAMP(335, 65, 76) }],
+  salad: [["...gGggGg...", "..gGggrggGg.", ".ggGggGggrgg", ".wwwwwwwwwww.", "..wwwwwwwww.."], { g: RAMP(105, 55, 42), G: RAMP(95, 60, 56), r: RAMP(358, 72, 48), w: "#fdf7ec" }],
+};
+function dish(cx, sx, sy, type, burnt, big) { // món ăn pixel, tâm đáy (sx, sy)
+  const t = DISHES[type % 12], key = "d|" + t + "|" + (burnt ? 1 : 0), cv = sprite(key, () => { const [rows, pal] = DISH_ART[t]; if (!burnt) return [rows, pal]; const bp = {}; for (const k in pal) bp[k] = RAMP(15, 18, k === "w" ? 22 : 16); return [rows, bp]; });
+  const w = cv.width * U, h = cv.height * U, x = snap(sx - w / 2), y = snap(sy - h + U); cx.imageSmoothingEnabled = false; cx.drawImage(cv, x, y, w, h); return [x, y, x + w, y + h];
+}
+// ===== robot phục vụ: thân bo tròn, màn hình mặt, bánh xe, đèn báo chớp, khay trên đầu =====
+function robot(cx, sx, sy, t, tray, dishT, dir) {
+  const fr = Math.floor(t * 4) % 2, key = "r|" + fr + "|" + (tray ? 1 : 0), cv = sprite(key, () => { const G = grid(14, 18); G.put(2, 7, 10, 8, "B"); G.put(3, 6, 8, 1, "B"); G.put(3, 15, 8, 1, "B"); G.put(3, 8, 8, 5, "k"); G.px(5, 9, "e"); G.px(8, 9, "e"); G.px(6, 11, "m"); G.px(7, 11, "m"); G.put(5, 9, 1, 1, "L"); G.px(8, 9, "L"); G.put(2, 16, 3, 2, "o"); G.put(9, 16, 3, 2, "o"); G.px(7, 4, "B"); G.px(7, 5, "B"); G.px(7, 3, fr ? "L" : "A"); if (tray) { G.put(1, 5, 12, 1, "T"); } return [G.rows(), { B: RAMP(200, 24, 80), k: "#20243a", e: "#7df9ff", L: "#7df9ff", m: "#7df9ff", o: "#2a2433", A: "#ff5d5d", T: RAMP(30, 30, 60) }]; });
+  cx.fillStyle = "rgba(20,16,40,0.32)"; cx.fillRect(snap(sx - 8 * U), snap(sy), 16 * U, U); const b = blit(cx, cv, sx, sy + U, dir < 0);
+  if (tray && dishT >= 0) { const d = dish(cx, sx, b[1] + 3 * U, dishT, false, false); b[1] = Math.min(b[1], d[1]); }
+  return b;
+}
+function prop(cx, name, sx, sy, t) { // đồ vật trang trí
+  const cv = sprite("pr|" + name + "|" + (name === "arcade" ? Math.floor((t || 0) * 3) % 3 : 0), () => {
+    if (name === "plant") { const G = grid(14, 22); G.put(4, 15, 6, 5, "P"); G.put(3, 14, 8, 1, "P"); for (const [x, y] of [[6, 2], [3, 5], [9, 4], [5, 8], [8, 9], [2, 10], [10, 11], [6, 12]]) G.put(x, y, 3, 4, "g"); G.put(6, 5, 2, 10, "G"); return [G.rows(), { P: RAMP(14, 55, 48), g: RAMP(115, 55, 38), G: RAMP(100, 50, 30) }]; }
+    if (name === "bin") { const G = grid(12, 16); G.put(1, 3, 10, 12, "B"); G.put(0, 2, 12, 2, "L"); G.put(3, 5, 6, 1, "k"); G.put(4, 1, 4, 1, "L"); return [G.rows(), { B: RAMP(150, 40, 34), L: RAMP(150, 30, 46), k: "#10281c" }]; }
+    if (name === "pos") { const G = grid(16, 12); G.put(1, 6, 14, 5, "B"); G.put(3, 1, 8, 5, "k"); G.put(4, 2, 6, 3, "s"); G.put(11, 4, 4, 2, "B"); G.put(5, 8, 6, 1, "k"); return [G.rows(), { B: RAMP(215, 12, 70), k: "#20243a", s: "#7fe0a6" }]; }
+    if (name === "arcade") { const fr = Math.floor((t || 0) * 3) % 3, G = grid(14, 28); G.put(1, 0, 12, 26, "B"); G.put(3, 4, 8, 8, "k"); G.put(4, 5, 6, 6, "s"); G.px(4 + fr * 2, 7, "A"); G.px(6 + fr, 9, "A"); G.put(3, 15, 8, 3, "B"); G.px(4, 16, "R"); G.px(6, 16, "Y"); G.px(9, 16, "R"); G.put(2, 26, 10, 2, "k"); return [G.rows(), { B: RAMP(265, 55, 36), k: "#10101e", s: "#34e0a1", A: "#fff", R: "#ff4d4d", Y: "#ffd23f" }]; }
+    if (name === "kiosk") { const G = grid(10, 20); G.put(1, 0, 8, 12, "B"); G.put(2, 2, 6, 7, "k"); G.put(3, 3, 4, 5, "s"); G.put(3, 12, 4, 8, "B"); G.put(0, 18, 10, 2, "B"); return [G.rows(), { B: RAMP(355, 70, 48), k: "#20243a", s: "#ffd23f" }]; }
+    const G = grid(8, 12); G.put(1, 2, 6, 9, "B"); G.put(2, 0, 4, 2, "B"); G.put(2, 5, 4, 2, "L"); return [G.rows(), { B: RAMP(355, 72, 46), L: "#fff" }];
+  });
+  return blit(cx, cv, sx, sy, false);
+}
+// ===== Hành trình của khách: vào cửa → xếp hàng → gọi món → thanh toán → ngồi chờ → robot mang món → ăn → dọn khay → đánh giá → ra về =====
+function simLedger(d) { // sổ sách của 50 lệnh gần nhất: món bán được tiền, món cháy mất nguyên liệu và hoàn tiền xin lỗi, đang nấu thì tiền gas và lương chạy theo từng giây
+  let rev = 0, cost = 0, ok = 0, fail = 0, stars = 0;
+  for (const r of d.history) { if (r.rc == null) continue; const sec = r.secs || 0, make = 5 + (sec / 60) * 1.5; if (r.rc === 0) { rev += 12 + Math.min(sec, 1800) / 30; cost += make; ok++; stars += sec > 900 ? 4 : 5; } else { cost += make + 5; fail++; stars += 1; } }
+  cost += d.running.reduce((a, j) => a + ((Date.now() / 1000 - j.started) / 60) * 1.5, 0);
+  return { rev, cost, ok, fail, avg: ok + fail ? stars / (ok + fail) : 0 };
+}
+const kVnd = (v) => Math.round(v).toLocaleString("vi-VN") + "k";
+function legsFlow(e, legs, kind) { e.flow = { legs, i: 0, t: 0, kind, tag: legs[0].tag }; e.trail = []; e.a = 1; legStart(e, legs[0]); }
+const dist3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const walkLeg = (a, b, tag, speed) => ({ a: a.slice(), b: b.slice(), dur: Math.max(0.2, dist3(a, b) / (speed || 105)), tag: tag || "walk" });
+const stayLeg = (a, dur, tag) => ({ a: a.slice(), b: a.slice(), dur, tag });
+function legStart(e, L) {
+  const g = sim.g, now = performance.now() / 1000; e.flow.tag = L.tag;
+  if (L.tag === "order") sim.parts.push({ k: "order", p: [L.a[0], 40, L.a[2]], v: [0, 0, 0], life: L.dur, max: L.dur, dt: e.hue % 12, s: 0, c: "" });
+  if (L.tag === "pay") { sim.cash = now; for (let i = 0; i < 7; i++) sim.parts.push({ k: "coin", p: [L.a[0], 36, L.a[2]], v: [(g.pay[0] + 20 - L.a[0]) * 1.4 + (Math.random() - 0.5) * 30, 90 + Math.random() * 40, -40 + Math.random() * 20], life: 0.9, max: 0.9, s: 0, c: "" }); }
 }
 function simStep(dt, t) {
   const k = 1 - Math.exp(-dt * 7), ka = 1 - Math.exp(-dt * 6), g = sim.g, now = performance.now() / 1000;
   for (const [key, e] of sim.ents) {
     const f = e.flow;
     if (f) {
-      f.u += dt / f.dur; const u = Math.min(1, f.u), s = u * u * (3 - 2 * u); e.p = path3At(f.pts, s); e.spin = u * 9; e.trail.push(e.p.slice()); if (e.trail.length > 8) e.trail.shift();
-      if (f.u >= 1) {
-        e.flow = null; e.trail = []; e.p = e.tp.slice();
-        if (f.kind === "in") { e.landed = now; ring3(e.tp, sim.C.accent); burst3([e.tp[0], 30, e.tp[2]], sim.C.warn, 8); }
-        else { e.born = now; sim.trayAt = now; burst3(e.tp, e.fail ? sim.C.bad : sim.C.accent, e.fail ? 16 : 10); ring3(e.tp, e.fail ? sim.C.bad : sim.C.accent); }
+      f.t += dt; let L = f.legs[f.i];
+      while (L && f.t >= L.dur) { f.t -= L.dur; f.i++; L = f.legs[f.i]; if (L) legStart(e, L); }
+      if (L) { const u = L.dur ? f.t / L.dur : 1; e.p = [0, 1, 2].map((q) => L.a[q] + (L.b[q] - L.a[q]) * u); if (L.tag === "dish") e.p[1] += 36 * 4 * u * (1 - u); e.dir = L.b[0] - L.a[0]; e.walk = now * 9; e.trail.push(e.p.slice()); if (e.trail.length > 6) e.trail.shift(); }
+      else {
+        e.flow = null; e.trail = [];
+        if (f.kind === "enter") { e.p = e.tp.slice(); }
+        else if (f.kind === "in") { e.p = e.tp.slice(); e.landed = now; }
+        else { const sp = e.seatP || e.tp, last = f.legs[f.legs.length - 1]; e.p = e.tp.slice(); e.born = now; sim.trayAt = now; spawnDiner(e, sp); sim.parts.push({ k: "robot", p: last.b.slice(), legs: [walkLeg(last.b, [last.b[0], 0, 52], "robot", 120), walkLeg([last.b[0], 0, 52], g.dock, "robot", 120)], i: 0, t: 0, dir: -1, life: 99, max: 99, v: [0, 0, 0] }); }
       }
       continue;
     }
     for (let i = 0; i < 3; i++) e.p[i] += (e.tp[i] - e.p[i]) * k; e.a += (e.ta - e.a) * ka;
     if (e.ta === 0 && e.a < 0.02) { sim.ents.delete(key); if (simSel === key) simSel = ""; }
   }
-  for (let i = 0; i < sim.bayA.length; i++) sim.bayA[i] += ((i < g.n ? 1 : 0) - sim.bayA[i]) * (1 - Math.exp(-dt * 5));
-  const want = sim.pressure >= 4 ? 16 : sim.pressure >= 2 ? 8 : 0; // hơi nước phủ bếp theo áp lực RAM
-  while (sim.fog.length < want) sim.fog.push({ x: Math.random() * sim.W, y: sim.H * (0.3 + Math.random() * 0.5), r: 50 + Math.random() * 70, v: 6 + Math.random() * 10, ph: Math.random() * 6.28 });
-  if (sim.fog.length > want) sim.fog.length = want;
-  for (const f of sim.fog) { f.x += f.v * dt; if (f.x - f.r > sim.W) f.x = -f.r; }
+  for (let i = 0; i < sim.bayA.length; i++) sim.bayA[i] += ((i < g.nv ? 1 : 0) - sim.bayA[i]) * (1 - Math.exp(-dt * 5));
   const parts = sim.parts;
-  for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.life -= dt; if (q.life <= 0) { parts.splice(i, 1); continue; } for (let a = 0; a < 3; a++) q.p[a] += q.v[a] * dt; if (q.k === "spark") q.v[1] -= 260 * dt; if (q.k === "steam") { q.v[0] += Math.sin(t * 2.4 + q.s) * 10 * dt; q.s += dt * 4; } }
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i];
+    if (q.k === "diner") { dinerStep(q, dt, now); if (q.done) { parts.splice(i, 1); } continue; }
+    if (q.k === "robot") { q.t += dt; const L = q.legs[q.i]; if (!L) { parts.splice(i, 1); continue; } if (q.t >= L.dur) { q.t -= L.dur; q.i++; } const u = L.dur ? Math.min(1, q.t / L.dur) : 1; q.p = [0, 1, 2].map((a) => L.a[a] + (L.b[a] - L.a[a]) * u); q.dir = L.b[0] - L.a[0]; continue; }
+    q.life -= dt; if (q.life <= 0) { parts.splice(i, 1); continue; }
+    for (let a = 0; a < 3; a++) q.p[a] += q.v[a] * dt; if (q.k === "spark" || q.k === "coin") q.v[1] -= 260 * dt; if (q.k === "steam") { q.v[0] += Math.sin(t * 2.4 + q.s) * 10 * dt; q.s += dt * 4; }
+  }
   sim.d && sim.d.running.forEach((j) => {
-    const slot = simSlot.get(j.pid), lvl = Math.min(1, j.cpu / 200), e = sim.ents.get("p" + j.pid);
-    if (e && !e.flow && lvl > 0.2 && t - sim.smokeAt > 0.28 * (1.5 - lvl)) { sim.smokeAt = t; const b = g.pod(slot); parts.push({ k: "steam", p: [b[0] + (Math.random() - 0.5) * 24, 44, b[2] + (Math.random() - 0.5) * 24], v: [0, 26 + 22 * lvl, 0], life: 1.8, max: 1.8, s: Math.random() * 6, r: 7 + Math.random() * 5, c: sim.C.muted }); }
+    const e = sim.ents.get("p" + j.pid), slot = e ? Math.min(e.slot, g.nv - 1) : 0, lvl = Math.min(1, j.cpu / 200), b = g.pan(slot);
+    if (e && !e.flow && lvl > 0.15 && t - sim.smokeAt > 0.3 * (1.5 - lvl)) { sim.smokeAt = t; parts.push({ k: "steam", p: [b[0] + (Math.random() - 0.5) * 12, 56, b[2]], v: [0, 24 + 20 * lvl, 0], life: 1.7, max: 1.7, s: Math.random() * 6, c: sim.C.muted }); }
   });
 }
-function simBusy() {
-  if (sim.running || sim.parts.length || sim.fog.length || sim.waiting > 0) return true;
-  for (const e of sim.ents.values()) if (e.flow || Math.abs(e.ta - e.a) > 0.02 || Math.hypot(e.tp[0] - e.p[0], e.tp[1] - e.p[1], e.tp[2] - e.p[2]) > 0.5) return true;
-  return false;
+function spawnDiner(e, sp) { // khách nhận món: ăn thật rồi dọn khay, đánh giá và ra về; món cháy thì khiếu nại, hoàn tiền và bỏ đi
+  const g = sim.g, fail = e.fail, seatI = e.seat, hasSeat = seatI >= 0, script = [];
+  if (fail) { script.push({ t: "stand" }, { t: "walk", to: g.pay, mood: "angry" }, { t: "refund", dur: 1.3 }, { t: "walk", to: g.bin, mood: "angry" }, { t: "dump", dur: 0.6 }, { t: "free" }, { t: "walk", to: g.exitP, mood: "angry" }, { t: "rate", n: 1 }); }
+  else if (!hasSeat || e.hue % 5 === 0) script.push({ t: "stand" }, { t: "bag" }, { t: "free" }, { t: "walk", to: g.exitP }, { t: "rate", n: 5 });
+  else script.push({ t: "eat", dur: 8 + (e.hue % 4) }, { t: "stand" }, { t: "free" }, { t: "walk", to: g.bin }, { t: "dump", dur: 0.6 }, { t: "walk", to: g.exitP }, { t: "rate", n: e.job.secs > 900 ? 4 : 5 });
+  const D = { k: "diner", p: sp.slice(), key: e.key, hue: e.hue, dish: e.hue % 12, fail, seat: hasSeat ? g.seats[seatI] : null, seatI, sit: hasSeat && !fail, script, si: 0, st: 0, started: false, mood: fail ? "angry" : "happy", life: 99, max: 99, v: [0, 0, 0], tray: false, done: false };
+  sim.parts.push(D); burst3([sp[0], 36, sp[2]], fail ? sim.C.bad : sim.C.accent, fail ? 14 : 8); emote([sp[0], 0, sp[2]], fail ? "anger" : "heart");
 }
+function dinerStep(q, dt, now) {
+  const g = sim.g, S = q.script[q.si]; if (!S) { q.done = true; freeSeat(q.key); return; }
+  if (!q.started) { q.started = true; q.st = 0; if (S.t === "walk") { q.from = q.p.slice(); q.to = S.to.slice(); q.dur = Math.max(0.3, dist3(q.from, q.to) / 115); q.sit = false; q.tray = true; } if (S.mood) q.mood = S.mood; }
+  q.st += dt;
+  if (S.t === "walk") { const u = Math.min(1, q.st / q.dur); q.p = [0, 1, 2].map((a) => q.from[a] + (q.to[a] - q.from[a]) * u); q.dir = q.to[0] - q.from[0]; q.walkPh = now * 9; if (u >= 1) { q.si++; q.started = false; } }
+  else if (S.t === "eat") { q.sit = true; q.p = [q.seat.x, 0, q.seat.z]; q.eating = true; if (q.st >= S.dur) { q.eating = false; q.si++; q.started = false; } }
+  else if (S.t === "stand") { q.sit = false; q.si++; q.started = false; }
+  else if (S.t === "free") { freeSeat(q.key); q.si++; q.started = false; }
+  else if (S.t === "bag") { q.bag = true; q.si++; q.started = false; }
+  else if (S.t === "refund") { if (q.st < 0.05) for (let i = 0; i < 6; i++) sim.parts.push({ k: "coin", p: [g.pay[0] + 30, 40, g.pay[2] - 10], v: [-40 - Math.random() * 30, 90, 40], life: 0.9, max: 0.9, s: 0, c: "" }); if (q.st >= S.dur) { q.si++; q.started = false; } }
+  else if (S.t === "dump") { q.tray = false; if (q.st >= S.dur) { q.si++; q.started = false; } }
+  else if (S.t === "rate") { emote(q.p, "stars" + S.n); q.si++; q.started = false; q.left = true; }
+}
+function simBusy() { return true; } // quán luôn có chuyển động nền: xe ngoài phố, nhân viên lau sàn, đèn chớp
 function simFrame(now) {
   sim.raf = 0; if (view !== "sim" || document.hidden) return;
   if (sim.last && now - sim.last < 1000 / SIM_FPS - 3) { sim.raf = requestAnimationFrame(simFrame); return; }
   const dt = Math.min(0.1, sim.last ? (now - sim.last) / 1000 : 0.04); sim.last = now;
-  const tt = performance.now() / 1000; simStep(dt, tt); simDraw(tt); if (simBusy()) sim.raf = requestAnimationFrame(simFrame); else sim.last = 0;
+  const tt = performance.now() / 1000; simStep(dt, tt); simDraw(tt); sim.raf = requestAnimationFrame(simFrame);
 }
 function simKick() {
-  if (reduceMotion()) { for (const e of sim.ents.values()) { e.flow = null; e.p = e.tp.slice(); e.a = e.ta; } sim.parts.length = 0; sim.fog.length = 0; simDraw(performance.now() / 1000); return; }
+  if (reduceMotion()) { for (const e of sim.ents.values()) { e.flow = null; e.p = e.tp.slice(); e.a = e.ta; } sim.parts.length = 0; simDraw(0); return; }
   simDraw(performance.now() / 1000); if (!sim.raf && !document.hidden) sim.raf = requestAnimationFrame(simFrame);
 }
-const LIGHT = [-0.35, 0.8, 0.5];
-const shade = (nx, ny, nz) => 0.5 + 0.5 * Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
+const GL = {};
+Object.assign(GL, { A: [2, 5, 7, 5, 5], C: [7, 4, 4, 4, 7], D: [6, 5, 5, 5, 6], H: [5, 5, 7, 5, 5], K: [5, 6, 4, 6, 5], L: [4, 4, 4, 4, 7], M: [5, 7, 7, 5, 5], N: [6, 5, 5, 5, 5], O: [7, 5, 5, 5, 7], P: [6, 5, 6, 4, 4], T: [7, 2, 2, 2, 2], Y: [5, 5, 2, 2, 2] });
+GL.B = [6, 5, 6, 5, 6]; GL.U = [5, 5, 5, 5, 7]; GL.R = [6, 5, 6, 5, 5]; GL.G = [7, 4, 5, 5, 7]; GL.E = [7, 4, 6, 4, 7]; GL.F = [7, 4, 6, 4, 4]; GL.I = [7, 2, 2, 2, 7]; GL.S = [7, 4, 7, 1, 7];
+for (let i = 0; i < 10; i++) GL[i] = [[7, 5, 5, 5, 7], [2, 6, 2, 2, 7], [7, 1, 7, 4, 7], [7, 1, 7, 1, 7], [5, 5, 7, 1, 1], [7, 4, 7, 1, 7], [7, 4, 7, 5, 7], [7, 1, 1, 2, 2], [7, 5, 7, 5, 7], [7, 5, 7, 1, 7]][i];
+function pixText(cx, ox, oy, str, c, u) { let x = 0; for (const ch of str) { const g = GL[ch]; if (g) for (let r = 0; r < 5; r++) for (let k = 0; k < 3; k++) if (g[r] & (4 >> k)) { cx.fillStyle = c; cx.fillRect(snap(ox + (x + k) * u), snap(oy + r * u), u, u); } x += 4; } return x * u; }
 function simDraw(t) {
-  const cx = sim.cx, C = sim.C, g = sim.g, W = sim.W, H = sim.H, d = sim.d; if (!cx || !g || !d) return;
-  cx.setTransform(sim.dpr, 0, 0, sim.dpr, 0, 0); cx.clearRect(0, 0, W, H);
-  const cam = simCam(t), fit = g.fit, P = (p) => proj3(p, cam, fit), now = performance.now() / 1000, fam = getComputedStyle(document.body).fontFamily, mono = "12px ui-monospace,Menlo,monospace";
-  const fit2 = (s, mw) => { if (cx.measureText(s).width <= mw) return s; let x = s; while (x.length > 1 && cx.measureText(x + "…").width > mw) x = x.slice(0, -1); return x + "…"; };
-  const poly = (pts, fill, stroke, lw) => { cx.beginPath(); pts.forEach((q, i) => i ? cx.lineTo(q[0], q[1]) : cx.moveTo(q[0], q[1])); cx.closePath(); if (fill) { cx.fillStyle = fill; cx.fill(); } if (stroke) { cx.strokeStyle = stroke; cx.lineWidth = lw || 1; cx.stroke(); } };
-  const box = (x0, x1, y0, y1, z0, z1, top, front, side) => { // hộp: mặt trên, mặt trước, hai mặt bên
-    const c = (x, y, z) => P([x, y, z]);
-    poly([c(x0, y1, z0), c(x1, y1, z0), c(x1, y1, z1), c(x0, y1, z1)], top, C.line);
-    poly([c(x0, y1, z1), c(x1, y1, z1), c(x1, y0, z1), c(x0, y0, z1)], front, C.line);
-    poly([c(x0, y1, z0), c(x0, y1, z1), c(x0, y0, z1), c(x0, y0, z0)], side, C.line); poly([c(x1, y1, z1), c(x1, y1, z0), c(x1, y0, z0), c(x1, y0, z1)], side, C.line);
-  };
-  const hx = g.sceneW / 2;
-  // sàn gạch và tường sau
-  for (let zi = -8; zi < 8; zi++) for (let xi = -10; xi < 10; xi++) { const x = xi * 70, z = zi * 70 + g.zPass - 280; if (z < g.zRail - 60 || z > g.zPass + 70) continue; poly([P([x, -40, z]), P([x + 70, -40, z]), P([x + 70, -40, z + 70]), P([x, -40, z + 70])], rgba(C.text, (xi + zi) & 1 ? 0.035 : 0.07)); }
-  poly([P([-hx - 100, -40, g.zRail - 60]), P([hx + 100, -40, g.zRail - 60]), P([hx + 100, 260, g.zRail - 60]), P([-hx - 100, 260, g.zRail - 60])], rgba(C.text, 0.045));
-  // mặt bếp và quầy lấy món
-  const sx = (g.cols * g.S) / 2 + 20, szN = -((g.rows - 1) * g.RZ) / 2 - 64, szF = ((g.rows - 1) * g.RZ) / 2 + 64;
-  box(-sx, sx, -40, 0, szN, szF, rgba(C.text, 0.12), rgba(C.text, 0.2), rgba(C.text, 0.16));
-  const px2 = (g.pcols * 38) / 2 + 14; box(-px2, px2, -40, 0, g.zPass - 30, g.zPass + 30, rgba(C.text, 0.12), rgba(C.text, 0.2), rgba(C.text, 0.16));
-  // ray treo phiếu
-  const r0 = P([-hx + 20, g.railY, g.zRail]), r1 = P([hx - 20, g.railY, g.zRail]); cx.strokeStyle = C.muted; cx.lineWidth = Math.max(2, r0[3] * 4); cx.beginPath(); cx.moveTo(r0[0], r0[1]); cx.lineTo(r1[0], r1[1]); cx.stroke();
-  // các vật cần sắp theo độ sâu: xa vẽ trước
-  const items = [], ents = [...sim.ents.values()];
-  for (let i = 0; i < g.n; i++) { const b = g.pod(i), q = P([b[0], 0, b[2]]); items.push({ z: q[2], draw: () => drawBurner(i, b) }); }
-  for (const e of ents) { if (e.a < 0.02) continue; const q = P(e.p); items.push({ z: q[2], draw: () => drawEnt(e) }); }
-  for (const q of sim.parts) { const s = P(q.p); items.push({ z: s[2], draw: () => drawPart(q) }); }
-  items.sort((a, b) => b.z - a.z); items.forEach((it) => it.draw());
-  function drawBurner(i, b) {
-    const run = ents.find((e) => e.state === "r" && e.slot === i && !e.flow), busy = sim.used.has(i), a = Math.max(0, Math.min(1, sim.bayA[i])), ring = [];
-    for (let k = 0; k < 28; k++) { const ang = k / 28 * 6.2832; ring.push(P([b[0] + Math.cos(ang) * 36, 0.5, b[2] + Math.sin(ang) * 36])); }
-    cx.save(); cx.globalAlpha = a; poly(ring, rgba(C.text, 0.08), busy ? rgba(C.warn, 0.9) : C.line, 2);
-    for (let k = 0; k < 4; k++) { const ang = k * Math.PI / 2 + Math.PI / 4, s0 = P([b[0] + Math.cos(ang) * 14, 1, b[2] + Math.sin(ang) * 14]), s1 = P([b[0] + Math.cos(ang) * 36, 1, b[2] + Math.sin(ang) * 36]); cx.strokeStyle = rgba(C.muted, 0.7); cx.lineWidth = Math.max(1.5, s0[3] * 4); cx.beginPath(); cx.moveTo(s0[0], s0[1]); cx.lineTo(s1[0], s1[1]); cx.stroke(); }
-    if (!run) { const c = P([b[0], 1, b[2] + 50]); cx.font = mono; cx.fillStyle = C.muted; cx.textAlign = "center"; cx.fillText(busy ? "đặt nồi…" : "bếp " + (i + 1), c[0], c[1]); cx.textAlign = "left"; }
-    cx.restore();
+  const cx = sim.cx, lx = sim.lx, C = sim.C, g = sim.g, W = sim.W, H = sim.H, d = sim.d; if (!cx || !g || !d) return;
+  sim.texts = []; sim.rects = []; sim.rows = [];
+  const cam = simCam(t), fit = g.fit, P = (p) => proj3(p, cam, fit), now = performance.now() / 1000, hr = new Date().getHours() + new Date().getMinutes() / 60;
+  lx.setTransform(1 / PX, 0, 0, 1 / PX, 0, 0); lx.clearRect(0, 0, W, H); lx.imageSmoothingEnabled = false;
+  const poly = (pts, fill) => { const ys = pts.map((q) => q[1] / PX), y0 = Math.ceil(Math.min(...ys)), y1 = Math.floor(Math.max(...ys)); lx.fillStyle = fill; for (let y = y0; y <= y1; y++) { const yc = y + 0.5, xs = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], ay = a[1] / PX, by = b[1] / PX; if ((ay <= yc && by > yc) || (by <= yc && ay > yc)) xs.push((a[0] + (b[0] - a[0]) * (yc - ay) / (by - ay)) / PX); } xs.sort((m, n) => m - n); for (let k = 0; k + 1 < xs.length; k += 2) { const a = Math.round(xs[k]), b = Math.round(xs[k + 1]); if (b > a) lx.fillRect(a * PX, y * PX, (b - a) * PX, PX); } } };
+  const wallR = (x0, x1, y0, y1, z, f) => poly([P([x0, y0, z]), P([x1, y0, z]), P([x1, y1, z]), P([x0, y1, z])], f), floorR = (x0, x1, z0, z1, y, f) => poly([P([x0, y, z0]), P([x1, y, z0]), P([x1, y, z1]), P([x0, y, z1])], f);
+  const box = (x0, x1, y0, y1, z0, z1, top, front, side) => { poly([P([x0, y1, z0]), P([x1, y1, z0]), P([x1, y1, z1]), P([x0, y1, z1])], top); poly([P([x0, y1, z1]), P([x1, y1, z1]), P([x1, y0, z1]), P([x0, y0, z1])], front); if (side) { poly([P([x0, y1, z0]), P([x0, y1, z1]), P([x0, y0, z1]), P([x0, y0, z0])], side); poly([P([x1, y1, z1]), P([x1, y1, z0]), P([x1, y0, z0]), P([x1, y0, z1])], side); } };
+  const reg = (owner, name, kind, b) => { sim.rects.push({ owner, name, kind, x: b[0], y: b[1], w: b[2] - b[0], h: b[3] - b[1] }); return b; };
+  const hsl = (h, s, l) => hslHex(h, s, l), ents = [...sim.ents.values()], zB = -200;
+  // ---- sàn: đại sảnh gạch đỏ kem, bếp gạch xanh trắng, thảm cửa vàng; mỗi viên có đường ron tối ở cạnh xa ----
+  for (let zi = 0; zi < 5; zi++) for (let xi = -7; xi < 7; xi++) { const x = xi * 80, z = zB + zi * 80, kitchen = x < -60 && z < -70, f = kitchen ? ((xi + zi) & 1 ? "#e6efe9" : "#a9cdbb") : ((xi + zi) & 1 ? "#f1e8d4" : "#c9503f"); floorR(x, x + 80, z, z + 80, 0, f); floorR(x, x + 80, z, z + 4, 0, kitchen ? "#7fa592" : "#9a3a2e"); floorR(x, x + 3, z, z + 80, 0, kitchen ? "#7fa592" : "#b8b09a"); }
+  floorR(480, 560, 60, 100, 1, "#f2c230"); floorR(-560, -480, 120, 160, 1, "#f2c230");
+  // ---- tường sau: bếp ốp gạch trắng, quầy thanh toán sơn đỏ có sọc vàng, bên phải kem có cửa sổ ra phố ----
+  wallR(-560, -60, 0, 235, zB, "#dfe8e6"); for (let x = -560; x < -60; x += 40) wallR(x, x + 2, 0, 120, zB + 1, "#b9c6c4"); for (let y = 0; y < 120; y += 30) wallR(-560, -60, y, y + 2, zB + 1, "#b9c6c4"); wallR(-560, -60, 120, 235, zB, "#f1e5c8"); wallR(-560, -60, 118, 124, zB + 1, "#c43a2c");
+  wallR(-60, 410, 0, 235, zB, "#c43a2c"); wallR(-60, 410, 70, 82, zB + 1, "#f2c230"); wallR(-60, 410, 0, 70, zB + 1, "#a22e24"); wallR(410, 560, 0, 235, zB, "#f1e5c8"); wallR(410, 560, 0, 24, zB + 1, "#c9b78e");
+  // cửa sổ nhìn ra phố: trời theo giờ thật, xe và người đi bộ, mưa khi RAM căng
+  const day = hr >= 6 && hr < 18, dusk = (hr >= 17 && hr < 19) || (hr >= 5 && hr < 7), sky = day ? (dusk ? "#f4a76a" : "#8fd0f8") : "#1b2250", wx0 = 430, wx1 = 540, wy0 = 96, wy1 = 192, wa = P([wx0, wy1, zB + 2]), wb = P([wx1, wy0, zB + 2]);
+  wallR(wx0 - 5, wx1 + 5, wy0 - 5, wy1 + 5, zB + 1, "#6b4a32"); wallR(wx0, wx1, wy0, wy1, zB + 2, sky); wallR(wx0, wx1, wy0, wy0 + 22, zB + 2, day ? "#7a8794" : "#2c3148");
+  lx.save(); lx.beginPath(); lx.rect(wa[0], wa[1], wb[0] - wa[0], wb[1] - wa[1]); lx.clip();
+  if (!day) for (let k = 0; k < 9; k++) { lx.fillStyle = "#fff6c8"; lx.fillRect(snap(wa[0] + ((k * 37) % (wb[0] - wa[0]))), snap(wa[1] + ((k * 53) % 30)), PX, PX); }
+  const carX = ((now * 38) % 260) - 40, car = sprite("car", () => { const G = grid(18, 9); G.put(1, 3, 16, 4, "B"); G.put(4, 0, 9, 4, "B"); G.put(5, 1, 3, 2, "G"); G.put(9, 1, 3, 2, "G"); G.put(2, 7, 4, 2, "W"); G.put(12, 7, 4, 2, "W"); return [G.rows(), { B: RAMP(8, 72, 48), G: "#b8e4f8", W: "#1d1630" }]; }), cp = P([wx0 + carX * 0.7, wy0 + 6, zB + 2]); lx.drawImage(car, snap(cp[0]), snap(cp[1]), car.width * U, car.height * U);
+  const pedX = ((now * 14 + 90) % 200) - 30, pp = P([wx0 + pedX * 0.8, wy0 + 6, zB + 2]); person(lx, pp[0], pp[1] + 28 * U, { role: "cust", pose: "walk", frame: Math.floor(now * 4) % 2, look: 5, arch: ARCH[0], hat: "cap", kid: false });
+  if (sim.pressure >= 2) { lx.fillStyle = "rgba(210,230,255,0.8)"; for (let k = 0; k < 26; k++) lx.fillRect(snap(wa[0] + ((k * 29 + now * 160) % (wb[0] - wa[0]))), snap(wa[1] + ((k * 41 + now * 260) % (wb[1] - wa[1]))), PX, PX * 3); }
+  lx.restore();
+  const nb = P([485, 232, zB + 3]); wallR(436, 534, 200, 232, zB + 3, "#2a1b24"); pixText(lx, nb[0] - 36, nb[1] - 4, "BURGER", hsl(350, 90, 62 + 6 * Math.sin(t * 5)), 3);
+  const ck = P([-30, 178, zB + 3]), hrA = (hr % 12) / 12 * 6.2832, mnA = (hr % 1) * 6.2832; { const pts = []; for (let k = 0; k < 20; k++) { const a = k / 20 * 6.2832; pts.push(P([-30 + Math.cos(a) * 16, 178 + Math.sin(a) * 16, zB + 3])); } poly(pts, "#2a1b24"); const pts2 = []; for (let k = 0; k < 20; k++) { const a = k / 20 * 6.2832; pts2.push(P([-30 + Math.cos(a) * 13, 178 + Math.sin(a) * 13, zB + 4])); } poly(pts2, "#f8f3e4"); for (const [ang, ln, col] of [[hrA, 7, "#2a1b24"], [mnA, 11, "#2a1b24"]]) { const e1 = P([-30 + Math.sin(ang) * ln, 178 + Math.cos(ang) * ln, zB + 5]); lx.fillStyle = col; const n = 6; for (let s = 1; s <= n; s++) lx.fillRect(snap(ck[0] + (e1[0] - ck[0]) * s / n), snap(ck[1] + (e1[1] - ck[1]) * s / n), PX, PX); } }
+  // bảng thực đơn trên quầy thanh toán: tên quán và bốn món kèm giá
+  wallR(15, 345, 112, 206, zB + 2, "#1d1520"); wallR(19, 341, 116, 202, zB + 3, "#2c2030"); { const mp = P([180, 198, zB + 4]); pixText(lx, mp[0] - 16 * U, mp[1] - 2, "MENU", "#ffc82e", U); for (let k = 0; k < 4; k++) { const ip = P([55 + k * 78, 150, zB + 4]); dish(lx, ip[0], ip[1] + 6 * U, [0, 1, 4, 5][k], false, true); const bp = P([40 + k * 78, 122, zB + 4]); lx.fillStyle = "#ffc82e"; lx.fillRect(snap(bp[0]), snap(bp[1]), (8 + k * 2) * U, U); } }
+  // bảng thành tích trong bếp: mỗi lệnh xong là một khung, sao vàng hoặc dấu X đỏ
+  wallR(-545, -75, 130, 224, zB + 2, "#8a5a3b"); wallR(-541, -79, 134, 220, zB + 3, "#f6ecd9");
+  // ---- quầy thanh toán và quầy bếp ----
+  const counterZ = Math.min(...[...Array(g.nv).keys()].map((i) => P(g.pod(i))[2])) - 0.5, items = [], add = (z, fn) => items.push({ z, fn });
+  add(counterZ, () => { box(-540, -66, 0, 40, -132, -76, "#cfd6de", "#b8c0ca", "#9aa3ad"); for (let i = 0; i < g.nv; i++) { const b = g.pan(i), al = Math.max(0, Math.min(1, sim.bayA[i])); lx.save(); lx.globalAlpha = al; const pts = []; for (let k = 0; k < 16; k++) { const a = k / 16 * 6.2832; pts.push(P([b[0] + Math.cos(a) * Math.min(30, g.S * 0.36), 41, b[2] + Math.sin(a) * Math.min(24, g.S * 0.3)])); } poly(pts, sim.used.has(i) ? "#8a3f1d" : "#2a2d36"); lx.restore(); } box(-420, -200, 36, 44, -88, -62, "#7a4a2a", "#5a3a22", "#4a3018"); });
+  const glassZ = P([-300, 70, -72])[2]; add(glassZ, () => { poly([P([-560, 40, -72]), P([-420, 40, -72]), P([-420, 125, -72]), P([-560, 125, -72])], "rgba(190,225,245,0.16)"); poly([P([-200, 40, -72]), P([-66, 40, -72]), P([-66, 125, -72]), P([-200, 125, -72])], "rgba(190,225,245,0.16)"); for (const x of [-560, -420, -200, -66]) wallR(x - 3, x + 3, 40, 125, -72, "#8d97a3"); wallR(-560, -66, 123, 129, -72, "#8d97a3"); const sp = P([-310, 134, -72]); pixText(lx, sp[0] - 24, sp[1], "PICKUP", "#ffc82e", 2); const kp = P([-480, 140, -72]); pixText(lx, kp[0] - 10, kp[1], "BEP", "#e8412f", 3); });
+  add(P([220, 0, -20])[2], () => { box(40, 400, 0, 42, -40, 6, "#cfd6de", "#c43a2c", "#a22e24"); wallR(40, 400, 20, 24, 6, "#f2c230"); const cd = Math.max(0, 1 - (now - (sim.cash || -9)) / 0.5); if (cd > 0) box(120, 170, 38, 44 + cd * 6, 0, 6, "#6b7280", "#4b5563", null); });
+  for (const px2 of [120, 190]) add(P([px2, 44, -20])[2] - 0.1, () => { const b = P([px2, 44, -20]); prop(lx, "pos", b[0], b[1], t); });
+  const tj = P([290, 44, -10]); add(tj[2] - 0.1, () => { const lvl = Math.min(6, 1 + Math.floor(sim.okN / 4)); lx.fillStyle = "#e8f6ff"; lx.fillRect(snap(tj[0] - 5 * U), snap(tj[1] - 9 * U), 10 * U, 9 * U); lx.fillStyle = "#ffc82e"; lx.fillRect(snap(tj[0] - 4 * U), snap(tj[1] - lvl * U), 8 * U, lvl * U); lx.fillStyle = "#c43a2c"; lx.fillRect(snap(tj[0] - 6 * U), snap(tj[1] - 10 * U), 12 * U, U); });
+  // ---- bàn ghế nhiều loại: bàn tròn, bàn cao, bàn dài, ghế bành; ghế vẽ trước người ngồi, mặt bàn sau để che chân ----
+  g.tables.forEach((tb, ti) => {
+    const tp = P([tb.x, 34, tb.z]);
+    add(tp[2], () => {
+      if (tb.t === "round") { const top = []; for (let k = 0; k < 22; k++) { const a = k / 22 * 6.2832; top.push(P([tb.x + Math.cos(a) * 34, 34, tb.z + Math.sin(a) * 26])); } wallR(tb.x - 4, tb.x + 4, 0, 34, tb.z, "#7a8794"); poly(top, ti % 2 ? "#f2c230" : "#e8412f"); }
+      else if (tb.t === "high") { const top = []; for (let k = 0; k < 18; k++) { const a = k / 18 * 6.2832; top.push(P([tb.x + Math.cos(a) * 28, 52, tb.z + Math.sin(a) * 22])); } wallR(tb.x - 3, tb.x + 3, 0, 52, tb.z, "#7a8794"); poly(top, "#2d7ad6"); }
+      else if (tb.t === "long") { box(tb.x - 80, tb.x + 80, 24, 36, tb.z - 14, tb.z + 14, "#c98a4b", "#9a6735", "#7a4f27"); for (const x of [tb.x - 74, tb.x + 74]) wallR(x - 3, x + 3, 0, 24, tb.z + 12, "#5a3a22"); }
+      else { box(tb.x - 54, tb.x + 54, 0, 22, tb.z - 54, tb.z - 24, "#c43a2c", "#a22e24", "#8a2820"); box(tb.x - 54, tb.x + 54, 22, 56, tb.z - 56, tb.z - 50, "#c43a2c", "#a22e24", "#8a2820"); box(tb.x - 46, tb.x + 46, 28, 34, tb.z - 14, tb.z + 14, "#f4efe3", "#cfc7b2", null); }
+      const bp = P([tb.x + 10, 36, tb.z]); lx.fillStyle = "#e8412f"; lx.fillRect(snap(bp[0]), snap(bp[1] - 5 * U), 2 * U, 5 * U); lx.fillStyle = "#ffc82e"; lx.fillRect(snap(bp[0] + 3 * U), snap(bp[1] - 5 * U), 2 * U, 5 * U);
+    });
+    if (tb.t !== "booth") for (const [sx, sz] of tb.seats) { const cpP = P([sx, 20, sz - 8]); add(cpP[2] + 0.3, () => { const hy = tb.t === "high" ? 30 : 0; box(sx - 9, sx + 9, hy + 18, hy + 22, sz - 10, sz + 4, "#c98a4b", "#9a6735", null); box(sx - 9, sx + 9, hy + 22, hy + 44, sz - 12, sz - 9, "#c98a4b", "#9a6735", null); }); }
+  });
+  // ---- đồ trang trí: cây, thùng rác, máy game, máy gọi món, đèn thả trần ----
+  for (const [x, z] of [[-540, 175], [545, 170], [-60, 60], [250, 175]]) { const pp = P([x, 0, z]); add(pp[2], () => prop(lx, "plant", pp[0], pp[1], t)); }
+  { const b = P([g.bin[0], 0, g.bin[2]]); add(b[2], () => prop(lx, "bin", b[0], b[1], t)); const a = P([520, 0, 150]); add(a[2], () => prop(lx, "arcade", a[0], a[1], t)); const kk = P([470, 0, 40]); add(kk[2], () => prop(lx, "kiosk", kk[0], kk[1], t)); }
+  for (const tb of g.tables) { const lp = P([tb.x, 190, tb.z]); add(lp[2] + 5, () => { const tb2 = P([tb.x, 100, tb.z]); lx.fillStyle = "rgba(255,230,160,0.10)"; poly([P([tb.x - 10, 190, tb.z]), P([tb.x + 10, 190, tb.z]), P([tb.x + 46, 36, tb.z]), P([tb.x - 46, 36, tb.z])], "rgba(255,226,150,0.07)"); lx.fillStyle = "#2a1b24"; lx.fillRect(snap(lp[0] - 6 * U), snap(lp[1] - 5 * U), 12 * U, 5 * U); lx.fillStyle = "#ffe08a"; lx.fillRect(snap(lp[0] - 4 * U), snap(lp[1]), 8 * U, U); void tb2; }); }
+  // ---- nhân viên: ông chủ, thu ngân, nhân viên lau sàn ----
+  const blocked = sim.waiting > 0 && sim.free > 0, full = sim.waiting > 0 && sim.free <= 0, away = sim.idle >= 120, bossLine = blocked ? "Chờ chút!" : full ? "Hết bếp rồi!" : away ? "Mở thêm bếp!" : sim.waiting ? "Đang ổn" : "Rảnh rỗi~";
+  const bpos = P([350, 0, -64]), cpos = P([150, 0, -64]), jx = Math.sin(now * 0.25) * 300 - 40, jp = P([jx, 0, 150]);
+  add(bpos[2], () => { const b = person(lx, bpos[0], bpos[1], { role: "boss", pose: blocked ? "up" : "stand", frame: Math.floor(now * 4) % 2, mood: blocked ? "angry" : "happy", acc: "stache", look: 1 }); reg("boss", "ông chủ", "person", b); sim.bossBox = b; });
+  add(cpos[2], () => { const b = person(lx, cpos[0], cpos[1], { role: "cashier", pose: now - (sim.cash || -9) < 1 ? "wave" : "stand", frame: Math.floor(now * 3) % 2, mood: "happy", acc: "headset", look: 6 }); reg("cashier", "thu ngân", "person", b); });
+  add(jp[2], () => { const b = person(lx, jp[0], jp[1], { role: "cust", pose: "walk", frame: Math.floor(now * 3) % 2, mood: "n", look: 9, arch: ARCH[2], shift: 40 }); reg("janitor", "nhân viên lau sàn", "person", b); lx.fillStyle = "#e8c24a"; lx.fillRect(snap(b[2] - 2 * U), snap(b[3] - 3 * U), 8 * U, 3 * U); lx.fillStyle = "#8a6a2a"; lx.fillRect(snap(b[2] + 2 * U), snap(b[1] + 6 * U), U, 22 * U); });
+  { const sp = P([jx > 0 ? jx - 60 : jx + 60, 0, 150]); add(sp[2], () => { prop(lx, "wet", sp[0], sp[1], t); }); }
+  const ptr = (n) => P(n);
+  // ---- lệnh/khách ----
+  for (const e of ents) {
+    if (e.a < 0.02) continue; e.hits = []; const slot = e.slot || 0, arch = ARCH[e.hue % 8], fl = e.flow, tag = fl ? fl.tag : "", hot = e.job ? Math.min(1, e.job.cpu / 200) : 0, look = e.hue % 20;
+    const cooking = e.state === "r" && !fl || (fl && fl.kind === "out" && tag === "dish") || (e.state === "d" && fl && fl.kind === "out" && tag === "dish");
+    if (cooking && e.state !== "q") {
+      const pod = g.pod(Math.min(slot, g.nv - 1)), cpP = P(pod), pan = P(g.pan(Math.min(slot, g.nv - 1)));
+      add(cpP[2], () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); const b = person(lx, cpP[0], cpP[1], { role: "cook", pose: "stir", frame: Math.floor(t * (3 + hot * 9)) % 2, hat: e.hue % 2 ? "paper" : "toque", acc: e.hue % 3 === 0 ? "glasses" : e.hue % 3 === 1 ? "stache" : "", mood: hot > 0.8 ? "angry" : "n", look: e.hue % 24, shift: 0 }); reg(e.key, "đầu bếp", "person", b); e.hits.push(b); lx.restore(); });
+      add(counterZ - 0.2, () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); lx.fillStyle = "#1f2228"; lx.fillRect(snap(pan[0] - 9 * U), snap(pan[1] - 3 * U), 18 * U, 3 * U); lx.fillStyle = "#3a3f48"; lx.fillRect(snap(pan[0] + 9 * U), snap(pan[1] - 2 * U), 6 * U, U); if (!fl) dish(lx, pan[0], pan[1] - 2, e.hue % 12, false, false); lx.restore(); });
+    }
+    const pp = P(e.p);
+    if (fl && (fl.kind === "enter" || (fl.kind === "in" && (tag === "walk")))) add(pp[2], () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); const b = person(lx, pp[0], pp[1], { role: "cust", pose: "walk", frame: Math.floor((e.walk || 0)) % 2, look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách đang đi", "person", b); e.hits = [b]; e.sb = b; lx.restore(); });
+    else if (fl && fl.kind === "in") add(pp[2], () => { lx.save(); const b = person(lx, pp[0], pp[1], { role: "cust", pose: tag === "order" ? "wave" : "stand", frame: Math.floor(now * 4) % 2, mood: tag === "pay" ? "happy" : "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách gọi món", "person", b); e.hits = [b]; e.sb = b; lx.restore(); });
+    else if (fl && fl.kind === "out") {
+      if (tag === "dish") add(pp[2], () => { const b = dish(lx, pp[0], pp[1], e.hue % 12, e.fail, true); reg(e.key, "món ra cửa sổ bếp", "dish", b); e.hits.push(b); e.sb = e.sb || b; });
+      else add(pp[2], () => { const b = robot(lx, pp[0], pp[1], t, true, e.hue % 12, e.dir || 1); reg(e.key, "robot phục vụ", "robot", b); e.hits.push(b); e.sb = b; });
+    } else if (e.state === "r") {
+      if (e.seat >= 0) { const sp = P([e.tp[0], 0, e.tp[2]]); add(sp[2], () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); const wait = Date.now() / 1000 - e.job.started, b = person(lx, sp[0], sp[1] - 4 * U, { role: "cust", pose: "sit", mood: wait > 600 ? "angry" : "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách chờ món", "person", b); e.hits.push(b); e.sb = b; const np = P([e.tp[0] + 12, 36, e.tp[2] + 24]); lx.fillStyle = "#f8f8f4"; lx.fillRect(snap(np[0]), snap(np[1] - 6 * U), 8 * U, 6 * U); pixText(lx, np[0] + U, np[1] - 5 * U, String(e.job.pid % 100).padStart(2, "0").slice(-2), "#c43a2c", U); lx.restore(); }); }
+      else add(pp[2], () => { lx.save(); const b = person(lx, pp[0], pp[1], { role: "cust", pose: "stand", mood: "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách đứng chờ", "person", b); e.hits.push(b); e.sb = b; lx.restore(); });
+    } else if (e.state === "q") add(pp[2], () => {
+      lx.save(); lx.globalAlpha = Math.min(1, e.a); const wait = Date.now() / 1000 - e.job.queued, b = person(lx, pp[0], pp[1], { role: "cust", pose: e.idx === 0 ? "wave" : "stand", frame: Math.floor(now * 3) % 2, mood: wait > 240 ? "angry" : "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc });
+      const bw = 18 * U, bx = snap(pp[0] - bw / 2), by = snap(b[1] - 14 * U); lx.fillStyle = "#f8f8f4"; lx.fillRect(bx, by, bw, 11 * U); lx.fillStyle = "#1d1630"; lx.fillRect(bx, by, bw, U); lx.fillRect(bx, by + 10 * U, bw, U); lx.fillRect(bx, by, U, 11 * U); lx.fillRect(bx + bw - U, by, U, 11 * U); lx.fillRect(snap(pp[0] - U), by + 11 * U, 2 * U, U); dish(lx, pp[0], by + 10 * U, e.hue % 12, false, false);
+      const pct = Math.min(1, wait / 300); lx.fillStyle = "#2a2a30"; lx.fillRect(bx, by - 2 * U, bw, U); lx.fillStyle = pct > 0.8 ? "#e53935" : pct > 0.5 ? "#f4b400" : "#43a047"; lx.fillRect(bx, by - 2 * U, Math.max(U, Math.round(bw * (1 - pct) / U) * U), U);
+      const bb = [b[0], by - 3 * U, b[2], b[3]]; reg(e.key, "khách xếp hàng", "person", bb); e.hits = [bb]; e.sb = bb; lx.restore();
+    });
+    else if (e.state === "d") add(pp[2], () => {
+      lx.save(); const age2 = Math.max(0, now - (e.born || 0)), bounce = age2 < 0.5 ? Math.round(Math.sin(age2 * 12) * 3 * Math.exp(-age2 * 5)) : 0, bx = snap(pp[0] - 8 * U), by = snap(pp[1] - 7 * U + bounce);
+      lx.fillStyle = "#8a5a3b"; lx.fillRect(bx, by, 16 * U, 14 * U); lx.fillStyle = "#f6ecd9"; lx.fillRect(bx + U, by + U, 14 * U, 12 * U); dish(lx, pp[0], by + 12 * U, e.hue % 12, e.fail, false);
+      if (e.fail) { for (const [x, y] of [[11, 1], [14, 1], [12, 2], [13, 2], [11, 3], [14, 3]]) { lx.fillStyle = "#e53935"; lx.fillRect(bx + x * U, by + y * U, U, U); } } else { for (const [x, y] of [[12, 0], [13, 0], [11, 1], [12, 1], [13, 1], [14, 1], [12, 2], [13, 2]]) { lx.fillStyle = "#ffd23f"; lx.fillRect(bx + x * U, by + y * U, U, U); } }
+      const bb = [bx, by, bx + 16 * U, by + 14 * U]; reg(e.key, "món trên bảng", "dish", bb); e.hits = [bb]; e.sb = bb; lx.restore();
+    });
   }
-  function drawEnt(e) {
-    const c = P(e.p), k = c[3]; cx.save(); cx.globalAlpha = Math.min(1, e.a); let bb;
-    if (e.flow) {
-      e.trail.forEach((tp, i) => { const s = P(tp); cx.fillStyle = rgba(e.fail ? C.bad : C.warn, (i + 1) / (e.trail.length * 5)); cx.beginPath(); cx.arc(s[0], s[1], 3 * s[3], 0, 6.3); cx.fill(); });
-      cx.translate(c[0], c[1]);
-      if (e.flow.kind === "in") { cx.rotate(Math.sin(e.spin) * 0.35); cx.fillStyle = C.panel; cx.strokeStyle = C.warn; cx.lineWidth = 1.5; cx.fillRect(-17 * k, -11 * k, 34 * k, 22 * k); cx.strokeRect(-17 * k, -11 * k, 34 * k, 22 * k); cx.fillStyle = C.muted; cx.fillRect(-12 * k, -5 * k, 24 * k, 2 * k); cx.fillRect(-12 * k, 1 * k, 18 * k, 2 * k); bb = [c[0] - 17 * k, c[1] - 11 * k, c[0] + 17 * k, c[1] + 11 * k]; }
-      else { plate(0, 0, 14 * k, e); bb = [c[0] - 14 * k, c[1] - 8 * k, c[0] + 14 * k, c[1] + 8 * k]; }
-    } else if (e.state === "q") bb = drawTicket(e, c, k);
-    else if (e.state === "d") bb = drawPlate(e, c, k, t);
-    else bb = drawPot(e, t);
-    cx.restore(); e.sb = bb;
-    if (bb && (e.key === simSel || e.key === sim.hover)) { cx.save(); cx.strokeStyle = C.text; cx.lineWidth = e.key === simSel ? 2 : 1; cx.strokeRect(bb[0] - 2, bb[1] - 2, bb[2] - bb[0] + 4, bb[3] - bb[1] + 4); cx.restore(); }
+  for (const q of sim.parts) {
+    const s = P(q.p), f = q.life / q.max;
+    if (q.k === "diner") add(s[2], () => { // khách đang ăn, dọn khay hoặc ra về
+      const arch = ARCH[q.hue % 8], look = q.hue % 20, st = q.script[q.si], walking = st && st.t === "walk", pose = q.sit ? (q.eating ? "eat" : "sit") : walking ? "walk" : "stand", frame = q.eating ? Math.floor(now * 1.4) % 2 : Math.floor(q.walkPh || 0) % 2;
+      lx.save(); const b = person(lx, s[0], s[1] - (q.sit ? 4 * U : 0), { role: "cust", pose, frame, mood: q.eating ? (Math.floor(now * 3) % 2 ? "chew" : "happy") : q.mood, look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg("diner:" + q.key, "khách ăn", "person", b);
+      if (q.eating) { const tp = P([q.seat.x, 36, q.seat.z + 24]); dish(lx, tp[0], tp[1], q.dish, false, false); if (q.dish === 4 || q.dish === 10) { lx.fillStyle = "rgba(255,255,255,0.8)"; lx.fillRect(snap(tp[0] + 2 * U), snap(tp[1] - 12 * U - ((now * 8) % 3) * U), U, U); } }
+      else if (q.tray && !q.sit) { lx.fillStyle = "#8a5a3b"; lx.fillRect(snap(s[0] - 7 * U), snap(b[1] + 17 * U), 14 * U, 2 * U); dish(lx, s[0], b[1] + 17 * U, q.dish, q.fail, false); }
+      if (q.bag && !q.sit) { lx.fillStyle = "#c98a4b"; lx.fillRect(snap(s[0] + 7 * U), snap(b[1] + 18 * U), 6 * U, 7 * U); lx.fillStyle = "#e8412f"; lx.fillRect(snap(s[0] + 8 * U), snap(b[1] + 20 * U), 4 * U, 2 * U); }
+      lx.restore();
+    });
+    else if (q.k === "robot") add(s[2], () => { const b = robot(lx, s[0], s[1], t, false, -1, q.dir || 1); reg("robot:" + q.i, "robot quay về", "robot", b); });
+    else add(s[2], () => {
+      if (q.k === "steam") { lx.fillStyle = rgba(q.c, 0.55 * f); const r = (4 + (1 - f) * 5) * U / 2; lx.fillRect(snap(s[0] - r), snap(s[1] - r), snap(r * 2) || PX, snap(r * 2) || PX); }
+      else if (q.k === "spark") { lx.fillStyle = rgba(q.c, f); lx.fillRect(snap(s[0]), snap(s[1]), PX * 2, PX * 2); }
+      else if (q.k === "coin") { lx.fillStyle = "#ffc82e"; lx.fillRect(snap(s[0]), snap(s[1]), PX * 2, PX * 2); lx.fillStyle = "#b8860b"; lx.fillRect(snap(s[0]), snap(s[1] + PX), PX * 2, PX); }
+      else if (q.k === "heart") { for (const [x, y, w, h] of [[0, 0, 2, 1], [3, 0, 2, 1], [0, 1, 5, 1], [1, 2, 3, 1], [2, 3, 1, 1]]) { lx.fillStyle = "#ff5a7a"; lx.fillRect(snap(s[0] - 5) + x * PX, snap(s[1]) + y * PX, w * PX, h * PX); } }
+      else if (q.k === "anger") { for (const [x, y] of [[0, 0], [4, 0], [1, 1], [3, 1], [2, 2], [1, 3], [3, 3], [0, 4], [4, 4]]) { lx.fillStyle = "#e53935"; lx.fillRect(snap(s[0] - 5) + x * PX, snap(s[1]) + y * PX, PX, PX); } }
+      else if (q.k.startsWith("stars")) { const n = Number(q.k.slice(5)); for (let i = 0; i < 5; i++) { const sx2 = snap(s[0] - 15 + i * 7), on = i < n; for (const [x, y] of [[2, 0], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [1, 3], [3, 3]]) { lx.fillStyle = on ? "#ffd23f" : "#5a5a66"; lx.fillRect(sx2 + x * PX, snap(s[1]) + y * PX, PX, PX); } } }
+      else if (q.k === "order") { const bw = 18 * U, bx = snap(s[0] - bw / 2), by = snap(s[1] - 22 * U); lx.fillStyle = "#f8f8f4"; lx.fillRect(bx, by, bw, 11 * U); lx.fillStyle = "#1d1630"; lx.fillRect(bx, by, bw, U); lx.fillRect(bx, by + 10 * U, bw, U); lx.fillRect(bx, by, U, 11 * U); lx.fillRect(bx + bw - U, by, U, 11 * U); dish(lx, s[0], by + 10 * U, q.dt, false, false); }
+    });
   }
-  function plate(x, y, r, e) { cx.fillStyle = C.panel; cx.strokeStyle = e.fail ? C.bad : C.muted; cx.lineWidth = 2; cx.beginPath(); cx.ellipse(x, y, r, r * 0.55, 0, 0, 6.3); cx.fill(); cx.stroke(); cx.fillStyle = e.fail ? "#2a1a18" : "hsl(" + e.hue + ",55%,45%)"; cx.beginPath(); cx.ellipse(x, y - r * 0.08, r * 0.55, r * 0.3, 0, 0, 6.3); cx.fill(); }
-  function drawPlate(e, c, k, tt) {
-    const age = Math.max(0, tt - (e.born || 0)), s = age < 0.6 ? 1 + 0.4 * Math.exp(-age * 7) * Math.cos(age * 14) : 1, r = 14 * k * s;
-    plate(c[0], c[1], r, e); if (e.fail && Math.sin(tt * 8) > 0) { cx.fillStyle = rgba(C.bad, 0.9); cx.fillRect(c[0] - 2, c[1] - r - 8, 4, 4); }
-    return [c[0] - r, c[1] - r * 0.6, c[0] + r, c[1] + r * 0.6];
-  }
-  function drawTicket(e, c, k) {
-    const w = 100, h = 58, sw = Math.sin(t * 1.6 + e.seed) * 0.05, top = e.p[1] + h / 2, xs = [-w / 2, w / 2], pts = [];
-    pts.push(P([e.p[0] - w / 2, top, e.p[2]]), P([e.p[0] + w / 2, top, e.p[2]]));
-    for (let q = 0; q <= 10; q++) pts.push(P([e.p[0] + w / 2 - q * w / 10, top - h + (q % 2 ? 5 : 0), e.p[2] + Math.sin(sw) * h]));
-    poly(pts, rgba(C.text, 0.1), e.idx === 0 ? C.text : C.line, 1);
-    const tl = P([e.p[0] - w / 2 + 6, top - 18, e.p[2]]), sc = Math.max(0.55, pts[0][3] * 1.0); void xs;
-    cx.save(); cx.translate(tl[0], tl[1]); cx.font = "600 " + Math.max(10, 13 * sc) + "px " + fam; cx.fillStyle = C.text; cx.fillText(fit2(niceTitle(e.job.cmd), (w - 12) * sc), 0, 0);
-    cx.font = Math.max(10, 12 * sc) + "px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted; cx.fillText("#" + (e.idx + 1) + " · " + simClock(Date.now() / 1000 - e.job.queued), 0, 17 * sc); cx.restore();
-    const clip = P([e.p[0], g.railY, g.zRail]); cx.strokeStyle = C.muted; cx.lineWidth = Math.max(1, k * 2); cx.beginPath(); cx.moveTo(clip[0], clip[1]); cx.lineTo(pts[0][0] / 2 + pts[1][0] / 2, pts[0][1]); cx.stroke();
-    const xsAll = pts.map((q) => q[0]), ysAll = pts.map((q) => q[1]); return [Math.min(...xsAll), Math.min(...ysAll), Math.max(...xsAll), Math.max(...ysAll)];
-  }
-  function cyl(b, R, hgt, base, lightK) { // thân trụ: các mảnh vẽ từ xa tới gần, đổ bóng theo hướng sáng
-    const N = 22, segs = [];
-    for (let i = 0; i < N; i++) { const a0 = i / N * 6.2832, a1 = (i + 1) / N * 6.2832, am = (a0 + a1) / 2; segs.push({ i, a0, a1, am, z: P([b[0] + Math.cos(am) * R, b[1] + hgt / 2, b[2] + Math.sin(am) * R])[2] }); }
-    segs.sort((p, q) => q.z - p.z);
-    for (const s of segs) { const sh = shade(Math.cos(s.am), 0, Math.sin(s.am)) * lightK; poly([P([b[0] + Math.cos(s.a0) * R, b[1] + hgt, b[2] + Math.sin(s.a0) * R]), P([b[0] + Math.cos(s.a1) * R, b[1] + hgt, b[2] + Math.sin(s.a1) * R]), P([b[0] + Math.cos(s.a1) * R, b[1], b[2] + Math.sin(s.a1) * R]), P([b[0] + Math.cos(s.a0) * R, b[1], b[2] + Math.sin(s.a0) * R])], "hsl(" + base + ",8%," + Math.round(20 + 42 * sh) + "%)"); }
-  }
-  function drawPot(e, tt) {
-    const b = [e.p[0], e.p[1], e.p[2]], big = e.job.mem >= 1500, R = big ? 30 : 25, hgt = big ? 40 : 30, hot = Math.min(1, e.job.cpu / 200), ign = Math.min(1, (now - e.landed) / 0.6);
-    const age = Date.now() / 1000 - e.job.started, pct = Math.min(1, age / d.timeout), col = pct >= 0.95 ? C.bad : pct >= 0.8 ? C.warn : C.accent, drop = Math.max(0, 1 - (now - e.landed) / 0.45), fx = sim.podFx[e.slot];
-    let dx = Math.sin(tt * 40) * hot * 1.2; if (fx && tt - fx.t0 < 0.5) dx += Math.sin(tt * 70) * 3 * (1 - (tt - fx.t0) / 0.5); b[0] += dx; b[1] += drop * 30;
-    const flame = (front) => { for (let k = 0; k < 12; k++) { const ang = k / 12 * 6.2832 + tt * 0.5, fr = Math.sin(ang) > 0; if (fr !== front) continue; const L = (6 + 22 * hot) * (0.6 + 0.4 * Math.sin(tt * 9 + k * 1.7)) * ign, r0 = R + 4;
-      for (const [sz, c2] of [[1, "rgba(255,120,30,0.85)"], [0.55, "rgba(255,225,120,0.95)"]]) poly([P([b[0] + Math.cos(ang - 0.22) * r0, 1, b[2] + Math.sin(ang - 0.22) * r0]), P([b[0] + Math.cos(ang) * (r0 + 3), 1 + L * sz, b[2] + Math.sin(ang) * (r0 + 3)]), P([b[0] + Math.cos(ang + 0.22) * r0, 1, b[2] + Math.sin(ang + 0.22) * r0])], c2); } };
-    flame(false);
-    cyl(b, R, hgt, big ? 215 : 30, 1);
-    const top = []; for (let k = 0; k < 26; k++) { const a = k / 26 * 6.2832; top.push(P([b[0] + Math.cos(a) * R, b[1] + hgt, b[2] + Math.sin(a) * R])); }
-    poly(top, "rgba(20,20,24,0.9)", C.muted, 2);
-    const lvl = Math.max(0.15, Math.min(1, e.job.mem / Math.max(500, d.totalMb / Math.max(2, d.cap)))), ly = b[1] + hgt - 3 - (1 - lvl) * (hgt - 8), liq = [];
-    for (let k = 0; k < 26; k++) { const a = k / 26 * 6.2832, rr = (R - 4) * (1 + 0.03 * Math.sin(a * 3 + tt * 3)); liq.push(P([b[0] + Math.cos(a) * rr, ly, b[2] + Math.sin(a) * rr])); }
-    poly(liq, "hsl(" + e.hue + ",55%,42%)");
-    for (let q = 0; q < 2 + Math.round(hot * 5); q++) { const ba = q * 2.4 + tt * 0.6, br = (R - 9) * ((q * 0.37 + tt * (0.3 + hot * 0.6)) % 1), s = P([b[0] + Math.cos(ba) * br * 0.8, ly + 0.5, b[2] + Math.sin(ba) * br * 0.8]); cx.fillStyle = "rgba(255,255,255,0.6)"; cx.beginPath(); cx.arc(s[0], s[1], Math.max(1, s[3] * (1.5 + (q % 2))), 0, 6.3); cx.fill(); }
-    const h1 = P([b[0] + R, b[1] + hgt - 6, b[2]]), h2 = P([b[0] + R + (big ? 10 : 26), b[1] + hgt - 6, b[2]]); cx.strokeStyle = C.muted; cx.lineWidth = Math.max(3, h1[3] * 6); cx.lineCap = "round"; cx.beginPath(); cx.moveTo(h1[0], h1[1]); cx.lineTo(h2[0], h2[1]); cx.stroke(); cx.lineCap = "butt";
-    flame(true);
-    const arcPts = []; for (let k = 0; k <= 28; k++) { const a = -Math.PI / 2 + k / 28 * pct * 6.2832; arcPts.push(P([b[0] + Math.cos(a) * (R + 12), 1.5, b[2] + Math.sin(a) * (R + 12)])); }
-    const full = []; for (let k = 0; k < 40; k++) { const a = k / 40 * 6.2832; full.push(P([b[0] + Math.cos(a) * (R + 12), 1.5, b[2] + Math.sin(a) * (R + 12)])); }
-    poly(full, null, rgba(C.track, 1), Math.max(2, full[0][3] * 5)); if (pct > 0) { cx.beginPath(); arcPts.forEach((q, i) => i ? cx.lineTo(q[0], q[1]) : cx.moveTo(q[0], q[1])); cx.strokeStyle = col; cx.lineWidth = Math.max(2, full[0][3] * 5); cx.stroke(); }
-    const lab = P([b[0], 0, b[2] + R + 30]), kk = lab[3], tw = g.S * kk * 0.92; cx.save(); cx.globalAlpha = Math.min(1, e.a) * Math.min(1, ign * 2); cx.textAlign = "center"; cx.font = "600 " + Math.max(11, 12 * kk) + "px " + fam; cx.fillStyle = C.text; cx.fillText(fit2(niceTitle(e.job.cmd), tw), lab[0], lab[1]);
-    cx.font = Math.max(11, 12 * kk) + "px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted; cx.fillText(simClock(age) + " · " + fmtCpu(e.job.cpu) + " nhân", lab[0], lab[1] + Math.max(13, 14 * kk)); cx.restore();
-    const xs = full.concat(top).map((q) => q[0]), ys = full.concat(top).map((q) => q[1]); return [Math.min(...xs), Math.min(...ys) - 10, Math.max(...xs), Math.max(...ys) + 26];
-  }
-  function drawPart(q) {
-    const s = P(q.p), f = q.life / q.max; cx.save();
-    if (q.k === "ring") { const pts = []; for (let k = 0; k < 24; k++) { const a = k / 24 * 6.2832, rr = q.s + (1 - f) * 40; pts.push(P([q.p[0] + Math.cos(a) * rr, q.p[1], q.p[2] + Math.sin(a) * rr])); } poly(pts, null, rgba(q.c, f), 2); }
-    else if (q.k === "steam") { cx.fillStyle = rgba(q.c, 0.34 * f); cx.beginPath(); cx.arc(s[0], s[1], (q.r + (1 - f) * 8) * s[3], 0, 6.3); cx.fill(); }
-    else { cx.fillStyle = rgba(q.c, f); cx.fillRect(s[0], s[1], q.s * s[3] * 1.5, q.s * s[3] * 1.5); }
-    cx.restore();
-  }
-  for (const f of sim.fog) { const gr = cx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r); gr.addColorStop(0, rgba(C.muted, 0.2 + 0.05 * Math.sin(t + f.ph))); gr.addColorStop(1, rgba(C.muted, 0)); cx.fillStyle = gr; cx.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2); }
-  // chuông gọi món ở đầu ray
-  const bp = P([hx - 6, g.railY - 10, g.zRail]), rg = Math.max(0, 1 - (now - sim.bell) / 0.7); cx.save(); cx.translate(bp[0], bp[1]); cx.rotate(Math.sin(now * 40) * 0.25 * rg); cx.fillStyle = rg > 0 ? C.warn : C.muted; cx.beginPath(); cx.arc(0, 4, 13 * bp[3], Math.PI, 0); cx.fill(); cx.fillRect(-15 * bp[3], 4, 30 * bp[3], 4); cx.restore();
-  // chữ cố định trên màn hình: nhãn, bộ đếm, chú giải
-  cx.textBaseline = "alphabetic"; cx.font = "600 12px ui-monospace,Menlo,monospace"; cx.fillStyle = C.muted; cx.fillText(simQueueLabel(), 0, 12); cx.fillText(simRunLabel(), 0, 28);
-  cx.textAlign = "right"; cx.fillText("xong " + sim.okN, W - 78, 12); cx.fillStyle = sim.failN ? C.bad : C.muted; cx.fillText("lỗi " + sim.failN, W, 12); cx.textAlign = "left";
-  const y0 = H - 40, y1 = H - 6; cx.font = mono; cx.fillStyle = C.muted; cx.fillText("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6); cx.fillText("vòng = thời gian · lửa = CPU · nước trong nồi = RAM · hơi nước = RAM căng · kéo chuột để xoay", 130, y0 - 6);
+  items.sort((a, b) => b.z - a.z); items.forEach((it) => it.fn()); void ptr;
+  // ---- phóng to cảnh pixel rồi vẽ chữ, danh sách và sổ sách lên trên ----
+  cx.setTransform(sim.dpr, 0, 0, sim.dpr, 0, 0); cx.clearRect(0, 0, W, H); cx.imageSmoothingEnabled = false; cx.drawImage(sim.lo, 0, 0, sim.lo.width, sim.lo.height, 0, 0, sim.lo.width * PX, sim.lo.height * PX);
+  for (const e of ents) if ((e.key === simSel || e.key === sim.hover) && e.hits) for (const b of e.hits) { cx.strokeStyle = C.text; cx.lineWidth = e.key === simSel ? 2 : 1; cx.strokeRect(b[0] - 2, b[1] - 2, b[2] - b[0] + 4, b[3] - b[1] + 4); }
+  cx.textBaseline = "alphabetic"; const M = "600 12px ui-monospace,Menlo,monospace", N = "12px ui-monospace,Menlo,monospace";
+  const txt = (s, x, y, font, color, align, owner) => { cx.font = font; const w = cx.measureText(s).width, fs = parseInt(font.match(/(\d+)px/)[1]), x0 = align === "right" ? x - w : align === "center" ? x - w / 2 : x; sim.texts.push({ s, owner, x: x0, y: y - fs * 0.85, w, h: fs * 1.05 }); cx.fillStyle = color; cx.textAlign = align || "left"; cx.fillText(s, x, y); cx.textAlign = "left"; };
+  const fitS = (s, mw) => { cx.font = N; if (cx.measureText(s).width <= mw) return s; let x = s; while (x.length > 1 && cx.measureText(x + "…").width > mw) x = x.slice(0, -1); return x + "…"; };
+  const led = simLedger(d); txt(simQueueLabel(), 0, 12, M, C.muted, "left", "hud"); txt(simRunLabel(), 0, 28, M, C.muted, "left", "hud"); txt("xong " + sim.okN + " · lỗi " + sim.failN, W - 8, 12, M, sim.failN ? C.bad : C.muted, "right", "hud");
+  if (sim.bossBox) { cx.font = M; const tw = cx.measureText(bossLine).width + 14, bx = Math.min(g.Ws - tw - 4, Math.max(4, (sim.bossBox[0] + sim.bossBox[2]) / 2 - tw / 2)), by = sim.bossBox[1] - 40; cx.fillStyle = rgba(C.panel, 0.95); cx.strokeStyle = blocked ? C.bad : C.line; cx.lineWidth = 1.5; cx.fillRect(bx, by, tw, 20); cx.strokeRect(bx, by, tw, 20); txt(bossLine, bx + 7, by + 14, M, blocked ? C.bad : C.text, "left", "boss"); }
+  const X0 = g.Ws, RW = g.RW, rowsMax = Math.floor((H - 64 - 52) / 18); cx.fillStyle = rgba(C.text, 0.05); cx.fillRect(X0, 36, RW, H - 64 - 36); cx.strokeStyle = C.line; cx.lineWidth = 1; cx.strokeRect(X0 + 0.5, 36.5, RW - 1, H - 64 - 36);
+  const running = ents.filter((e) => e.state === "r" && e.ta > 0).sort((a, b) => a.slot - b.slot), waiting = ents.filter((e) => e.state === "q" && e.ta > 0).sort((a, b) => a.idx - b.idx); let ry = 52, used = 0;
+  const kv = (k, v, col) => { txt(k, X0 + 10, ry, N, C.muted, "left", "list"); txt(v, X0 + RW - 8, ry, N, col || C.text, "right", "list"); ry += 18; used++; };
+  txt("sổ sách 50 lệnh", X0 + 8, ry, M, C.muted, "left", "list"); ry += 18; used++; kv("doanh thu", kVnd(led.rev), C.accent); kv("chi phí", kVnd(led.cost), C.warn); kv("lãi", kVnd(led.rev - led.cost), led.rev - led.cost >= 0 ? C.accent : C.bad); kv("sao · khách", led.avg.toFixed(1).replace(".", ",") + " · " + (led.ok + led.fail)); ry += 4;
+  const row = (e, tm) => { if (used >= rowsMax) return; sim.rows.push({ key: e.key, x: X0, y: ry - 13, w: RW, h: 18 }); if (e.key === simSel) { cx.fillStyle = rgba(C.text, 0.12); cx.fillRect(X0 + 1, ry - 13, RW - 2, 18); } cx.fillStyle = hslHex(e.hue, 55, 46); cx.fillRect(X0 + 8, ry - 9, 10, 10); txt(fitS(niceTitle(e.job.cmd), RW - 96), X0 + 24, ry, N, C.text, "left", "list"); txt(tm, X0 + RW - 8, ry, N, C.muted, "right", "list"); ry += 18; used++; };
+  if (used < rowsMax) { txt("đang nấu " + running.length, X0 + 8, ry, M, C.muted, "left", "list"); ry += 18; used++; } for (const e of running) row(e, simClock(Date.now() / 1000 - e.job.started));
+  ry += 4; if (used < rowsMax) { txt("khách chờ " + sim.waiting, X0 + 8, ry, M, C.muted, "left", "list"); ry += 18; used++; } for (const e of waiting) row(e, simClock(Date.now() / 1000 - e.job.queued));
+  const y0 = H - 40, y1 = H - 6; txt("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6, N, C.muted, "left", "legend"); txt("vào cửa → xếp hàng → gọi món → trả tiền → ăn → về · kéo chuột để xoay", 120, y0 - 6, N, C.muted, "left", "legend");
   const top = Math.max(d.maxLoad * 1.25, ...loads, 1), yy = (v) => y1 - (Math.min(v, top) / top) * (y1 - y0);
   cx.save(); cx.setLineDash([3, 4]); cx.strokeStyle = rgba(C.faint, 0.6); cx.beginPath(); cx.moveTo(0, yy(d.maxLoad)); cx.lineTo(W, yy(d.maxLoad)); cx.stroke(); cx.restore();
   if (loads.length > 1) { cx.strokeStyle = loads[loads.length - 1] >= d.maxLoad ? C.bad : C.accent; cx.lineWidth = 1.5; cx.beginPath(); loads.forEach((v, i) => { const x = (i / (loads.length - 1)) * W; i ? cx.lineTo(x, yy(v)) : cx.moveTo(x, yy(v)); }); cx.stroke(); const lv = loads[loads.length - 1]; cx.fillStyle = cx.strokeStyle; cx.beginPath(); cx.arc(W - 2, yy(lv), 3 + Math.sin(t * 5), 0, 6.3); cx.fill(); }
 }
 function simHit(x, y) {
+  for (const r of sim.rows) if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return sim.ents.get(r.key) || null;
   let best = null;
-  for (const e of sim.ents.values()) { const b = e.sb; if (e.ta > 0 && e.a > 0.4 && b && x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3] && (!best || e.p[2] > best.p[2])) best = e; }
-  return best;
+  for (const e of sim.ents.values()) if (e.ta > 0 && e.a > 0.4 && e.hits) for (const b of e.hits) if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3] && (!best || (b[2] - b[0]) * (b[3] - b[1]) < best.ar)) best = { e, ar: (b[2] - b[0]) * (b[3] - b[1]) };
+  return best ? best.e : null;
 }
 function simClickAt(x, y) { const e = simHit(x, y); if (e) selectSim(e.key); return !!e; }
 const simKeys = () => [...sim.ents.values()].filter((e) => e.ta > 0).map((e) => ({ key: e.key, state: e.state }));
-const simPoint = (key) => { const b = sim.ents.get(key).sb; return { x: (b[0] + b[2]) / 2, y: (b[1] + b[3]) / 2 }; };
+const simPoint = (key) => { const e = sim.ents.get(key), b = e.sb || e.hits[0]; return { x: (b[0] + b[2]) / 2, y: (b[1] + b[3]) / 2 }; };
 function simStats() {
-  const c = { r: 0, q: 0, d: 0, f: 0, out: 0, fl: 0, pods: sim.g ? sim.g.n : 0 };
+  const c = { r: 0, q: 0, d: 0, f: 0, out: 0, fl: 0, pods: sim.g ? sim.g.nv : 0 };
   for (const e of sim.ents.values()) { if (e.flow) c.fl++; if (e.ta <= 0) continue; c[e.state]++; if (e.fail) c.f++; const b = e.sb; if (!b || b[0] < -1 || b[1] < -1 || b[2] > sim.W + 1 || b[3] > sim.H + 1) c.out++; }
   return c;
 }
@@ -600,23 +790,17 @@ function simContrast() {
   return bad;
 }
 const simAdvance = (sec) => { for (let i = 0; i < sec / 0.04; i++) simStep(0.04, performance.now() / 1000); simDraw(performance.now() / 1000); };
-// Kiểm tra bố cục tĩnh với camera chuẩn: nhãn, phiếu, bếp (cả chữ dưới nồi), đĩa, chuông, chú giải và đường tải đều nằm trong khung và không đè nhau trên màn hình.
+// Kiểm tra chữ và hình ở ba góc camera (giữa và hai biên độ lắc): chữ không đè chữ, không đè lên hình của người khác, không ra khỏi khung; hình không ra khỏi khung.
 function simAudit() {
-  const g = sim.g, cx = sim.cx, W = sim.W, H = sim.H, bad = [];
-  cx.font = "600 12px ui-monospace,Menlo,monospace"; const tw = (t) => cx.measureText(t).width;
-  const R = (n, x0, y0, x1, y1) => ({ n, x: x0, y: y0, w: x1 - x0, h: y1 - y0 }), hit = (a, b) => a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1;
-  const bb = (n, pts, padB) => { const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]); return R(n, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys) + (padB || 0)); };
-  const hud = [R("nhãn phiếu chờ", 0, 0, tw(simQueueLabel()), 14), R("nhãn bếp", 0, 16, tw(simRunLabel()), 30), R("bộ đếm", W - 130, 0, W, 14), R("chú giải", 0, H - 58, W, H - 44), R("đường tải", 0, H - 40, W, H - 6)];
-  for (const yaw of [-0.08, 0, 0.08]) {
-    const P = (p) => proj3(p, { yaw, pitch: g.pitch0 }, g.fit), tickets = [], pots = [], plates = [], hx = g.sceneW / 2;
-    for (let k = 0; k < g.qvis; k++) { const c = g.que(k), top = c[1] + 29; tickets.push(bb("phiếu " + (k + 1), [P([c[0] - 50, top, c[2]]), P([c[0] + 50, top, c[2]]), P([c[0] - 50, top - 58, c[2] + 3]), P([c[0] + 50, top - 58, c[2] + 3])])); }
-    for (let i = 0; i < g.n; i++) { const b = g.pod(i), pts = []; for (let k = 0; k < 16; k++) { const a = k / 16 * 6.2832; pts.push(P([b[0] + Math.cos(a) * 42, 1.5, b[2] + Math.sin(a) * 42]), P([b[0] + Math.cos(a) * 30, 40, b[2] + Math.sin(a) * 30])); } pts.push(P([b[0], 0, b[2] + 60])); pots.push(bb("bếp " + (i + 1), pts, 14)); }
-    for (let m = 0; m < g.pcols; m++) { const c = g.done(m); plates.push(bb("đĩa " + (m + 1), [P([c[0] - 14, c[1], c[2] - 8]), P([c[0] + 14, c[1], c[2] + 8])])); }
-    const bp = P([hx - 6, g.railY - 10, g.zRail]), all = [...hud, ...tickets, ...pots, ...plates, R("chuông", bp[0] - 16, bp[1] - 16, bp[0] + 16, bp[1] + 12)];
-    for (const r of all) if (r.x < -1 || r.y < -1 || r.x + r.w > W + 1 || r.y + r.h > H + 1) bad.push(r.n + " nằm ngoài khung");
-    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) if (hit(all[i], all[j])) bad.push(all[i].n + " đè " + all[j].n);
+  const bad = [], keep = sim.yawFix, t = performance.now() / 1000, hit = (a, b) => a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1, nm = (r) => "\"" + (r.s || r.name).slice(0, 14) + "\"";
+  for (const yaw of [-0.06, 0, 0.06]) {
+    sim.yawFix = yaw; simDraw(t); const T = sim.texts, Rr = sim.rects, W = sim.W, H = sim.H;
+    for (const a of T) if (a.x < -1 || a.y < -1 || a.x + a.w > W + 1 || a.y + a.h > H + 1) bad.push("chữ " + nm(a) + " nằm ngoài khung");
+    for (const r of Rr) if (r.x < -1 || r.y < -1 || r.x + r.w > sim.g.Ws + 1 || r.y + r.h > H + 1) bad.push("hình " + nm(r) + " nằm ngoài cảnh");
+    for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) if (hit(T[i], T[j])) bad.push("chữ " + nm(T[i]) + " đè chữ " + nm(T[j]));
+    for (const a of T) for (const r of Rr) if (a.owner !== r.owner && hit(a, r)) bad.push("chữ " + nm(a) + " đè hình " + nm(r));
   }
-  return [...new Set(bad)];
+  sim.yawFix = keep; simDraw(t); return [...new Set(bad)];
 }
 function simInk() { const px = sim.cx.getImageData(0, 0, sim.cv.width, sim.cv.height).data; for (let i = 3; i < px.length; i += 4) if (px[i]) return 1; return 0; }
 function selectSim(key) {
@@ -653,7 +837,7 @@ const cvEl = $("simCv"), cvAt = (ev) => { const r = cvEl.getBoundingClientRect()
 cvEl.addEventListener("click", (ev) => { if (sim.dragged) { sim.dragged = false; return; } simClickAt(...cvAt(ev)); });
 cvEl.addEventListener("dblclick", () => { sim.yaw = 0; sim.pitchUser = null; if (sim.g && last) renderSim(last, derive(last)); });
 cvEl.addEventListener("pointerdown", (ev) => { sim.drag = { x: ev.clientX, y: ev.clientY, yaw: sim.yaw, pitch: sim.pitchUser == null ? (sim.g ? sim.g.pitch0 : 0.72) : sim.pitchUser }; sim.dragged = false; cvEl.setPointerCapture(ev.pointerId); });
-cvEl.addEventListener("pointermove", (ev) => { const d0 = sim.drag; if (!d0) return; const dx = ev.clientX - d0.x, dy = ev.clientY - d0.y; if (Math.abs(dx) + Math.abs(dy) < 5 && !sim.dragged) return; sim.dragged = true; sim.yaw = Math.max(-0.9, Math.min(0.9, d0.yaw + dx * 0.006)); sim.pitch = Math.max(0.3, Math.min(1.2, d0.pitch + dy * 0.004)); if (last) renderSim(last, derive(last)); });
+cvEl.addEventListener("pointermove", (ev) => { const d0 = sim.drag; if (!d0) return; const dx = ev.clientX - d0.x, dy = ev.clientY - d0.y; if (Math.abs(dx) + Math.abs(dy) < 5 && !sim.dragged) return; sim.dragged = true; sim.yaw = Math.max(-0.9, Math.min(0.9, d0.yaw + dx * 0.006)); sim.pitchUser = Math.max(0.25, Math.min(1.1, d0.pitch + dy * 0.004)); if (last) renderSim(last, derive(last)); });
 cvEl.addEventListener("pointerup", () => { sim.drag = null; });
 cvEl.addEventListener("mousemove", (ev) => { const pt = cvAt(ev), e = simHit(...pt), k = e ? e.key : ""; cvEl.title = e ? e.job.cmd || "" : ""; if (k !== sim.hover) { sim.hover = k; cvEl.style.cursor = k ? "pointer" : ""; simKick(); } });
 cvEl.addEventListener("mouseleave", () => { sim.hover = ""; cvEl.style.cursor = ""; simKick(); });
