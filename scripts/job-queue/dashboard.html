@@ -92,15 +92,18 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 [role="tabpanel"][hidden]{display:none}
 .p-sim{display:none;grid-column:2/-1}
 .grid.sim .mid,.grid.sim .p-info{display:none}.grid.sim .p-sim{display:flex}
-.simbody{display:flex;flex-direction:column;gap:8px;overflow:hidden;padding:16px 12px 12px}
+.simbody{display:flex;flex-direction:column;gap:8px;overflow:auto;padding:16px 12px 12px}
 .simnote{font-size:12px;color:var(--muted);min-height:18px}.simnote.warn{color:var(--warn)}
-#stage{position:relative;flex:1;min-height:400px}
+#stage{position:relative;flex:none;height:clamp(380px,52vh,560px)}
 .zl{position:absolute;top:0;font:600 12px var(--mono);color:var(--muted);white-space:nowrap}
 .pod{position:absolute;border:1px dashed var(--line)}
 .pod.lock{border-style:solid;background:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--faint) 14%,transparent) 6px 7px)}
 .pod i{position:absolute;left:6px;bottom:3px;font:11px var(--mono);font-style:normal;color:var(--faint)}
-.tok{position:absolute;left:0;top:0;padding:6px 8px;border:1px solid var(--line);background:var(--panel);overflow:hidden;transition:transform .8s cubic-bezier(.2,.7,.2,1),width .8s cubic-bezier(.2,.7,.2,1),height .8s cubic-bezier(.2,.7,.2,1),opacity .5s}
-.tok.nt{transition:none}
+.tok{position:absolute;left:0;top:0;display:block;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;padding:6px 8px;border:1px solid var(--line);background:var(--panel);overflow:hidden;transition:transform .8s cubic-bezier(.2,.7,.2,1),width .8s cubic-bezier(.2,.7,.2,1),height .8s cubic-bezier(.2,.7,.2,1),opacity .5s}
+.tok.nt{transition:none}.tok:hover{border-color:var(--text)}.tok.sel{outline:2px solid var(--text);outline-offset:1px}
+#simDetail{display:none;flex:none;border:1px solid var(--line);background:var(--panel);padding:10px 12px}#simDetail.on{display:block}
+.sd-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.sd-head .title{font-weight:650;overflow-wrap:anywhere}
+.sd-grid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:2px 14px;margin:8px 0;font-size:12px;color:var(--muted)}.sd-grid b{font-weight:600;color:var(--text);overflow-wrap:anywhere}
 .tok .title{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:unset}
 .tok .time{display:block;font-size:11px;color:var(--muted)}
 .tok.s-r{border-color:var(--accent);animation:pulse var(--beat,2s) ease-in-out infinite}
@@ -152,7 +155,7 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
       <section class="panel" aria-labelledby="h-queue"><h2 id="h-queue">đang chờ</h2><div class="body"><ol id="queue"></ol></div></section>
     </div>
     <section class="panel p-sim" aria-labelledby="h-sim"><h2 id="h-sim">mô phỏng</h2>
-      <div class="body simbody"><div id="simNote" class="simnote"></div><div id="stage"><div id="simBg"></div></div></div>
+      <div class="body simbody"><div id="simNote" class="simnote"></div><div id="stage"><div id="simBg"></div></div><div id="simDetail" aria-live="polite"></div></div>
     </section>
     <section class="panel p-info" aria-label="Thông tin thêm">
       <div class="tabs" role="tablist" aria-label="Thông tin thêm">
@@ -346,7 +349,7 @@ function renderTab(d) {
   $("icon").href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' fill='" + COLORS[state] + "'/%3E%3C/svg%3E";
 }
 // Mô phỏng: mỗi lệnh là một ô (token) giữ nguyên theo pid; vị trí tính từ trạng thái (chờ, chạy, xong) và CSS transition tự trượt ô giữa hai lần nạp dữ liệu.
-let view = "list", simFirst = true;
+let view = "list", simFirst = true, simSel = "", simSig = "";
 const simTok = new Map(), simSlot = new Map();
 function simGeo(d, W, H) {
   const n = Math.max(d.jobs, d.running.length), zq = Math.max(150, Math.round(W * 0.22)), zd = Math.max(96, Math.round(W * 0.12)), gap = 20, top = 26;
@@ -360,9 +363,10 @@ function simGeo(d, W, H) {
 }
 function simPlace(key, state, pos, w, h, o, build, fail) {
   let t = simTok.get(key), fresh = false;
-  if (!t) { t = el("div", "tok nt"); $("stage").append(t); simTok.set(key, t); fresh = true; }
+  if (!t) { t = el("button", "tok nt"); t.type = "button"; t.addEventListener("click", () => selectSim(key)); $("stage").append(t); simTok.set(key, t); fresh = true; }
   if (t.dataset.state !== state) { t.dataset.state = state; t.replaceChildren(); if (build) build(t); }
-  t.className = "tok s-" + state + (fail ? " fail" : "") + (fresh ? " nt" : "");
+  t.className = "tok s-" + state + (fail ? " fail" : "") + (fresh ? " nt" : "") + (key === simSel ? " sel" : "");
+  t.style.pointerEvents = o ? "" : "none"; t.tabIndex = o ? 0 : -1; t.setAttribute("aria-pressed", String(key === simSel));
   t.style.transform = "translate(" + pos.x + "px," + pos.y + "px)"; t.style.width = w + "px"; t.style.height = h + "px"; t.dataset.o = o;
   if (fresh) { t.style.opacity = simFirst ? o : 0; requestAnimationFrame(() => requestAnimationFrame(() => { t.classList.remove("nt"); t.style.opacity = t.dataset.o; })); }
   else t.style.opacity = o;
@@ -404,8 +408,38 @@ function renderSim(d, p) {
   for (const [k, t] of simTok) if (!seen.has(k)) { simTok.delete(k); t.style.opacity = 0; setTimeout(() => t.remove(), 600); }
   $("simNote").textContent = p.waiting.length ? (p.cause ? "Hàng đợi đang chờ vì " + p.cause + "." : lockWhy) : "Không có lệnh nào đang chờ.";
   $("simNote").className = "simnote" + (p.waiting.length && p.cause ? " warn" : "");
-  simFirst = false;
+  renderSimDetail(d, p); simFirst = false;
 }
+function selectSim(key) {
+  simSel = simSel === key ? "" : key;
+  if (last) { renderSim(last, derive(last)); tickTimes(); }
+}
+// Thẻ chi tiết của ô đang chọn: phần cố định (lệnh, output) dựng một lần, phần số liệu dựng lại mỗi lần nạp để không mất chỗ cuộn của output.
+function renderSimDetail(d, p) {
+  const box = $("simDetail"), pid = simSel.slice(1); let kind = "", job = null, idx = -1;
+  if (simSel) {
+    job = d.running.find((j) => String(j.pid) === pid);
+    if (job) kind = "r";
+    else if ((idx = p.waiting.findIndex((j) => String(j.pid) === pid)) >= 0) { kind = "q"; job = p.waiting[idx]; }
+    else { job = d.history.find((r) => r.rc != null && String(parseInt(r.id.split("-")[1], 10)) === pid); if (job) kind = "d"; }
+  }
+  if (!kind) { simSel = ""; simSig = ""; box.className = ""; box.replaceChildren(); return; }
+  box.className = "on";
+  if (simSig !== simSel + kind) {
+    simSig = simSel + kind; box.replaceChildren();
+    const head = el("div", "sd-head"), close = el("button", "chip", "đóng"); close.type = "button"; close.addEventListener("click", () => selectSim(simSel));
+    head.append(el("span", "title", niceTitle(job.cmd)), close);
+    box.append(head, el("div", "sd-grid"), cmdLine(job.cmd, true));
+    if (kind === "d") { const pre = el("pre", "out"); pre.style.marginLeft = "0"; box.append(pre); loadLog(job.id, pre); }
+  }
+  const row = (k, v) => [el("span", "", k), typeof v === "string" ? el("b", "", v) : v], g = box.querySelector(".sd-grid"), rows = [];
+  const bold = (n) => { const b = el("b"); b.append(n); return b; };
+  if (kind === "r") rows.push(row("Trạng thái", "Đang chạy"), row("Đã chạy", bold(timeSpan(job.started, "run", d.timeout))), row("Đang dùng", fmtCpu(job.cpu) + " nhân CPU, " + fmtMem(job.mem) + " RAM"), row("Tối đa", fmtTime(d.timeout)));
+  else if (kind === "q") rows.push(row("Trạng thái", "Đang chờ, thứ " + (idx + 1) + " trong hàng"), row("Đã chờ", bold(timeSpan(job.queued, "wait", 0))), row("Lý do", waitReason(job, idx, d, p).text), row("Dự kiến cần", fmtCpu(job.cpu) + " nhân CPU, " + fmtMem(job.mem) + " RAM"));
+  else rows.push(row("Kết quả", job.rc === 0 ? "Xong" : job.rc === 124 ? "Quá hạn, nên chia nhỏ lệnh" : "Lỗi " + job.rc), row("Mất", fmtTime(job.secs)), row("Lúc", fmtStamp(job.start)), row("Thư mục", job.cwd));
+  g.replaceChildren(...rows.flat());
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && simSel) selectSim(simSel); });
 function applyView(mode) {
   view = mode; $("grid").classList.toggle("sim", mode === "sim");
   document.querySelectorAll("#views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === mode)));
