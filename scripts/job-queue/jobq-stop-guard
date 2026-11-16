@@ -37,11 +37,11 @@ if [ -n "$text" ] && ! printf '%s' "$text" | grep -q '📚'; then
 fi
 # Danh sách việc còn mục chưa xong mà tin nhắn cuối không nêu lý do dừng thì chặn 1 lần.
 pending=$(jq -rs '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use" and .name == "TodoWrite")] | last | (.input.todos // []) | map(select(.status != "completed")) | length' "$tp" 2>/dev/null || echo 0)
-if [ "${pending:-0}" -gt 0 ] && ! printf '%s' "$text" | grep -qiE 'kết luận|còn lại|tiếp theo|bước tiếp|còn tồn|cần bạn quyết|\[!important\]|chặn|blocked|recap|next steps'; then
+if [ "${pending:-0}" -gt 0 ] && ! printf '%s' "$text" | grep -qiE 'kết luận|còn lại|còn mở|tiếp theo|bước tiếp|còn tồn|cần bạn quyết|\[!important\]|chặn|blocked|recap|next steps'; then
   jq -n --arg n "$pending" '{decision:"block",reason:("\($n) todo item(s) are not completed. Finish them, or say which are left and why you are stopping, in a short list placed before the closing English-learning block.")}'
   exit 0
 fi
 [ "$(printf '%s' "$turn" | jq -r .tools)" -ge "$MIN_TOOLS" ] || exit 0
 # tin nhắn cuối đã nêu bước tiếp theo / việc còn lại / kết luận thì thôi
-printf '%s' "$turn" | jq -r .text | grep -qiE 'kết luận|còn lại|tiếp theo|bước tiếp|còn tồn|cần bạn quyết|\[!important\]|nhắn `|recap|next steps' && exit 0
-jq -n '{decision:"block",reason:"Before stopping, add a short bullet list: still open, next step. Do not repeat what is done. Use the language of the conversation, one language only. Put the list before the closing English-learning block, which stays last."}'
+printf '%s' "$turn" | jq -r .text | grep -qiE 'kết luận|còn lại|còn mở|tiếp theo|bước tiếp|còn tồn|cần bạn quyết|\[!important\]|nhắn `|recap|next steps' && exit 0
+jq -n '{decision:"block",reason:"Before stopping, add a short > [!NOTE] box, in the language of the conversation only: a bold line for what is still open followed by one task-list item (- [ ]) per open thing, then one bold line for the next step with a single sentence. Do not repeat what is done. Put the box before the closing English-learning block, which stays last."}'
