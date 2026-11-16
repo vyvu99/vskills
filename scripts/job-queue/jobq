@@ -22,12 +22,14 @@ MAX_JOBS=$(( NCPU * 3 ))                                # chỗ chạy tối đa
 B_JOBS=${JOBQ_SLOTS:-$MAX_JOBS}
 B_CPU=$(cc "${JOBQ_BUDGET_CPU:-$(( NCPU * 3 ))}")       # đặt chỗ CPU rộng vì ước lượng thường cao hơn dùng thật; lệnh chạy ở ưu tiên nền nên nhường CPU cho ứng dụng đang dùng
 B_MEM=${JOBQ_BUDGET_MEM:-$(( TOTAL_MB * 3 / 2 ))}       # ước lượng RAM thường cao hơn dùng thật nên cho đặt chỗ tới 150% tổng RAM; RAM thật được canh bằng số đo sống bên dưới
-MAX_CPU=${JOBQ_MAX_CPU:-92}                             # % CPU đang dùng (user+sys) từ ngưỡng này thì ngừng nhận lệnh mới; load average không dùng vì tính cả tiến trình chờ đĩa nên cao giả
+MAX_CPU=${JOBQ_MAX_CPU:-90}                             # % CPU đang dùng (user+sys) từ ngưỡng này thì ngừng nhận lệnh mới; load average không dùng vì tính cả tiến trình chờ đĩa nên cao giả
 MAX_PAGEOUT=${JOBQ_MAX_PAGEOUT:-1500}                      # số trang RAM bị đẩy ra đĩa trong một lần đo (khoảng 1-2 giây) từ ngưỡng này thì máy đang giật nên ngừng nhận lệnh mới
 MAX_PRESSURE=${JOBQ_MAX_PRESSURE:-4}                    # áp lực RAM macOS: 1 bình thường, 2 cảnh báo, 4 nguy cấp; chỉ chặn ở mức nguy cấp
-MIN_FREE_MB=${JOBQ_MIN_FREE_MB:-1500}                   # RAM trống tối thiểu để nhận lệnh thứ 2 trở đi
-MAX_CPU_IDLE=${JOBQ_MAX_CPU_IDLE:-98}                      # khi bạn không đụng tới máy từ IDLE_SEC giây thì nới CPU tối đa lên mức này và hạ nửa mức RAM trống tối thiểu, vì không có thao tác nào để làm giật
+MIN_FREE_MB=${JOBQ_MIN_FREE_MB:-$(awk -v t="$TOTAL_MB" 'BEGIN{m=int(t/10); if(m<1000)m=1000; if(m>6000)m=6000; print m}')} # RAM trống tối thiểu để nhận lệnh thứ 2 trở đi: 10% tổng RAM (kẹp 1-6GB) nên máy nào cũng giữ RAM không quá 90%
+MAX_CPU_IDLE=${JOBQ_MAX_CPU_IDLE:-95}                      # khi bạn không đụng tới máy từ IDLE_SEC giây thì nới CPU tối đa lên mức này và hạ nửa mức RAM trống tối thiểu, vì không có thao tác nào để làm giật
 IDLE_SEC=${JOBQ_IDLE_SEC:-120}
+DEF_C=$(( NCPU * 25 )); [ "$DEF_C" -lt 50 ] && DEF_C=50; [ "$DEF_C" -gt 200 ] && DEF_C=200 # điểm nặng mặc định cho lệnh chưa có lịch sử, theo cỡ máy: 1/4 số nhân (50-200 centi-nhân)
+DEF_M=$(( TOTAL_MB / 6 )); [ "$DEF_M" -lt 300 ] && DEF_M=300; [ "$DEF_M" -gt 2000 ] && DEF_M=2000 # và 1/6 RAM (300-2000MB)
 COOLDOWN=${JOBQ_COOLDOWN_SEC:-3}                        # sau khi nhận một lệnh, đợi ngần này giây cho nó dùng đủ tài nguyên rồi mới nhận lệnh tiếp
 WARM_SEC=10                                             # lệnh chạy quá ngần này giây thì tính theo số đo thật thay vì ước lượng
 SWAP_GROWTH_MB=${JOBQ_SWAP_GROWTH_MB:-256}              # swap tăng từ ngần này MB giữa hai lần đo thì phanh
@@ -81,7 +83,7 @@ held() { # in "số_lệnh centi-cpu mem_mb": lệnh đã chạy đủ lâu tín
   local f p n=0 c=0 m=0 wc wm ws am ac
   for f in "$Q_DIR"/slots/*; do
     [ -L "$f" ] || continue
-    p=$(readlink "$f"); n=$((n+1)); wc=200; wm=2000; ws=$(now)
+    p=$(readlink "$f"); n=$((n+1)); wc=$DEF_C; wm=$DEF_M; ws=$(now)
     read -r wc wm ws 2>/dev/null < "$f.w" || true
     if [ $(( $(now) - ${ws:-0} )) -ge "$WARM_SEC" ]; then
       read -r am ac 2>/dev/null <<< "$(tail -n 1 "$Q_DIR/sample.$p" 2>/dev/null)"
@@ -92,11 +94,19 @@ held() { # in "số_lệnh centi-cpu mem_mb": lệnh đã chạy đủ lâu tín
   echo "$n $c $m"
 }
 
+ramp() { # in "centi-cpu mem_mb" còn sẽ tăng thêm của các lệnh mới nhận: lệnh vừa chạy chưa dùng hết tài nguyên nên số đo máy còn thấp; phần này giảm tuyến tính về 0 trong WARM_SEC giây đầu
+  local f wc wm ws age rc=0 rm=0
+  for f in "$Q_DIR"/slots/*; do
+    [ -L "$f" ] || continue; wc=$DEF_C; wm=$DEF_M; ws=$(now); read -r wc wm ws 2>/dev/null < "$f.w" || true
+    age=$(( $(now) - ${ws:-0} )); [ "$age" -lt "$WARM_SEC" ] && { rc=$(( rc + wc * (WARM_SEC - age) / WARM_SEC )); rm=$(( rm + wm * (WARM_SEC - age) / WARM_SEC )); }
+  done
+  echo "$rc $rm"
+}
 # Điểm nặng = số đo lớn nhất trong 5 lần chạy gần nhất của cùng lệnh; chưa có lịch sử thì dùng mặc định cao (2 nhân, 2000MB).
 estimate() { # $1 key
-  [ -f "$HIST" ] || { echo "200 2000"; return; }
-  awk -F'\t' -v k="$1" '$1==k{c[++n]=$2;m[n]=$3} END{
-    if(!n){print "200 2000"; exit}
+  [ -f "$HIST" ] || { echo "$DEF_C $DEF_M"; return; }
+  awk -F'\t' -v k="$1" -v dc="$DEF_C" -v dm="$DEF_M" '$1==k{c[++n]=$2;m[n]=$3} END{
+    if(!n){print dc, dm; exit}
     for(i=(n>5?n-4:1);i<=n;i++){if(c[i]>C)C=c[i]; if(m[i]>M)M=m[i]}
     printf "%d %d\n", (C<25?25:C), (M<100?100:M)}' "$HIST"
 }
@@ -156,15 +166,16 @@ swap_ok() { # swap tăng từ SWAP_GROWTH_MB trở lên giữa hai lần đo cá
   if [ "${pe:-0}" -eq 0 ] || [ $((t - pe)) -ge 10 ]; then echo "$t $cur 0" > "$Q_DIR/swap"; fi
   return 0
 }
-gate_ok() { # $1 $2 = điểm nặng CPU (centi-nhân) và RAM (MB) của lệnh sắp vào; chỉ cần chỗ trống bằng nửa điểm đó vì điểm lấy theo mức cao nhất từng đo và CPU chia sẻ được
-  local c=${1:-0} m=${2:-0} cpu po idle mcpu mfree _i
+gate_ok() { # $1 $2 = điểm nặng CPU (centi-nhân) và RAM (MB) của lệnh sắp vào; cần đủ chỗ trống cho phần CPU bền vững (75% mức đỉnh) và toàn bộ RAM đỉnh, sau khi trừ phần các lệnh mới nhận còn sẽ tăng, để các lệnh không tranh nhau tài nguyên
+  local c=${1:-0} m=${2:-0} cpu po idle mcpu mfree _i rc rm; c=$(( c * 3 / 4 ))
   [ "$(held_slots)" -eq 0 ] && return 0
   [ "$(pressure)" -lt "$MAX_PRESSURE" ] || return 1
   swap_ok || return 1
   read -r cpu po idle <<< "$(machine)"; read -r mcpu mfree _i <<< "$(limits)"
   [ "${po:-0}" -lt "$MAX_PAGEOUT" ] || return 1
-  [ $(( (mcpu - cpu) * NCPU )) -ge $(( c / 2 )) ] || return 1
-  [ "$(free_mb)" -ge $(( mfree + m / 2 )) ]
+  read -r rc rm <<< "$(ramp)"
+  [ $(( (mcpu - cpu) * NCPU - rc )) -ge "$c" ] || return 1
+  [ $(( $(free_mb) - rm )) -ge $(( mfree + m )) ]
 }
 
 lock() { # khoá ngắn quanh bước "kiểm tra ngân sách + lấy slot" để hai lệnh không cùng lọt vào
@@ -185,11 +196,11 @@ fits() { # $1 centi-cpu $2 mem_mb; cần hn hc hm từ held()
 
 # --- Trang web tĩnh: jobq tự ghi $Q_DIR/web/snapshot.js khi có thay đổi, dashboard.html nạp lại file đó (chạy được qua file://, không cần server) ---
 headroom() { # số lệnh nữa có thể nhận ngay lúc này, tính từ CPU và RAM trống theo hạn mức hiện tại chia cho nửa độ nặng của lệnh đầu hàng chờ (chưa có lệnh chờ thì lấy 1 nhân, 1GB); máy đang giật hoặc thiếu RAM thì bằng 0
-  local cpu po idle mcpu mfree _i wc=100 wm=1000 first n_cpu n_mem n; read -r cpu po idle <<< "$(machine)"; read -r mcpu mfree _i <<< "$(limits)"
+  local cpu po idle mcpu mfree _i wc=$DEF_C wm=$DEF_M first n_cpu n_mem n rc rm; read -r cpu po idle <<< "$(machine)"; read -r mcpu mfree _i <<< "$(limits)"
   if [ "$(pressure)" -ge "$MAX_PRESSURE" ] || [ "${cpu:-0}" -ge "$mcpu" ] || [ "${po:-0}" -ge "$MAX_PAGEOUT" ]; then echo 0; return; fi
   first=$(ls "$Q_DIR/queue" 2>/dev/null | sort | head -1); [ -n "$first" ] && read -r wc wm 2>/dev/null < "$Q_DIR/queue/$first"
-  wc=$(( wc / 2 )); wm=$(( wm / 2 )); [ "$wc" -lt 25 ] && wc=25; [ "$wm" -lt 100 ] && wm=100
-  n_cpu=$(( (mcpu - cpu) * NCPU / wc )); n_mem=$(( ($(free_mb) - mfree) / wm )); n=$n_cpu; [ "$n_mem" -lt "$n" ] && n=$n_mem; [ "$n" -lt 0 ] && n=0; echo "$n"
+  wc=$(( wc * 3 / 4 )); [ "$wc" -lt 25 ] && wc=25; [ "$wm" -lt 100 ] && wm=100; read -r rc rm <<< "$(ramp)"
+  n_cpu=$(( ((mcpu - cpu) * NCPU - rc) / wc )); n_mem=$(( ($(free_mb) - mfree - rm) / wm )); n=$n_cpu; [ "$n_mem" -lt "$n" ] && n=$n_mem; [ "$n" -lt 0 ] && n=0; echo "$n"
 }
 snapshot_tsv() {
   local f p w wc wm st args nrun cap emax efree idle; read -r emax efree idle <<< "$(limits)"; nrun=$(held_slots); cap=$(( nrun + $(headroom) )); [ "$cap" -gt "$MAX_JOBS" ] && cap=$MAX_JOBS
@@ -366,7 +377,7 @@ cmd_run() {
   trap 'release; exit 130' INT TERM
   trap release EXIT
 
-  local deadline=$(( $(now) + WAIT )) first hw_c hw_m age ok la
+  local deadline=$(( $(now) + WAIT )) first hw_c hw_m age ok la wk=2
   while :; do
     reap
     first=$(ls "$Q_DIR/queue" | sort | head -1)
@@ -378,7 +389,7 @@ cmd_run() {
       fits "$W_CPU" "$W_MEM" && ok=1
     else
       # chạy lách: chỉ khi lệnh đầu hàng chưa vừa chỗ, lệnh này vừa, và đầu hàng chưa chờ quá lâu (chống đói)
-      hw_c=200; hw_m=2000; [ -n "$first" ] && read -r hw_c hw_m 2>/dev/null < "$Q_DIR/queue/$first" || true
+      hw_c=$DEF_C; hw_m=$DEF_M; [ -n "$first" ] && read -r hw_c hw_m 2>/dev/null < "$Q_DIR/queue/$first" || true
       age=$(( $(now) - 10#${first%%-*} ))
       if ! fits "$hw_c" "$hw_m" && fits "$W_CPU" "$W_MEM" && [ "$age" -lt "$BACKFILL" ]; then ok=1; fi
     fi
@@ -386,7 +397,7 @@ cmd_run() {
     if [ "$ok" = 1 ] && [ "$hn" -gt 0 ]; then la=$(cat "$Q_DIR/last_admit" 2>/dev/null || echo 0); [ $(( $(now) - la )) -ge "$COOLDOWN" ] || ok=0; fi
     if [ "$ok" = 1 ] && gate_ok "$W_CPU" "$W_MEM"; then
       for i in $(seq 1 "$MAX_JOBS"); do
-        ln -s "$$" "$Q_DIR/slots/$i" 2>/dev/null && { got=$i; echo "$W_CPU $W_MEM $(now)" > "$Q_DIR/slots/$i.w"; now > "$Q_DIR/last_admit"; break; }
+        ln -s "$$" "$Q_DIR/slots/$i" 2>/dev/null && { got=$i; echo "$W_CPU $W_MEM $(now)" > "$Q_DIR/slots/$i.w"; now > "$Q_DIR/last_admit"; wk=$(( MAX_CPU * NCPU / 100 / (hn + 1) )); [ "$wk" -lt 1 ] && wk=1; [ "$wk" -gt "$NCPU" ] && wk=$NCPU; break; }
       done
     fi
     unlock
@@ -403,7 +414,7 @@ cmd_run() {
   fifo="$Q_DIR/runs/$runid.fifo"; mkfifo "$fifo"
   tee "$Q_DIR/runs/$runid.log" < "$fifo" & teepid=$!; disown "$teepid"
 
-  export JOBQ_ACTIVE=1 JOBQ_WORKERS=2 UV_THREADPOOL_SIZE=2
+  export JOBQ_ACTIVE=1 JOBQ_WORKERS=$wk UV_THREADPOOL_SIZE=$(( wk < 2 ? 2 : wk )) # worker chia theo số lệnh đang chạy: chạy một mình thì dùng gần hết nhân cho xong nhanh, đông lệnh thì mỗi lệnh ít worker để không chen nhau
   case "${NODE_OPTIONS:-}" in *max-old-space-size*) ;; *) export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=$NODE_MB" ;; esac
   local pre=(nice -n 10)
   command -v taskpolicy >/dev/null && pre=(taskpolicy -b nice -n 10) # macOS: hạ ưu tiên CPU + IO
