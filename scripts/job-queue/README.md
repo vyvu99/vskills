@@ -32,7 +32,6 @@ jobq run -- pnpm --filter api test        # queue, then run
 jobq run -t 1800 -- pnpm test:e2e         # raise the timeout to 30 minutes
 jobq run --cost cpu=3,mem=2000 -- <lệnh>  # declare the weight up front for a command with no history
 jobq status                               # running and waiting commands (similar waiting ones grouped), active limits, machine load
-jobq top                                  # live terminal view, refreshes every 2 seconds, Ctrl-C to exit
 jobq stats                                # which commands are heaviest: run count, peak CPU/RAM, duration
 jobq web                                  # open the monitoring page (list view, or a moving simulation of queue, machines and finished commands)
 jobq clean                                # clean up slots of dead processes, trim history to 2000 lines

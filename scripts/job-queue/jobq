@@ -5,7 +5,7 @@
 #   jobq run [-t TIMEOUT_S] [-w WAIT_S] [--cost cpu=N,mem=MB] -- <lệnh...>
 #   jobq split N -- file...   # chia danh sách file thành N lô đều nhau, mỗi dòng một lô (đã escape, dán thẳng vào jobq run)
 #   jobq logs [N|id]   # lịch sử 50 lệnh gần nhất kèm output (N=1 là lệnh mới nhất)
-#   jobq status | top | stats | clean | web [--no-open]   # top: màn hình sống trong terminal; web: trang theo dõi tĩnh có chế độ mô phỏng (không server)
+#   jobq status | stats | clean | web [--no-open]   # web: trang theo dõi tĩnh, xem dạng danh sách hoặc mô phỏng (không server)
 set -u
 
 Q_DIR="${JOBQ_DIR:-$HOME/.cache/jobq}"
@@ -243,39 +243,6 @@ cmd_status() {
   return 0
 }
 
-cmd_top() { # màn hình sống trong terminal, làm mới mỗi 2 giây; thoát bằng Ctrl-C
-  mkdir -p "$Q_DIR/slots" "$Q_DIR/queue"
-  trap 'printf "\033[?25h\n"; exit 0' INT TERM; printf '\033[?25l\033[2J'
-  local cols=${COLUMNS:-$(tput cols 2>/dev/null || echo 100)} lines=${LINES:-$(tput lines 2>/dev/null || echo 40)}
-  while :; do
-    reap
-    snapshot_tsv | awk -F'\t' -v now="$(now)" -v w="$cols" -v maxrows="$lines" "$AWK_GROUP"'
-      function bar(f,n,  i,k,o){ if(f>1)f=1; if(f<0)f=0; k=int(f*n+0.5); for(i=1;i<=n;i++) o=o (i<=k?"█":"░"); return o }
-      function col(c,t){ return "\033[" c "m" t "\033[0m" }
-      function ln(t){ print t "\033[K" }
-      $1=="META"{ jobs=$2; load=$5; maxl=$6; fr=$7; minf=$8; pr=$9; maxp=$10; to=$12; tot=$13 }
-      $1=="RUN"{ r[++nr]=$0 }
-      $1=="WAIT"{ k=norm($6); if(!(k in n)){ order[++ng]=k; first[k]=$5 } n[k]++; if($5<first[k]) first[k]=$5; nw++ }
-      END{ B=24
-        printf "\033[H"
-        ln(col("1","jobq top") "  chạy " col("32",nr "/" jobs) "  chờ " col(pick(nw,"33","2"),nw) col("2","    Ctrl-C để thoát"))
-        ln("")
-        ln(sprintf("CPU      %s %s%%/%s%%", col(pick(load>=maxl,"31","32"),bar(load/maxl,B)), load, maxl))
-        used=0; if(tot>0) used=(tot-fr)/tot
-        ln(sprintf("RAM      %s trống %dMB/%dMB (cần ≥%dMB)", col(pick(fr<minf,"31","32"),bar(used,B)), fr, tot, minf))
-        ln(sprintf("áp lực   %s mức %d/%d", col(pick(pr>=maxp,"31",pick(pr>=2,"33","32")),bar(pick(pr>=maxp,1,pick(pr>=2,0.66,0.33)),B)), pr, maxp))
-        ln("")
-        room=maxrows-9; shown=0
-        for(i=1;i<=nr && shown<room;i++){ split(r[i],f,"\t"); age=now-f[5]
-          ln(sprintf("%s %s %s %5.1f %6s  %s", col("32","RUN "), col(pick(age>to*0.8,"31",pick(age>to*0.5,"33","32")),bar(age/to,10)), mmss(age), f[3]/100, sz(f[4]), substr(norm(f[6]),1,w-42))); shown++ }
-        for(i=1;i<=ng && shown<room;i++){ k=order[i]
-          ln(sprintf("%s %s %s %s", col("33","WAIT"), cnt(n[k]), col("2",mmss(now-first[k])), substr(k,1,w-18))); shown++ }
-        if(ng+nr>shown) ln(col("2","… còn " (ng+nr-shown) " dòng nữa"))
-        printf "\033[J" }'
-    sleep 2
-  done
-}
-
 cmd_stats() { # lệnh nào nặng: số lần chạy, CPU/RAM lớn nhất, thời gian trung bình
   [ -f "$HIST" ] || { echo "chưa có lịch sử"; return 0; }
   awk -F'\t' '{n[$1]++; if($2>c[$1])c[$1]=$2; if($3>m[$1])m[$1]=$3; t[$1]+=$4; cmd[$1]=$5}
@@ -461,7 +428,6 @@ cmd_run() {
 case "${1:-}" in
   run) shift; cmd_run "$@"; exit $? ;;
   status) cmd_status ;;
-  top) cmd_top ;;
   stats) cmd_stats ;;
   split) shift; cmd_split "$@" ;;
   logs) shift; cmd_logs "$@" ;;

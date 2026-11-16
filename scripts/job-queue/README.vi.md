@@ -32,7 +32,6 @@ jobq run -- pnpm --filter api test        # xếp hàng rồi chạy
 jobq run -t 1800 -- pnpm test:e2e         # nới timeout lên 30 phút
 jobq run --cost cpu=3,mem=2000 -- <lệnh>  # khai sẵn mức nặng cho lệnh chưa có lịch sử
 jobq status                               # lệnh đang chạy và đang chờ (lệnh chờ giống nhau gộp một dòng), giới hạn đang áp dụng, tải máy
-jobq top                                  # màn hình sống trong terminal, làm mới mỗi 2 giây, Ctrl-C để thoát
 jobq stats                                # lệnh nào nặng nhất: số lần, CPU/RAM lớn nhất, thời gian
 jobq web                                  # mở trang theo dõi (xem dạng danh sách hoặc mô phỏng chuyển động hàng chờ, máy chạy, lệnh đã xong)
 jobq clean                                # dọn chỗ của tiến trình đã chết, cắt lịch sử còn 2000 dòng
