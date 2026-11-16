@@ -90,12 +90,31 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 .empty-fail{display:none}.only-fail:not(:has(.fail)) .empty-fail{display:block}
 .out{margin:4px 0 12px 20px;padding:8px 10px;background:var(--bg);font:12px/1.5 var(--mono);max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);border:1px solid var(--line)}
 [role="tabpanel"][hidden]{display:none}
+.p-sim{display:none;grid-column:2/-1}
+.grid.sim .mid,.grid.sim .p-info{display:none}.grid.sim .p-sim{display:flex}
+.simbody{display:flex;flex-direction:column;gap:8px;overflow:hidden;padding:16px 12px 12px}
+.simnote{font-size:12px;color:var(--muted);min-height:18px}.simnote.warn{color:var(--warn)}
+#stage{position:relative;flex:1;min-height:400px}
+.zl{position:absolute;top:0;font:600 12px var(--mono);color:var(--muted);white-space:nowrap}
+.pod{position:absolute;border:1px dashed var(--line)}
+.pod.lock{border-style:solid;background:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--faint) 14%,transparent) 6px 7px)}
+.pod i{position:absolute;left:6px;bottom:3px;font:11px var(--mono);font-style:normal;color:var(--faint)}
+.tok{position:absolute;left:0;top:0;padding:6px 8px;border:1px solid var(--line);background:var(--panel);overflow:hidden;transition:transform .8s cubic-bezier(.2,.7,.2,1),width .8s cubic-bezier(.2,.7,.2,1),height .8s cubic-bezier(.2,.7,.2,1),opacity .5s}
+.tok.nt{transition:none}
+.tok .title{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;-webkit-line-clamp:unset}
+.tok .time{display:block;font-size:11px;color:var(--muted)}
+.tok.s-r{border-color:var(--accent);animation:pulse var(--beat,2s) ease-in-out infinite}
+.tok.s-r .bar{margin:6px 0 0}
+.tok.s-d{padding:0;border:1.5px solid var(--faint);background:transparent}
+.tok.s-d.fail{background:var(--bad);border-color:var(--bad)}
+@keyframes pulse{50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}}
 dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;color:var(--muted);font-size:14px}
 @media (pointer:coarse){.run summary{min-height:44px}.tabs button,.seg2 button,.chip{min-height:44px}}
-@media (prefers-reduced-motion:reduce){.live.fresh i{animation:none}.bar i{transition:none}}
+@media (prefers-reduced-motion:reduce){.live.fresh i{animation:none}.bar i{transition:none}.tok{transition:none}.tok.s-r{animation:none}}
 @media (max-width:1099px){
   .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
   .left{display:contents}
+  .p-sim{grid-column:1/-1}
   .p-machine{grid-column:1/-1}.p-machine .body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.p-machine .m{margin:0}
 }
 @media (max-width:899px){
@@ -119,11 +138,12 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
     <div class="brand">jobq</div>
     <div class="tools">
       <span id="live" class="live"><i></i><span id="fresh">Đang tải dữ liệu</span></span>
-      <div class="seg2" role="group" aria-label="Giao diện"><button type="button" data-theme="auto">tự động</button><button type="button" data-theme="light">sáng</button><button type="button" data-theme="dark">tối</button></div>
+      <div class="seg2" id="views" role="group" aria-label="Kiểu xem"><button type="button" data-view="list">danh sách</button><button type="button" data-view="sim">mô phỏng</button></div>
+      <div class="seg2" id="themes" role="group" aria-label="Giao diện"><button type="button" data-theme="auto">tự động</button><button type="button" data-theme="light">sáng</button><button type="button" data-theme="dark">tối</button></div>
     </div>
   </div>
   <div id="stale" class="notice" role="alert">Trang chưa nhận được dữ liệu mới. Nếu các lệnh vẫn đang chạy thì có thể jobq đã dừng đột ngột.</div>
-  <div class="grid">
+  <div class="grid" id="grid">
     <div class="left">
       <section class="panel p-machine" aria-labelledby="h-machine"><h2 id="h-machine">máy</h2><div class="body" id="readouts"></div></section>
     </div>
@@ -131,6 +151,9 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
       <section class="panel" aria-labelledby="h-lanes"><h2 id="h-lanes">chỗ chạy</h2><div class="body" id="lanes"></div></section>
       <section class="panel" aria-labelledby="h-queue"><h2 id="h-queue">đang chờ</h2><div class="body"><ol id="queue"></ol></div></section>
     </div>
+    <section class="panel p-sim" aria-labelledby="h-sim"><h2 id="h-sim">mô phỏng</h2>
+      <div class="body simbody"><div id="simNote" class="simnote"></div><div id="stage"><div id="simBg"></div></div></div>
+    </section>
     <section class="panel p-info" aria-label="Thông tin thêm">
       <div class="tabs" role="tablist" aria-label="Thông tin thêm">
         <button type="button" role="tab" id="t-runs" aria-controls="p-runs" aria-selected="true">lịch sử</button>
@@ -322,10 +345,79 @@ function renderTab(d) {
   if (lastIcon === state) return; lastIcon = state;
   $("icon").href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3' y='3' width='10' height='10' fill='" + COLORS[state] + "'/%3E%3C/svg%3E";
 }
+// Mô phỏng: mỗi lệnh là một ô (token) giữ nguyên theo pid; vị trí tính từ trạng thái (chờ, chạy, xong) và CSS transition tự trượt ô giữa hai lần nạp dữ liệu.
+let view = "list", simFirst = true;
+const simTok = new Map(), simSlot = new Map();
+function simGeo(d, W, H) {
+  const n = Math.max(d.jobs, d.running.length), zq = Math.max(150, Math.round(W * 0.22)), zd = Math.max(96, Math.round(W * 0.12)), gap = 20, top = 26;
+  const px = zq + gap, pw = Math.max(80, W - zq - zd - gap * 2), cols = pw >= 700 ? 4 : pw >= 300 ? 2 : 1, rows = Math.ceil(n / cols);
+  const podW = (pw - (cols - 1) * 10) / cols, podH = Math.min(120, (H - top - (rows - 1) * 10) / rows);
+  const qh = 48, qrows = Math.max(1, Math.floor((H - top - 20) / (qh + 8))), dsz = 20, dcols = Math.max(1, Math.floor((zd + 6) / 26)), drows = Math.max(1, Math.floor((H - top) / 26));
+  return { n, zq, zd, px, cols, podW, podH, qh, qrows, dsz, dcols, dcap: dcols * drows, W,
+    pod: (i) => ({ x: px + (i % cols) * (podW + 10), y: top + Math.floor(i / cols) * (podH + 10) }),
+    que: (k) => ({ x: 0, y: top + Math.min(k, qrows - 1) * (qh + 8) }),
+    done: (m) => ({ x: W - zd + (m % dcols) * 26, y: top + Math.floor(m / dcols) * 26 }) };
+}
+function simPlace(key, state, pos, w, h, o, build, fail) {
+  let t = simTok.get(key), fresh = false;
+  if (!t) { t = el("div", "tok nt"); $("stage").append(t); simTok.set(key, t); fresh = true; }
+  if (t.dataset.state !== state) { t.dataset.state = state; t.replaceChildren(); if (build) build(t); }
+  t.className = "tok s-" + state + (fail ? " fail" : "") + (fresh ? " nt" : "");
+  t.style.transform = "translate(" + pos.x + "px," + pos.y + "px)"; t.style.width = w + "px"; t.style.height = h + "px"; t.dataset.o = o;
+  if (fresh) { t.style.opacity = simFirst ? o : 0; requestAnimationFrame(() => requestAnimationFrame(() => { t.classList.remove("nt"); t.style.opacity = t.dataset.o; })); }
+  else t.style.opacity = o;
+  return t;
+}
+function renderSim(d, p) {
+  const stage = $("stage"), W = stage.clientWidth, H = stage.clientHeight;
+  if (W < 80 || H < 80) return; // trang đang ẩn: chưa đo được
+  const g = simGeo(d, W, H), seen = new Set(), bg = $("simBg"); bg.replaceChildren();
+  const zl = (x, text) => { const z = el("div", "zl", text); z.style.left = x + "px"; bg.append(z); };
+  zl(0, "hàng chờ " + p.waiting.length + (p.waiting.length > g.qrows ? " (hiện " + g.qrows + ")" : "")); zl(g.px, "máy chạy " + d.running.length + "/" + g.n); zl(W - g.zd, "xong (đặc = lỗi)");
+  const head = p.waiting[0], lockWhy = head ? waitReason(head, 0, d, p).text : "";
+  for (const [pid] of simSlot) if (!d.running.some((j) => j.pid === pid)) simSlot.delete(pid);
+  const used = new Set(simSlot.values());
+  d.running.forEach((j) => { if (!simSlot.has(j.pid)) { let s = 0; while (used.has(s)) s++; simSlot.set(j.pid, s); used.add(s); } });
+  for (let i = 0; i < g.n; i++) {
+    const a = g.pod(i), busy = used.has(i), pod = el("div", "pod" + (!busy && head ? " lock" : ""));
+    pod.style.cssText = "left:" + a.x + "px;top:" + a.y + "px;width:" + g.podW + "px;height:" + g.podH + "px";
+    if (!busy && head) pod.title = lockWhy; pod.append(el("i", "", "máy " + (i + 1))); bg.append(pod);
+  }
+  d.running.forEach((j) => {
+    const a = g.pod(simSlot.get(j.pid)), k = "p" + j.pid; seen.add(k);
+    const t = simPlace(k, "r", { x: a.x + 6, y: a.y + 6 }, g.podW - 12, Math.max(44, g.podH - 12), 1, (n) => {
+      const b = el("div", "bar"); b.dataset.since = j.started; b.dataset.timeout = d.timeout; b.append(el("i"));
+      n.append(el("span", "title", niceTitle(j.cmd)), timeSpan(j.started, "run", d.timeout), b);
+    });
+    t.style.setProperty("--beat", Math.max(0.6, 2.4 - Math.min(j.cpu / 100, 1.8)) + "s"); t.title = j.cmd;
+  });
+  p.waiting.forEach((j, i) => {
+    const k = "p" + j.pid; seen.add(k);
+    simPlace(k, "q", g.que(i), g.zq, g.qh, i < g.qrows ? 1 : 0, (n) => n.append(el("span", "title", niceTitle(j.cmd)), timeSpan(j.queued, "wait", 0))).title = j.cmd;
+  });
+  let m = 0;
+  for (const r of d.history) {
+    if (r.rc == null || m >= g.dcap) continue;
+    const k = "p" + parseInt(r.id.split("-")[1], 10); if (seen.has(k)) continue; seen.add(k);
+    simPlace(k, "d", g.done(m++), g.dsz, g.dsz, 1, null, r.rc !== 0).title = niceTitle(r.cmd) + " · " + (r.rc === 0 ? "xong" : "lỗi " + r.rc) + " · " + fmtTime(r.secs);
+  }
+  for (const [k, t] of simTok) if (!seen.has(k)) { simTok.delete(k); t.style.opacity = 0; setTimeout(() => t.remove(), 600); }
+  $("simNote").textContent = p.waiting.length ? (p.cause ? "Hàng đợi đang chờ vì " + p.cause + "." : lockWhy) : "Không có lệnh nào đang chờ.";
+  $("simNote").className = "simnote" + (p.waiting.length && p.cause ? " warn" : "");
+  simFirst = false;
+}
+function applyView(mode) {
+  view = mode; $("grid").classList.toggle("sim", mode === "sim");
+  document.querySelectorAll("#views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === mode)));
+  if (mode === "sim" && last) { renderSim(last, derive(last)); tickTimes(); }
+}
+let savedView = "list"; try { savedView = localStorage.getItem("jobq-view") || "list"; } catch (e) { savedView = "list"; }
+document.querySelectorAll("#views button").forEach((b) => b.addEventListener("click", () => { applyView(b.dataset.view); try { localStorage.setItem("jobq-view", b.dataset.view); } catch (e) { /* trình duyệt chặn lưu thì chỉ mất lựa chọn lần sau */ } }));
+addEventListener("resize", () => { if (view === "sim" && last) renderSim(last, derive(last)); });
 function render(d) {
   if (d.ts !== lastTs) { lastTs = d.ts; loads.push(d.load); if (loads.length > 60) loads.shift(); }
   const p = derive(d);
-  renderMachine(d, p); renderLanes(d, p); renderQueue(d, p); renderRuns(d); renderTab(d); rendered = true;
+  renderMachine(d, p); renderLanes(d, p); renderQueue(d, p); renderRuns(d); renderTab(d); if (view === "sim") renderSim(d, p); rendered = true;
 }
 const level = (pct) => pct >= 95 ? "bad" : pct >= 80 ? "warn" : "";
 // Đếm giây ngay trên trình duyệt giữa hai lần nạp dữ liệu, chỉ sửa chữ và transform nên rất nhẹ.
@@ -384,12 +476,13 @@ $("onlyFail").addEventListener("click", (e) => { const on = e.currentTarget.getA
 // Giao diện: tự động theo hệ thống, hoặc ép sáng/tối; lưu lựa chọn nếu trình duyệt cho phép.
 function applyTheme(mode) {
   if (mode === "light" || mode === "dark") document.documentElement.dataset.theme = mode; else delete document.documentElement.dataset.theme;
-  document.querySelectorAll(".seg2 button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === (mode || "auto"))));
+  document.querySelectorAll("#themes button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === (mode || "auto"))));
 }
 let saved = "auto"; try { saved = localStorage.getItem("jobq-theme") || "auto"; } catch (e) { saved = "auto"; }
 if (!["auto", "light", "dark"].includes(saved)) saved = "auto";
 applyTheme(saved);
-document.querySelectorAll(".seg2 button").forEach((b) => b.addEventListener("click", () => { applyTheme(b.dataset.theme); try { localStorage.setItem("jobq-theme", b.dataset.theme); } catch (e) { /* trình duyệt chặn lưu thì chỉ mất lựa chọn lần sau */ } }));
+document.querySelectorAll("#themes button").forEach((b) => b.addEventListener("click", () => { applyTheme(b.dataset.theme); try { localStorage.setItem("jobq-theme", b.dataset.theme); } catch (e) { /* trình duyệt chặn lưu thì chỉ mất lựa chọn lần sau */ } }));
+applyView(["list", "sim"].includes(savedView) ? savedView : "list");
 setInterval(tick, 3000); setInterval(() => { if (last) { tickTimes(); checkFresh(); } }, 1000); tick();
 </script>
 </body>
