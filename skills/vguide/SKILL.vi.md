@@ -55,6 +55,7 @@ Khi user nói "đây không phải báo cáo đã làm gì", bỏ mọi câu nó
 6. Sản phẩm không có màn hình (CLI, API) dùng khối lệnh và kết quả ngắn thay cho ảnh.
 7. **Ảnh phải vừa một trang khi in.** Chụp phần màn hình đang thấy hoặc một vùng đã cắt, không chụp cả trang cuộn dài. Ảnh máy tính cao tối đa bằng chiều rộng; ảnh điện thoại cao tối đa khoảng 2,2 lần chiều rộng. Màn dài hơn thì cắt quanh phần bước đó dùng, hoặc tách thành hai ảnh. Nhúng mỗi ảnh với chiều rộng rõ ràng để một ảnh nằm gọn một trang: `<img src="..." alt="..." width="560">` cho ảnh máy tính và ảnh vuông, `width="280"` cho ảnh điện thoại. Không để một ảnh bị cắt sang hai trang.
 8. **Ảnh kể cùng một câu chuyện với chữ.** Một bộ dữ liệu thử chạy xuyên mọi ảnh của một vai (cùng người dùng, bản ghi, mã, ngày), nên mã hay tên ở ảnh này xuất hiện nguyên vẹn ở ảnh sau và khớp với chữ của bước. Mỗi bước có thao tác đều có ảnh riêng thể hiện đúng thao tác đó, theo thứ tự bước. Mỗi ảnh có khung đỏ bao đúng thứ bước yêu cầu người đọc dùng hay bấm (mỗi đích một khung, không khung gì khác), và khung được vẽ ngay trên trang trước khi chụp, không vẽ tay sau. Trước khi chụp, tạo dữ liệu bước đó cần qua chính sản phẩm để khung nằm trên nội dung thật, không phải màn trống.
+9. **Ghi bước thao tác ngay trong ảnh.** Cạnh mỗi khung đỏ, chính trang vẽ sẵn một chú thích ngắn trước khi chụp: số thứ tự theo trình tự thao tác (1, 2, 3 khi một ảnh có nhiều đích) và tối đa khoảng sáu từ nêu việc cần làm ("Chọn Đăng ký", "Nhập lý do"). Cùng ngôn ngữ với tài liệu, tương phản cao, đủ lớn để đọc ở chiều rộng khi in (khoảng 11 px trở lên khi ảnh hiển thị 560 px, 280 px với ảnh điện thoại), không che phần nội dung nó chỉ tới, không chứa dữ liệu cá nhân. Chú thích nhắc lại việc của bước chứ không thêm thông tin mới, nên tài liệu vẫn đọc đúng khi không có ảnh.
 
 ## Bước 4 - Viết hướng dẫn
 
@@ -78,6 +79,7 @@ Hướng dẫn dài được đọc bằng cách tra cứu, không đọc từ �
 8. **Kiểm độ dài**: nếu sau các quy tắc trên phần của một vai vẫn vượt khoảng 300 dòng hoặc 15 bước, đề nghị user tách thành một tệp cho mỗi vai kèm một tệp mục lục chung; không tự tách khi chưa có câu trả lời.
 9. **Đi thẳng vào trọng tâm.** Tiêu đề bước là một hành động; dòng đầu nói cần làm gì. Bỏ phần tả màn hình trông ra sao và mọi nhãn, trạng thái, lựa chọn mà người đọc không phải chọn hay thao tác. Chỉ liệt kê lựa chọn cần quyết định. Trường hợp hiếm thì thành một dòng ở "cần nhớ" hoặc bỏ.
 10. **Hạn mức chữ.** Một bước có tối đa khoảng 60 từ ngoài bảng và danh sách. Phần giới thiệu, bảng thuật ngữ, tình huống minh hoạ mỗi phần vượt một màn hình thì cắt còn đúng thuật ngữ và điều các bước thực sự dùng.
+11. **Ảnh gánh các thao tác, chữ gánh phần còn lại.** Khi ảnh có chú thích đánh số, chữ của bước không lặp lại các cú bấm. Chữ chỉ giữ điều ảnh không thể cho thấy: mục đích trong một dòng, điều kiện và giới hạn (bắt buộc, tối đa, ai làm được) và điều xảy ra tiếp theo. Bước từng là danh sách đánh số các cú bấm thì thành một câu trỏ tới số trong ảnh ("Làm theo các số 1 đến 3 trong ảnh") kèm các phần bổ sung đó. Mọi chỉ dẫn người đọc cần để làm phải còn nằm trong chú thích, nên viết nhãn chú thích trước rồi mới rút gọn chữ cho khớp. Mục tiêu tối đa khoảng 35 từ mỗi bước ngoài bảng; bỏ danh sách lựa chọn mà ảnh đã thể hiện, trừ khi người đọc phải chọn theo tên.
 
 ## Bước 6 - Giọng văn và nội dung
 
@@ -93,7 +95,7 @@ Hướng dẫn dài được đọc bằng cách tra cứu, không đọc từ �
 
 1. Tìm trong văn bản các nội dung bị cấm: vai đã bỏ, từ thân mật, ngôi thứ hai, từ về màu/bố cục/thành phần, đường dẫn tệp, thông tin đăng nhập.
 2. Kiểm mọi đường dẫn ảnh tồn tại và mỗi bước có ảnh khi có ảnh.
-3. Kiểm Bước 5: có bảng tra nhanh, các bước đã nhóm, không đoạn nào quá khoảng năm dòng, không điều nào lặp ở hai chỗ, mỗi sơ đồ nằm trong phần của vai. Kiểm kích thước ảnh: không ảnh nào cao quá tỷ lệ ở Bước 3, mọi ảnh đều có chiều rộng. Kiểm không bước nào vượt hạn mức chữ.
+3. Kiểm Bước 5: có bảng tra nhanh, các bước đã nhóm, không đoạn nào quá khoảng năm dòng, không điều nào lặp ở hai chỗ, mỗi sơ đồ nằm trong phần của vai. Kiểm kích thước ảnh: không ảnh nào cao quá tỷ lệ ở Bước 3, mọi ảnh đều có chiều rộng. Kiểm mọi ảnh có chú thích đánh số cho từng khung. Kiểm không bước nào vượt hạn mức chữ. Kiểm chữ của bước không lặp lại điều các chú thích đánh số đã nói.
 4. Kiểm mọi khẳng định về ai làm được gì với nguồn sự thật ở Bước 1.
 5. Mở tệp cho user và đưa đường dẫn. Báo đã kiểm gì và chưa kiểm gì (ví dụ ảnh chụp ở vai khác).
 
