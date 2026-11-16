@@ -55,4 +55,6 @@ Read each log's last lines. Failure: fix the cause, then rerun only that package
 
 After the last fix, rerun the stages that touched fixed files for those packages, so the final state is proven rather than assumed. Print one table, one row per package: typecheck, build, lint, test (pass, fail, or skipped with reason), plus files the formatter changed. If a stage could not run (missing script, tooling error), say so instead of reporting pass.
 
+Print the final result in the terminal following `_vskills-shared/result-format.md`.
+
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

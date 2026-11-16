@@ -91,4 +91,6 @@ Before the stop summary, re-verify everything touched together, not each item al
 2. Give one consolidated summary in the conversation, not a new file unless the project requires one: what is settled and how it was verified, what is unverified, contradictions found, anything fixed incidentally, and one decision table for the user ordered by what blocks the work (each with its named options). Follow the project's reporting conventions if it has them.
 3. Notify the user only if something needs their decision on return, not for a routine "done".
 
+Print the final result in the terminal following `_vskills-shared/result-format.md`.
+
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

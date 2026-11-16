@@ -91,4 +91,6 @@ Trước bản tổng kết khi dừng, kiểm lại mọi thứ đã đụng t�
 2. Đưa một bản tổng kết hợp nhất ngay trong cuộc trò chuyện, không tạo file mới trừ khi project yêu cầu: cái gì đã chốt và kiểm chứng thế nào, cái gì chưa kiểm chứng, mâu thuẫn tìm thấy, mọi thứ sửa tiện tay, và một bảng quyết định cho user xếp theo mức độ chặn công việc (kèm các phương án có tên). Theo quy ước báo cáo của project nếu có.
 3. Chỉ thông báo user nếu có gì cần họ quyết khi quay lại, không phải một tin "xong" thường lệ.
 
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
 Làm theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

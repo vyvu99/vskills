@@ -119,4 +119,6 @@ Lúc đó đọc `references/fix-mode.md` và làm theo: thứ tự ưu tiên c�
 
 ## Next steps
 
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
 Xem `REPORT.md` tìm thấy gì và gợi ý một hành động tiếp theo phù hợp trong 1-2 câu, theo `_vskills-shared/repo-profile.md` §7. Nếu không cần gì thêm thì nói rõ.

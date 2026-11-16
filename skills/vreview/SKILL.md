@@ -119,4 +119,6 @@ Read `references/fix-mode.md` at that point and follow it: fixed priority order,
 
 ## Next steps
 
+Print the final result in the terminal following `_vskills-shared/result-format.md`.
+
 Look at what `REPORT.md` found and suggest one fitting next action in 1-2 sentences, per `_vskills-shared/repo-profile.md` §7. If nothing further is needed, say so.

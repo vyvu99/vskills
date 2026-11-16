@@ -140,4 +140,6 @@ Then offer with `AskUserQuestion`: (a) implement now with `vcook <plan-path>`, (
 
 ## Next steps
 
+Print the final result in the terminal following `_vskills-shared/result-format.md`.
+
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

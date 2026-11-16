@@ -55,4 +55,6 @@ wait
 
 Sau lần sửa cuối, chạy lại các stage liên quan tới file đã sửa cho những package đó, để trạng thái cuối được chứng minh chứ không giả định. In một bảng, mỗi package một dòng: typecheck, build, lint, test (pass, fail, hoặc skipped kèm lý do), thêm các file formatter đã đổi. Stage nào không chạy được (thiếu script, lỗi tooling) thì nói rõ thay vì báo pass.
 
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
 Làm theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

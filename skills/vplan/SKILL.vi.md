@@ -140,4 +140,6 @@ Sau đó đề xuất bằng `AskUserQuestion`: (a) implement ngay bằng `vcook
 
 ## Next steps
 
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.
