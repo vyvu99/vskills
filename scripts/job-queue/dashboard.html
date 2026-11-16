@@ -96,7 +96,7 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 .simnote{font-size:12px;color:var(--muted);min-height:18px}.simhint{display:none}
 @media (max-width:760px){.simhint{display:block}}.simnote.warn{color:var(--warn)}
 #stage{position:relative;flex:1 1 auto;min-height:480px}
-#simCv{display:block}#simCv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+#simCv{display:block;image-rendering:pixelated}#simCv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 #stage{overflow-x:auto;overflow-y:hidden}
 #simDetail{flex:none;height:150px;overflow:auto;border:1px solid var(--line);background:var(--panel);padding:10px 12px}#simDetail .out{max-height:none}
 .sd-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.sd-head .title{font-weight:650;overflow-wrap:anywhere}
@@ -367,7 +367,7 @@ function proj3(p, cam, fit) {
 function simGeo(d, W, H) {
   const n = Math.max(d.cap, d.running.length, 1), nv = Math.min(n, 12), RW = W >= 900 ? 210 : 176, Ws = W - RW, S = Math.min(86, 430 / nv), qvis = 6, dcap = 6, pitch0 = 0.4;
   const pod = (i) => [-520 + S / 2 + i * S, 0, -165], pan = (i) => [-520 + S / 2 + i * S, 42, -108], shelf = [-310, 44, -80], dock = [-310, 0, -40], pay = [150, 0, 16];
-  const que = (k) => [190 + Math.min(k, qvis - 1) * 52, 0, 22], door = [540, 0, 80], exitP = [-540, 0, 140], bin = [-500, 0, 90], wait = (i) => [60 + i * 36, 0, 30];
+  const que = (k) => [180 + Math.min(k, qvis - 1) * 70, 0, 22], door = [540, 0, 80], exitP = [-540, 0, 140], bin = [-500, 0, 90], wait = (i) => [60 + i * 36, 0, 30];
   // bàn và ghế: mỗi ghế là chỗ ngồi hướng về phía người xem, phía xa của bàn
   const tables = [{ t: "round", x: -400, z: 112, seats: [[-424, 92], [-376, 92]] }, { t: "round", x: -280, z: 112, seats: [[-304, 92], [-256, 92]] }, { t: "round", x: -160, z: 112, seats: [[-184, 92], [-136, 92]] }, { t: "high", x: -40, z: 112, seats: [[-56, 92], [-24, 92]] }, { t: "long", x: 90, z: 120, seats: [[30, 100], [70, 100], [110, 100], [150, 100]] }, { t: "booth", x: 290, z: 112, seats: [[270, 92], [310, 92]] }, { t: "booth", x: 400, z: 112, seats: [[380, 92], [420, 92]] }];
   const seats = []; tables.forEach((tb, ti) => tb.seats.forEach(([x, z]) => seats.push({ x, z, ti, high: tb.t === "high" })));
@@ -384,13 +384,15 @@ function takeSeat(key) { const g = sim.g; for (let i = 0; i < g.seats.length; i+
 function freeSeat(key) { for (const i in sim.seatBy) if (sim.seatBy[i] === key) delete sim.seatBy[i]; }
 function simPut(key, state, tp, alpha, job, extra) {
   let e = sim.ents.get(key); const now = performance.now() / 1000, g = sim.g;
+  if (e && state === "q") e.qi = extra.idx; // nhớ thứ tự cuối cùng trong hàng để biết lệnh nào được chạy lách
   if (!e) {
-    e = { key, state, p: tp.slice(), a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now, landed: simFirst ? -9 : now, hue: hueOf(key), sb: null, hits: [], seat: -2 };
+    e = { key, state, p: tp.slice(), a: simFirst ? alpha : 0, seed: Math.random() * 6.28, born: now, landed: simFirst ? -9 : now, hue: hueOf(key), dt: dishFor(job, hueOf(key)), sb: null, hits: [], seat: -2 };
     if (!simFirst && state === "q") { e.p = g.door.slice(); legsFlow(e, [walkLeg(g.door, tp, "walk")], "enter"); }
     else if (!simFirst) e.p[1] += state === "d" ? 20 : 0;
     sim.ents.set(key, e);
   } else if (e.state !== state && !simFirst) {
-    if (state === "r") { const sp = extra.seatP, aisle = [sp[0], 0, 52]; legsFlow(e, [walkLeg(e.p, g.pay, "walk"), stayLeg(g.pay, 1.3, "order"), stayLeg(g.pay, 1.1, "pay"), walkLeg(g.pay, aisle, "walk"), walkLeg(aisle, sp, "walk")], "in"); sim.bell = now; }
+    // lệnh đã xong mà báo lại đang chạy: coi như khách mới vào từ cửa, không đi từ khung trên bảng
+    if (state === "r") { if (e.state === "d") e.p = g.door.slice(); if (e.qi > 0) sim.cashSay = { text: "Món nhẹ, lên trước!", until: now + 3 }; const sp = extra.seatP, aisle = [sp[0], 0, 52]; legsFlow(e, [walkLeg(e.p, g.pay, "walk"), stayLeg(g.pay, 1.3, "order"), stayLeg(g.pay, 1.1, "pay"), walkLeg(g.pay, aisle, "walk"), walkLeg(aisle, sp, "walk")], "in"); sim.bell = now; }
     if (state === "d") { const sp = e.seatP || tp, d0 = g.pan(Math.min(e.slot, g.nv - 1)), a1 = [g.dock[0], 0, 52], a2 = [sp[0], 0, 52], a3 = [sp[0], 0, sp[2] + 40]; legsFlow(e, [{ a: d0.slice(), b: g.shelf.slice(), dur: 0.9, tag: "dish" }, stayLeg(g.dock, 0.5, "robot"), walkLeg(g.dock, a1, "robot", 120), walkLeg(a1, a2, "robot", 120), walkLeg(a2, a3, "robot", 120)], "out"); }
   }
   e.state = state; e.tp = tp; e.ta = alpha; e.job = job; Object.assign(e, extra);
@@ -404,10 +406,10 @@ function renderSim(d, p) {
   const stage = $("stage"), H = stage.clientHeight, W = Math.max(stage.clientWidth, 720); // màn hẹp: cảnh giữ chiều rộng tối thiểu và cuộn ngang trong khung
   if (stage.clientWidth < 80 || H < 80) return; // trang đang ẩn: chưa đo được
   if (!sim.cv) { sim.cv = $("simCv"); sim.cx = sim.cv.getContext("2d"); sim.lo = document.createElement("canvas"); sim.lx = sim.lo.getContext("2d"); }
-  const dpr = devicePixelRatio || 1; if (sim.cv.width !== Math.round(W * dpr) || sim.cv.height !== Math.round(H * dpr)) { sim.cv.width = Math.round(W * dpr); sim.cv.height = Math.round(H * dpr); }
+  const dpr = Math.max(1, Math.round(devicePixelRatio || 1)); if (sim.cv.width !== Math.round(W * dpr) || sim.cv.height !== Math.round(H * dpr)) { sim.cv.width = Math.round(W * dpr); sim.cv.height = Math.round(H * dpr); }
   const lw = Math.ceil(W / PX), lh = Math.ceil(H / PX); if (sim.lo.width !== lw || sim.lo.height !== lh) { sim.lo.width = lw; sim.lo.height = lh; }
   sim.cv.style.width = W + "px"; sim.cv.style.height = H + "px"; sim.W = W; sim.H = H; sim.dpr = dpr; sim.C = simColors();
-  const g = simGeo(d, W, H - 64), seen = new Set(); sim.g = g; sim.waiting = p.waiting.length; sim.running = d.running.length; sim.extra = Math.max(0, d.cap - d.running.length); sim.head = p.waiting[0] || null; sim.pressure = d.pressure; sim.idle = d.idle || 0;
+  const g = simGeo(d, W, H - 64), seen = new Set(); sim.g = g; sim.waiting = p.waiting.length; sim.running = d.running.length; sim.extra = Math.max(0, d.cap - d.running.length); sim.head = p.waiting[0] || null; sim.pressure = d.pressure; sim.idle = d.idle || 0; sim.cause = p.cause || "";
   for (const [pid] of simSlot) if (!d.running.some((j) => j.pid === pid)) simSlot.delete(pid);
   const used = new Set(simSlot.values());
   d.running.forEach((j) => { if (!simSlot.has(j.pid)) { let s = 0; while (used.has(s)) s++; simSlot.set(j.pid, s); used.add(s); } });
@@ -415,7 +417,7 @@ function renderSim(d, p) {
   for (let i = 0; i < g.nv; i++) if (sim.bayA[i] === undefined) sim.bayA[i] = simFirst ? 1 : 0;
   d.running.forEach((j) => {
     const slot = Math.min(simSlot.get(j.pid), g.nv - 1), k = "p" + j.pid, old = sim.ents.get(k); seen.add(k);
-    let seat = old && old.seat !== -2 ? old.seat : takeSeat(k); const sp = seat >= 0 ? [g.seats[seat].x, 0, g.seats[seat].z] : g.wait(slot);
+    let seat = old && old.seat !== -2 && old.state !== "d" ? old.seat : takeSeat(k); const sp = seat >= 0 ? [g.seats[seat].x, 0, g.seats[seat].z] : g.wait(slot);
     simPut(k, "r", sp, 1, j, { slot, seat, seatP: sp });
   });
   p.waiting.forEach((j, i) => { const k = "p" + j.pid; seen.add(k); simPut(k, "q", g.que(i), i < g.qvis ? 1 : 0, j, { idx: i }); });
@@ -423,7 +425,7 @@ function renderSim(d, p) {
   for (const r of d.history) {
     if (r.rc == null || m >= g.dcap) continue;
     const k = "p" + parseInt(r.id.split("-")[1], 10); if (seen.has(k)) continue; seen.add(k);
-    const old = sim.ents.get(k); simPut(k, "d", g.done(m++), 1, r, { fail: r.rc !== 0, slot: old ? old.slot : 0 });
+    const old = sim.ents.get(k); simPut(k, "d", g.done(m++), 1, r, { fail: r.rc !== 0, timeout: r.rc === 124, slot: old ? old.slot : 0 });
   }
   sim.okN = d.history.filter((r) => r.rc === 0).length; sim.failN = d.history.filter((r) => r.rc != null && r.rc !== 0).length;
   for (const [k, e] of sim.ents) if (!seen.has(k) && !e.flow) { freeSeat(k); e.ta = 0; e.tp = e.p.slice(); }
@@ -434,7 +436,7 @@ function renderSim(d, p) {
 const snap = (v) => Math.round(v / PX) * PX;
 // ===== Hệ sprite: lưới ký tự + bảng màu có dải ba tông (sáng ấm, nền, tối lạnh), tự đổ bóng theo hướng sáng trên-trái, tự viền chọn lọc =====
 const hslHex = (h, s, l) => { h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(100, s)) / 100; l = Math.max(0, Math.min(100, l)) / 100; const a = s * Math.min(l, 1 - l), f = (n) => { const k = (n + h / 30) % 12, c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return Math.round(255 * c).toString(16).padStart(2, "0"); }; return "#" + f(0) + f(8) + f(4); };
-const RAMP = (h, s, l) => [hslHex(h + 8, s - 8, l + 13), hslHex(h, s, l), hslHex(h - 14, s + 8, l - 17)];
+const RAMP = (h, s, l) => [hslHex(h + 8, s - 6, l + 17), hslHex(h, s, l), hslHex(h - 14, s + 10, l - 23)];
 const OUT = "#1d1630", mixHex = (a, b, t) => { const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16)); return "#" + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, "0")).join(""); };
 const spriteCache = new Map();
 function makeSprite(rows, pal) {
@@ -446,7 +448,7 @@ function makeSprite(rows, pal) {
     c.fillStyle = col; c.fillRect(x + 1, y + 1, 1, 1);
   }
   for (let y = -1; y <= H; y++) for (let x = -1; x <= W; x++) { // viền chọn lọc: điểm trống sát hình lấy màu tối pha từ chính hình đó
-    if (at(x, y)) continue; let nb = at(x, y - 1) || at(x - 1, y) || at(x + 1, y) || at(x, y + 1); if (!nb) continue; const p = pal[nb], base = Array.isArray(p) ? p[2] : p; c.fillStyle = mixHex(base, OUT, 0.7); c.fillRect(x + 1, y + 1, 1, 1);
+    if (at(x, y)) continue; let nb = at(x, y - 1) || at(x - 1, y) || at(x + 1, y) || at(x, y + 1); if (!nb) continue; const p = pal[nb], base = Array.isArray(p) ? p[2] : p; c.fillStyle = mixHex(base, OUT, 0.82); c.fillRect(x + 1, y + 1, 1, 1);
   }
   return cv;
 }
@@ -509,7 +511,8 @@ function person(cx, sx, sy, o) { // vẽ người đứng chân tại (sx, sy); 
   return blit(cx, cv, sx, sy + U, false);
 }
 // ===== món ăn: 12 sprite vẽ tay, mỗi chất liệu có dải ba tông =====
-const DISHES = ["burger", "fries", "nuggets", "hotdog", "cola", "icecream", "pizza", "chicken", "taco", "donut", "shake", "salad"];
+const DISHES = ["burger", "fries", "nuggets", "hotdog", "cola", "icecream", "pizza", "chicken", "taco", "donut", "shake", "salad", "combo"];
+const dishFor = (job, hue) => { const w = job.mem != null ? (job.mem >= 1500 || job.cpu >= 200 ? 2 : job.mem >= 500 || job.cpu >= 100 ? 1 : 0) : ((job.secs || 0) >= 600 ? 2 : (job.secs || 0) >= 120 ? 1 : 0); return w === 2 ? 12 : w === 1 ? [0, 3, 6, 7][hue % 4] : [1, 4, 5, 9][hue % 4]; };
 const DISH_ART = {
   burger: [["...bbbbbb...", "..bbbsbbsb..", ".bbbbbbbbbb.", "gggggggggggg", ".mmmmmmmmmm.", "yyyyyyyyyyyy", ".rrrrrrrrrr.", ".bbbbbbbbbb.", "..bbbbbbbb.."], { b: RAMP(33, 78, 54), s: "#fff1c2", g: RAMP(105, 55, 40), m: RAMP(18, 52, 28), y: RAMP(48, 95, 60), r: RAMP(5, 72, 48) }],
   fries: [["..y.y.y.y...", ".y.y.y.y.y..", ".yyyyyyyyyy.", "..rrrrrrrr..", "..rwwwwwwr..", "..rwwrrwwr..", "..rrrrrrrr..", "..rrrrrrrr.."], { y: RAMP(48, 95, 58), r: RAMP(358, 72, 46), w: "#fff4d6" }],
@@ -523,9 +526,10 @@ const DISH_ART = {
   donut: [["...pppppp...", "..pppppppp..", ".pppwppwppp.", ".ppp....ppp.", ".pppwppwppp.", "..pppppppp..", "...pppppp..."], { p: RAMP(335, 72, 72), w: "#fff1de" }],
   shake: [["....rr......", "....r.......", ".wwwwwwwwww.", "..pppppppp..", "..ppwwwwpp..", "..pppppppp..", "...pppppp..."], { w: "#fdf7ec", r: RAMP(358, 75, 46), p: RAMP(335, 65, 76) }],
   salad: [["...gGggGg...", "..gGggrggGg.", ".ggGggGggrgg", ".wwwwwwwwwww.", "..wwwwwwwww.."], { g: RAMP(105, 55, 42), G: RAMP(95, 60, 56), r: RAMP(358, 72, 48), w: "#fdf7ec" }],
+  combo: [["..bbbb..y.y.y..w.", ".bbsbbb.yyyyyy.www", ".gggggg.yyyyyy.cccc", ".mmmmmm.rrrrrr.cwwc", ".yyyyyy.rwwwwr.cwwc", ".bbbbbb.rrrrrr.cccc", "..bbbb..rrrrrr..cc."].map((r) => r.padEnd(19, ".")), { b: RAMP(33, 78, 54), s: "#fff1c2", g: RAMP(105, 55, 40), m: RAMP(18, 52, 28), y: RAMP(48, 95, 58), r: RAMP(358, 72, 46), w: "#fff4d6", c: RAMP(358, 75, 46) }],
 };
 function dish(cx, sx, sy, type, burnt, big) { // món ăn pixel, tâm đáy (sx, sy)
-  const t = DISHES[type % 12], key = "d|" + t + "|" + (burnt ? 1 : 0), cv = sprite(key, () => { const [rows, pal] = DISH_ART[t]; if (!burnt) return [rows, pal]; const bp = {}; for (const k in pal) bp[k] = RAMP(15, 18, k === "w" ? 22 : 16); return [rows, bp]; });
+  const t = DISHES[type % 13], key = "d|" + t + "|" + (burnt ? 1 : 0), cv = sprite(key, () => { const [rows, pal] = DISH_ART[t]; if (!burnt) return [rows, pal]; const bp = {}; for (const k in pal) bp[k] = RAMP(15, 18, k === "w" ? 22 : 16); return [rows, bp]; });
   const w = cv.width * U, h = cv.height * U, x = snap(sx - w / 2), y = snap(sy - h + U); cx.imageSmoothingEnabled = false; cx.drawImage(cv, x, y, w, h); return [x, y, x + w, y + h];
 }
 // ===== robot phục vụ: thân bo tròn, màn hình mặt, bánh xe, đèn báo chớp, khay trên đầu =====
@@ -538,6 +542,9 @@ function robot(cx, sx, sy, t, tray, dishT, dir) {
 function prop(cx, name, sx, sy, t) { // đồ vật trang trí
   const cv = sprite("pr|" + name + "|" + (name === "arcade" ? Math.floor((t || 0) * 3) % 3 : 0), () => {
     if (name === "plant") { const G = grid(14, 22); G.put(4, 15, 6, 5, "P"); G.put(3, 14, 8, 1, "P"); for (const [x, y] of [[6, 2], [3, 5], [9, 4], [5, 8], [8, 9], [2, 10], [10, 11], [6, 12]]) G.put(x, y, 3, 4, "g"); G.put(6, 5, 2, 10, "G"); return [G.rows(), { P: RAMP(14, 55, 48), g: RAMP(115, 55, 38), G: RAMP(100, 50, 30) }]; }
+    if (name === "grill") { const G = grid(20, 9); G.put(0, 3, 20, 6, "B"); G.put(1, 2, 18, 1, "B"); G.put(2, 3, 16, 2, "k"); G.put(3, 6, 2, 2, "R"); G.put(7, 6, 2, 2, "Y"); G.put(13, 6, 5, 2, "k"); return [G.rows(), { B: RAMP(215, 8, 62), k: "#2a2d36", R: "#e8412f", Y: "#ffc82e" }]; }
+    if (name === "fridge") { const G = grid(16, 34); G.put(0, 0, 16, 34, "B"); G.put(0, 15, 16, 1, "k"); G.put(12, 5, 2, 8, "k"); G.put(12, 19, 2, 8, "k"); G.put(2, 3, 3, 2, "A"); G.put(2, 20, 4, 2, "Y"); return [G.rows(), { B: RAMP(205, 12, 78), k: "#3a4150", A: "#e8412f", Y: "#ffc82e" }]; }
+    if (name === "shelf") { const G = grid(30, 14); G.put(0, 11, 30, 3, "W"); G.put(2, 5, 5, 6, "P"); G.put(9, 3, 4, 8, "G"); G.put(15, 6, 6, 5, "P"); G.put(23, 4, 4, 7, "R"); G.put(3, 4, 3, 1, "k"); G.put(16, 5, 4, 1, "k"); return [G.rows(), { W: RAMP(30, 45, 40), P: RAMP(210, 10, 70), G: RAMP(105, 50, 44), R: RAMP(358, 65, 46), k: "#2a2d36" }]; }
     if (name === "bin") { const G = grid(12, 16); G.put(1, 3, 10, 12, "B"); G.put(0, 2, 12, 2, "L"); G.put(3, 5, 6, 1, "k"); G.put(4, 1, 4, 1, "L"); return [G.rows(), { B: RAMP(150, 40, 34), L: RAMP(150, 30, 46), k: "#10281c" }]; }
     if (name === "pos") { const G = grid(16, 12); G.put(1, 6, 14, 5, "B"); G.put(3, 1, 8, 5, "k"); G.put(4, 2, 6, 3, "s"); G.put(11, 4, 4, 2, "B"); G.put(5, 8, 6, 1, "k"); return [G.rows(), { B: RAMP(215, 12, 70), k: "#20243a", s: "#7fe0a6" }]; }
     if (name === "arcade") { const fr = Math.floor((t || 0) * 3) % 3, G = grid(14, 28); G.put(1, 0, 12, 26, "B"); G.put(3, 4, 8, 8, "k"); G.put(4, 5, 6, 6, "s"); G.px(4 + fr * 2, 7, "A"); G.px(6 + fr, 9, "A"); G.put(3, 15, 8, 3, "B"); G.px(4, 16, "R"); G.px(6, 16, "Y"); G.px(9, 16, "R"); G.put(2, 26, 10, 2, "k"); return [G.rows(), { B: RAMP(265, 55, 36), k: "#10101e", s: "#34e0a1", A: "#fff", R: "#ff4d4d", Y: "#ffd23f" }]; }
@@ -549,8 +556,8 @@ function prop(cx, name, sx, sy, t) { // đồ vật trang trí
 // ===== Hành trình của khách: vào cửa → xếp hàng → gọi món → thanh toán → ngồi chờ → robot mang món → ăn → dọn khay → đánh giá → ra về =====
 function simLedger(d) { // sổ sách của 50 lệnh gần nhất: món bán được tiền, món cháy mất nguyên liệu và hoàn tiền xin lỗi, đang nấu thì tiền gas và lương chạy theo từng giây
   let rev = 0, cost = 0, ok = 0, fail = 0, stars = 0;
-  for (const r of d.history) { if (r.rc == null) continue; const sec = r.secs || 0, make = 5 + (sec / 60) * 1.5; if (r.rc === 0) { rev += 12 + Math.min(sec, 1800) / 30; cost += make; ok++; stars += sec > 900 ? 4 : 5; } else { cost += make + 5; fail++; stars += 1; } }
-  cost += d.running.reduce((a, j) => a + ((Date.now() / 1000 - j.started) / 60) * 1.5, 0);
+  for (const r of d.history) { if (r.rc == null) continue; const sec = r.secs || 0, make = 4 + sec * 0.05; if (r.rc === 0) { rev += 15 + Math.min(sec, 1800) * 0.12; cost += make; ok++; stars += sec > 900 ? 4 : 5; } else { cost += make + 5; fail++; stars += 1; } }
+  cost += d.running.reduce((a, j) => a + (Date.now() / 1000 - j.started) * 0.05, 0);
   return { rev, cost, ok, fail, avg: ok + fail ? stars / (ok + fail) : 0 };
 }
 const kVnd = (v) => Math.round(v).toLocaleString("vi-VN") + "k";
@@ -560,7 +567,7 @@ const walkLeg = (a, b, tag, speed) => ({ a: a.slice(), b: b.slice(), dur: Math.m
 const stayLeg = (a, dur, tag) => ({ a: a.slice(), b: a.slice(), dur, tag });
 function legStart(e, L) {
   const g = sim.g, now = performance.now() / 1000; e.flow.tag = L.tag;
-  if (L.tag === "order") sim.parts.push({ k: "order", p: [L.a[0], 40, L.a[2]], v: [0, 0, 0], life: L.dur, max: L.dur, dt: e.hue % 12, s: 0, c: "" });
+  if (L.tag === "order") sim.parts.push({ k: "order", p: [L.a[0], 40, L.a[2]], v: [0, 0, 0], life: L.dur, max: L.dur, dt: e.dt, s: 0, c: "" });
   if (L.tag === "pay") { sim.cash = now; for (let i = 0; i < 7; i++) sim.parts.push({ k: "coin", p: [L.a[0], 36, L.a[2]], v: [(g.pay[0] + 20 - L.a[0]) * 1.4 + (Math.random() - 0.5) * 30, 90 + Math.random() * 40, -40 + Math.random() * 20], life: 0.9, max: 0.9, s: 0, c: "" }); }
 }
 function simStep(dt, t) {
@@ -596,12 +603,12 @@ function simStep(dt, t) {
     if (e && !e.flow && lvl > 0.15 && t - sim.smokeAt > 0.3 * (1.5 - lvl)) { sim.smokeAt = t; parts.push({ k: "steam", p: [b[0] + (Math.random() - 0.5) * 12, 56, b[2]], v: [0, 24 + 20 * lvl, 0], life: 1.7, max: 1.7, s: Math.random() * 6, c: sim.C.muted }); }
   });
 }
-function spawnDiner(e, sp) { // khách nhận món: ăn thật rồi dọn khay, đánh giá và ra về; món cháy thì khiếu nại, hoàn tiền và bỏ đi
+function spawnDiner(e, sp) { if (e.timeout) sim.bossSay = { text: "Quá giờ, chia nhỏ đơn!", until: performance.now() / 1000 + 4 }; // khách nhận món: ăn thật rồi dọn khay, đánh giá và ra về; món cháy thì khiếu nại, hoàn tiền và bỏ đi
   const g = sim.g, fail = e.fail, seatI = e.seat, hasSeat = seatI >= 0, script = [];
   if (fail) { script.push({ t: "stand" }, { t: "walk", to: g.pay, mood: "angry" }, { t: "refund", dur: 1.3 }, { t: "walk", to: g.bin, mood: "angry" }, { t: "dump", dur: 0.6 }, { t: "free" }, { t: "walk", to: g.exitP, mood: "angry" }, { t: "rate", n: 1 }); }
   else if (!hasSeat || e.hue % 5 === 0) script.push({ t: "stand" }, { t: "bag" }, { t: "free" }, { t: "walk", to: g.exitP }, { t: "rate", n: 5 });
   else script.push({ t: "eat", dur: 8 + (e.hue % 4) }, { t: "stand" }, { t: "free" }, { t: "walk", to: g.bin }, { t: "dump", dur: 0.6 }, { t: "walk", to: g.exitP }, { t: "rate", n: e.job.secs > 900 ? 4 : 5 });
-  const D = { k: "diner", p: sp.slice(), key: e.key, hue: e.hue, dish: e.hue % 12, fail, seat: hasSeat ? g.seats[seatI] : null, seatI, sit: hasSeat && !fail, script, si: 0, st: 0, started: false, mood: fail ? "angry" : "happy", life: 99, max: 99, v: [0, 0, 0], tray: false, done: false };
+  const D = { k: "diner", p: sp.slice(), key: e.key, hue: e.hue, dish: e.dt, fail, seat: hasSeat ? g.seats[seatI] : null, seatI, sit: hasSeat && !fail, script, si: 0, st: 0, started: false, mood: fail ? "angry" : "happy", life: 99, max: 99, v: [0, 0, 0], tray: false, done: false };
   sim.parts.push(D); burst3([sp[0], 36, sp[2]], fail ? sim.C.bad : sim.C.accent, fail ? 14 : 8); emote([sp[0], 0, sp[2]], fail ? "anger" : "heart");
 }
 function dinerStep(q, dt, now) {
@@ -665,8 +672,8 @@ function simDraw(t) {
   // bảng thành tích trong bếp: mỗi lệnh xong là một khung, sao vàng hoặc dấu X đỏ
   wallR(-545, -75, 130, 224, zB + 2, "#8a5a3b"); wallR(-541, -79, 134, 220, zB + 3, "#f6ecd9");
   // ---- quầy thanh toán và quầy bếp ----
-  const counterZ = Math.min(...[...Array(g.nv).keys()].map((i) => P(g.pod(i))[2])) - 0.5, items = [], add = (z, fn) => items.push({ z, fn });
-  add(counterZ, () => { box(-540, -66, 0, 40, -132, -76, "#cfd6de", "#b8c0ca", "#9aa3ad"); for (let i = 0; i < g.nv; i++) { const b = g.pan(i), al = Math.max(0, Math.min(1, sim.bayA[i])); lx.save(); lx.globalAlpha = al; const pts = []; for (let k = 0; k < 16; k++) { const a = k / 16 * 6.2832; pts.push(P([b[0] + Math.cos(a) * Math.min(30, g.S * 0.36), 41, b[2] + Math.sin(a) * Math.min(24, g.S * 0.3)])); } poly(pts, sim.used.has(i) ? "#8a3f1d" : "#2a2d36"); lx.restore(); } box(-420, -200, 36, 44, -88, -62, "#7a4a2a", "#5a3a22", "#4a3018"); });
+  const counterZ = Math.min(...[...Array(g.nv).keys()].map((i) => P(g.pod(i))[2])) - 0.5, items = [], add = (z, fn) => items.push({ z, fn }), cooked = new Set();
+  add(counterZ, () => { box(-540, -66, 0, 40, -132, -76, "#cfd6de", "#b8c0ca", "#9aa3ad"); for (let i = 0; i < g.nv; i++) { const b = g.pan(i), al = Math.max(0, Math.min(1, sim.bayA[i])); lx.save(); lx.globalAlpha = al; const pts = []; for (let k = 0; k < 16; k++) { const a = k / 16 * 6.2832; pts.push(P([b[0] + Math.cos(a) * Math.min(30, g.S * 0.36), 41, b[2] + Math.sin(a) * Math.min(24, g.S * 0.3)])); } poly(pts, sim.used.has(i) ? "#8a3f1d" : "#2a2d36"); lx.restore(); } box(-420, -200, 36, 44, -88, -62, "#7a4a2a", "#5a3a22", "#4a3018"); for (let i = 0; i < g.nv; i++) { const b = P(g.pan(i)); lx.save(); lx.globalAlpha = Math.max(0, Math.min(1, sim.bayA[i])); prop(lx, "grill", b[0], b[1] + 2 * U, t); lx.restore(); } const fr = P([-548, 0, -150]); prop(lx, "fridge", fr[0], fr[1], t); for (const x of [-430, -330, -230]) { const sp = P([x, 100, -196]); prop(lx, "shelf", sp[0], sp[1], t); } box(-545, -75, 150, 172, -170, -100, "#cfd6de", "#b8c0ca", "#9aa3ad"); });
   const glassZ = P([-300, 70, -72])[2]; add(glassZ, () => { poly([P([-560, 40, -72]), P([-420, 40, -72]), P([-420, 125, -72]), P([-560, 125, -72])], "rgba(190,225,245,0.16)"); poly([P([-200, 40, -72]), P([-66, 40, -72]), P([-66, 125, -72]), P([-200, 125, -72])], "rgba(190,225,245,0.16)"); for (const x of [-560, -420, -200, -66]) wallR(x - 3, x + 3, 40, 125, -72, "#8d97a3"); wallR(-560, -66, 123, 129, -72, "#8d97a3"); const sp = P([-310, 134, -72]); pixText(lx, sp[0] - 24, sp[1], "PICKUP", "#ffc82e", 2); const kp = P([-480, 140, -72]); pixText(lx, kp[0] - 10, kp[1], "BEP", "#e8412f", 3); });
   add(P([220, 0, -20])[2], () => { box(40, 400, 0, 42, -40, 6, "#cfd6de", "#c43a2c", "#a22e24"); wallR(40, 400, 20, 24, 6, "#f2c230"); const cd = Math.max(0, 1 - (now - (sim.cash || -9)) / 0.5); if (cd > 0) box(120, 170, 38, 44 + cd * 6, 0, 6, "#6b7280", "#4b5563", null); });
   for (const px2 of [120, 190]) add(P([px2, 44, -20])[2] - 0.1, () => { const b = P([px2, 44, -20]); prop(lx, "pos", b[0], b[1], t); });
@@ -684,14 +691,16 @@ function simDraw(t) {
     if (tb.t !== "booth") for (const [sx, sz] of tb.seats) { const cpP = P([sx, 20, sz - 8]); add(cpP[2] + 0.3, () => { const hy = tb.t === "high" ? 30 : 0; box(sx - 9, sx + 9, hy + 18, hy + 22, sz - 10, sz + 4, "#c98a4b", "#9a6735", null); box(sx - 9, sx + 9, hy + 22, hy + 44, sz - 12, sz - 9, "#c98a4b", "#9a6735", null); }); }
   });
   // ---- đồ trang trí: cây, thùng rác, máy game, máy gọi món, đèn thả trần ----
-  for (const [x, z] of [[-540, 175], [545, 170], [-60, 60], [250, 175]]) { const pp = P([x, 0, z]); add(pp[2], () => prop(lx, "plant", pp[0], pp[1], t)); }
+  for (const [x, z] of [[-540, 175], [545, 170]]) { const pp = P([x, 0, z]); add(pp[2], () => prop(lx, "plant", pp[0], pp[1], t)); }
   { const b = P([g.bin[0], 0, g.bin[2]]); add(b[2], () => prop(lx, "bin", b[0], b[1], t)); const a = P([520, 0, 150]); add(a[2], () => prop(lx, "arcade", a[0], a[1], t)); const kk = P([470, 0, 40]); add(kk[2], () => prop(lx, "kiosk", kk[0], kk[1], t)); }
   for (const tb of g.tables) { const lp = P([tb.x, 190, tb.z]); add(lp[2] + 5, () => { const tb2 = P([tb.x, 100, tb.z]); lx.fillStyle = "rgba(255,230,160,0.10)"; poly([P([tb.x - 10, 190, tb.z]), P([tb.x + 10, 190, tb.z]), P([tb.x + 46, 36, tb.z]), P([tb.x - 46, 36, tb.z])], "rgba(255,226,150,0.07)"); lx.fillStyle = "#2a1b24"; lx.fillRect(snap(lp[0] - 6 * U), snap(lp[1] - 5 * U), 12 * U, 5 * U); lx.fillStyle = "#ffe08a"; lx.fillRect(snap(lp[0] - 4 * U), snap(lp[1]), 8 * U, U); void tb2; }); }
+  { const xs = [...Array(7).keys()].map((i) => 150 + i * 70); xs.forEach((x, i) => { const pp = P([x, 0, 44]); add(pp[2], () => { lx.fillStyle = "#2a2d36"; lx.fillRect(snap(pp[0] - U), snap(pp[1] - 18 * U), 2 * U, 18 * U); lx.fillStyle = "#ffc82e"; lx.fillRect(snap(pp[0] - 2 * U), snap(pp[1] - 19 * U), 4 * U, 2 * U); lx.fillStyle = "#2a2d36"; lx.fillRect(snap(pp[0] - 3 * U), snap(pp[1] - U), 6 * U, U); if (i > 0) { const q = P([xs[i - 1], 0, 44]); lx.fillStyle = "#c43a2c"; const n = Math.max(2, Math.round((pp[0] - q[0]) / PX)); for (let k = 0; k <= n; k++) lx.fillRect(snap(q[0] + (pp[0] - q[0]) * k / n), snap(q[1] - 16 * U + Math.sin(k / n * 3.14) * 2 * U), PX, 2 * U); } }); }); }
   // ---- nhân viên: ông chủ, thu ngân, nhân viên lau sàn ----
-  const blocked = sim.waiting > 0 && sim.free > 0, full = sim.waiting > 0 && sim.free <= 0, away = sim.idle >= 120, bossLine = blocked ? "Chờ chút!" : full ? "Hết bếp rồi!" : away ? "Mở thêm bếp!" : sim.waiting ? "Đang ổn" : "Rảnh rỗi~";
+  const blocked = sim.waiting > 0 && sim.free > 0, full = sim.waiting > 0 && sim.free <= 0, away = sim.idle >= 120, bossLine = sim.bossSay && now < sim.bossSay.until ? sim.bossSay.text : blocked ? (sim.cause.includes("RAM") ? "Hết nguyên liệu!" : sim.cause.includes("CPU") ? "Bếp quá nóng!" : "Chờ chút!") : full ? "Hết bếp rồi!" : away ? "Mở thêm bếp!" : sim.waiting ? "Đang ổn" : "Rảnh rỗi~";
   const bpos = P([350, 0, -64]), cpos = P([150, 0, -64]), jx = Math.sin(now * 0.25) * 300 - 40, jp = P([jx, 0, 150]);
   add(bpos[2], () => { const b = person(lx, bpos[0], bpos[1], { role: "boss", pose: blocked ? "up" : "stand", frame: Math.floor(now * 4) % 2, mood: blocked ? "angry" : "happy", acc: "stache", look: 1 }); reg("boss", "ông chủ", "person", b); sim.bossBox = b; });
-  add(cpos[2], () => { const b = person(lx, cpos[0], cpos[1], { role: "cashier", pose: now - (sim.cash || -9) < 1 ? "wave" : "stand", frame: Math.floor(now * 3) % 2, mood: "happy", acc: "headset", look: 6 }); reg("cashier", "thu ngân", "person", b); });
+  add(cpos[2] - 0.01, () => { if (sim.cashSay && now < sim.cashSay.until && sim.cashBox) sim.cashSayDraw = true; });
+  add(cpos[2], () => { const b = person(lx, cpos[0], cpos[1], { role: "cashier", pose: now - (sim.cash || -9) < 1 ? "wave" : "stand", frame: Math.floor(now * 3) % 2, mood: "happy", acc: "headset", look: 6 }); reg("cashier", "thu ngân", "person", b); sim.cashBox = b; });
   add(jp[2], () => { const b = person(lx, jp[0], jp[1], { role: "cust", pose: "walk", frame: Math.floor(now * 3) % 2, mood: "n", look: 9, arch: ARCH[2], shift: 40 }); reg("janitor", "nhân viên lau sàn", "person", b); lx.fillStyle = "#e8c24a"; lx.fillRect(snap(b[2] - 2 * U), snap(b[3] - 3 * U), 8 * U, 3 * U); lx.fillStyle = "#8a6a2a"; lx.fillRect(snap(b[2] + 2 * U), snap(b[1] + 6 * U), U, 22 * U); });
   { const sp = P([jx > 0 ? jx - 60 : jx + 60, 0, 150]); add(sp[2], () => { prop(lx, "wet", sp[0], sp[1], t); }); }
   const ptr = (n) => P(n);
@@ -700,32 +709,34 @@ function simDraw(t) {
     if (e.a < 0.02) continue; e.hits = []; const slot = e.slot || 0, arch = ARCH[e.hue % 8], fl = e.flow, tag = fl ? fl.tag : "", hot = e.job ? Math.min(1, e.job.cpu / 200) : 0, look = e.hue % 20;
     const cooking = e.state === "r" && !fl || (fl && fl.kind === "out" && tag === "dish") || (e.state === "d" && fl && fl.kind === "out" && tag === "dish");
     if (cooking && e.state !== "q") {
-      const pod = g.pod(Math.min(slot, g.nv - 1)), cpP = P(pod), pan = P(g.pan(Math.min(slot, g.nv - 1)));
+      cooked.add(Math.min(slot, g.nv - 1)); const pod = g.pod(Math.min(slot, g.nv - 1)), cpP = P(pod), pan = P(g.pan(Math.min(slot, g.nv - 1)));
       add(cpP[2], () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); const b = person(lx, cpP[0], cpP[1], { role: "cook", pose: "stir", frame: Math.floor(t * (3 + hot * 9)) % 2, hat: e.hue % 2 ? "paper" : "toque", acc: e.hue % 3 === 0 ? "glasses" : e.hue % 3 === 1 ? "stache" : "", mood: hot > 0.8 ? "angry" : "n", look: e.hue % 24, shift: 0 }); reg(e.key, "đầu bếp", "person", b); e.hits.push(b); lx.restore(); });
-      add(counterZ - 0.2, () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); lx.fillStyle = "#1f2228"; lx.fillRect(snap(pan[0] - 9 * U), snap(pan[1] - 3 * U), 18 * U, 3 * U); lx.fillStyle = "#3a3f48"; lx.fillRect(snap(pan[0] + 9 * U), snap(pan[1] - 2 * U), 6 * U, U); if (!fl) dish(lx, pan[0], pan[1] - 2, e.hue % 12, false, false); lx.restore(); });
+      add(counterZ - 0.2, () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); lx.fillStyle = "#1f2228"; lx.fillRect(snap(pan[0] - 9 * U), snap(pan[1] - 3 * U), 18 * U, 3 * U); lx.fillStyle = "#3a3f48"; lx.fillRect(snap(pan[0] + 9 * U), snap(pan[1] - 2 * U), 6 * U, U); if (!fl) dish(lx, pan[0], pan[1] - 2, e.dt, false, false); lx.restore(); });
     }
     const pp = P(e.p);
     if (fl && (fl.kind === "enter" || (fl.kind === "in" && (tag === "walk")))) add(pp[2], () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); const b = person(lx, pp[0], pp[1], { role: "cust", pose: "walk", frame: Math.floor((e.walk || 0)) % 2, look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách đang đi", "person", b); e.hits = [b]; e.sb = b; lx.restore(); });
     else if (fl && fl.kind === "in") add(pp[2], () => { lx.save(); const b = person(lx, pp[0], pp[1], { role: "cust", pose: tag === "order" ? "wave" : "stand", frame: Math.floor(now * 4) % 2, mood: tag === "pay" ? "happy" : "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách gọi món", "person", b); e.hits = [b]; e.sb = b; lx.restore(); });
     else if (fl && fl.kind === "out") {
-      if (tag === "dish") add(pp[2], () => { const b = dish(lx, pp[0], pp[1], e.hue % 12, e.fail, true); reg(e.key, "món ra cửa sổ bếp", "dish", b); e.hits.push(b); e.sb = e.sb || b; });
-      else add(pp[2], () => { const b = robot(lx, pp[0], pp[1], t, true, e.hue % 12, e.dir || 1); reg(e.key, "robot phục vụ", "robot", b); e.hits.push(b); e.sb = b; });
+      if (e.seat >= 0 && e.seatP) { const sp = P([e.seatP[0], 0, e.seatP[2]]); add(sp[2], () => { lx.save(); const b = person(lx, sp[0], sp[1] - 4 * U, { role: "cust", pose: "sit", mood: "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách chờ món", "person", b); e.hits.push(b); lx.restore(); }); }
+      if (tag === "dish") add(pp[2], () => { const b = dish(lx, pp[0], pp[1], e.dt, e.fail, true); reg(e.key, "món ra cửa sổ bếp", "dish", b); e.hits.push(b); e.sb = e.sb || b; });
+      else add(pp[2], () => { const b = robot(lx, pp[0], pp[1], t, true, e.dt, e.dir || 1); reg(e.key, "robot phục vụ", "robot", b); e.hits.push(b); e.sb = b; });
     } else if (e.state === "r") {
       if (e.seat >= 0) { const sp = P([e.tp[0], 0, e.tp[2]]); add(sp[2], () => { lx.save(); lx.globalAlpha = Math.min(1, e.a); const wait = Date.now() / 1000 - e.job.started, b = person(lx, sp[0], sp[1] - 4 * U, { role: "cust", pose: "sit", mood: wait > 600 ? "angry" : "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách chờ món", "person", b); e.hits.push(b); e.sb = b; const np = P([e.tp[0] + 12, 36, e.tp[2] + 24]); lx.fillStyle = "#f8f8f4"; lx.fillRect(snap(np[0]), snap(np[1] - 6 * U), 8 * U, 6 * U); pixText(lx, np[0] + U, np[1] - 5 * U, String(e.job.pid % 100).padStart(2, "0").slice(-2), "#c43a2c", U); lx.restore(); }); }
       else add(pp[2], () => { lx.save(); const b = person(lx, pp[0], pp[1], { role: "cust", pose: "stand", mood: "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc }); reg(e.key, "khách đứng chờ", "person", b); e.hits.push(b); e.sb = b; lx.restore(); });
     } else if (e.state === "q") add(pp[2], () => {
-      lx.save(); lx.globalAlpha = Math.min(1, e.a); const wait = Date.now() / 1000 - e.job.queued, b = person(lx, pp[0], pp[1], { role: "cust", pose: e.idx === 0 ? "wave" : "stand", frame: Math.floor(now * 3) % 2, mood: wait > 240 ? "angry" : "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc });
-      const bw = 18 * U, bx = snap(pp[0] - bw / 2), by = snap(b[1] - 14 * U); lx.fillStyle = "#f8f8f4"; lx.fillRect(bx, by, bw, 11 * U); lx.fillStyle = "#1d1630"; lx.fillRect(bx, by, bw, U); lx.fillRect(bx, by + 10 * U, bw, U); lx.fillRect(bx, by, U, 11 * U); lx.fillRect(bx + bw - U, by, U, 11 * U); lx.fillRect(snap(pp[0] - U), by + 11 * U, 2 * U, U); dish(lx, pp[0], by + 10 * U, e.hue % 12, false, false);
-      const pct = Math.min(1, wait / 300); lx.fillStyle = "#2a2a30"; lx.fillRect(bx, by - 2 * U, bw, U); lx.fillStyle = pct > 0.8 ? "#e53935" : pct > 0.5 ? "#f4b400" : "#43a047"; lx.fillRect(bx, by - 2 * U, Math.max(U, Math.round(bw * (1 - pct) / U) * U), U);
+      lx.save(); lx.globalAlpha = Math.min(1, e.a); const wait = Date.now() / 1000 - e.job.queued, b = person(lx, pp[0], pp[1], { role: "cust", pose: e.idx === 0 ? "wave" : "stand", frame: Math.floor(now * 3) % 2, mood: wait > (sim.d.timeout || 900) / 3 ? "angry" : "n", look, arch, kid: arch.kid, hat: arch.hat, acc: arch.acc });
+      const bw = 24 * U, bx = snap(pp[0] - bw / 2), by = snap(b[1] - 14 * U); lx.fillStyle = "#f8f8f4"; lx.fillRect(bx, by, bw, 11 * U); lx.fillStyle = "#1d1630"; lx.fillRect(bx, by, bw, U); lx.fillRect(bx, by + 10 * U, bw, U); lx.fillRect(bx, by, U, 11 * U); lx.fillRect(bx + bw - U, by, U, 11 * U); lx.fillRect(snap(pp[0] - U), by + 11 * U, 2 * U, U); dish(lx, pp[0], by + 10 * U, e.dt, false, false);
+      const pct = Math.min(1, wait / (sim.d.timeout || 900)); lx.fillStyle = "#2a2a30"; lx.fillRect(bx, by - 2 * U, bw, U); lx.fillStyle = pct > 0.8 ? "#e53935" : pct > 0.5 ? "#f4b400" : "#43a047"; lx.fillRect(bx, by - 2 * U, Math.max(U, Math.round(bw * (1 - pct) / U) * U), U);
       const bb = [b[0], by - 3 * U, b[2], b[3]]; reg(e.key, "khách xếp hàng", "person", bb); e.hits = [bb]; e.sb = bb; lx.restore();
     });
     else if (e.state === "d") add(pp[2], () => {
       lx.save(); const age2 = Math.max(0, now - (e.born || 0)), bounce = age2 < 0.5 ? Math.round(Math.sin(age2 * 12) * 3 * Math.exp(-age2 * 5)) : 0, bx = snap(pp[0] - 8 * U), by = snap(pp[1] - 7 * U + bounce);
-      lx.fillStyle = "#8a5a3b"; lx.fillRect(bx, by, 16 * U, 14 * U); lx.fillStyle = "#f6ecd9"; lx.fillRect(bx + U, by + U, 14 * U, 12 * U); dish(lx, pp[0], by + 12 * U, e.hue % 12, e.fail, false);
-      if (e.fail) { for (const [x, y] of [[11, 1], [14, 1], [12, 2], [13, 2], [11, 3], [14, 3]]) { lx.fillStyle = "#e53935"; lx.fillRect(bx + x * U, by + y * U, U, U); } } else { for (const [x, y] of [[12, 0], [13, 0], [11, 1], [12, 1], [13, 1], [14, 1], [12, 2], [13, 2]]) { lx.fillStyle = "#ffd23f"; lx.fillRect(bx + x * U, by + y * U, U, U); } }
+      lx.fillStyle = "#8a5a3b"; lx.fillRect(bx, by, 16 * U, 14 * U); lx.fillStyle = "#f6ecd9"; lx.fillRect(bx + U, by + U, 14 * U, 12 * U); dish(lx, pp[0], by + 12 * U, e.dt, e.fail, false);
+      if (e.timeout) { for (const [x, y] of [[11, 0], [12, 0], [13, 0], [14, 0], [10, 1], [15, 1], [10, 2], [15, 2], [10, 3], [15, 3], [11, 4], [12, 4], [13, 4], [14, 4], [12, 1], [12, 2], [13, 2]]) { lx.fillStyle = "#e53935"; lx.fillRect(bx + x * U - U, by + y * U, U, U); } } else if (e.fail) { for (const [x, y] of [[11, 1], [14, 1], [12, 2], [13, 2], [11, 3], [14, 3]]) { lx.fillStyle = "#e53935"; lx.fillRect(bx + x * U, by + y * U, U, U); } } else { for (const [x, y] of [[12, 0], [13, 0], [11, 1], [12, 1], [13, 1], [14, 1], [12, 2], [13, 2]]) { lx.fillStyle = "#ffd23f"; lx.fillRect(bx + x * U, by + y * U, U, U); } }
       const bb = [bx, by, bx + 16 * U, by + 14 * U]; reg(e.key, "món trên bảng", "dish", bb); e.hits = [bb]; e.sb = bb; lx.restore();
     });
   }
+  for (let i = 0; i < g.nv; i++) if (!cooked.has(i)) { const cpP = P(g.pod(i)); add(cpP[2], () => { lx.save(); lx.globalAlpha = Math.max(0, Math.min(1, sim.bayA[i])) * 0.95; const b = person(lx, cpP[0], cpP[1], { role: "cook", pose: "stand", frame: Math.floor(now * 0.8 + i) % 2, hat: i % 2 ? "paper" : "toque", acc: i % 3 === 0 ? "glasses" : i % 3 === 1 ? "stache" : "", mood: "n", look: 3 + i * 5 }); reg("idle-cook-" + i, "đầu bếp rảnh", "person", b); lx.restore(); }); }
   for (const q of sim.parts) {
     const s = P(q.p), f = q.life / q.max;
     if (q.k === "diner") add(s[2], () => { // khách đang ăn, dọn khay hoặc ra về
@@ -744,7 +755,7 @@ function simDraw(t) {
       else if (q.k === "heart") { for (const [x, y, w, h] of [[0, 0, 2, 1], [3, 0, 2, 1], [0, 1, 5, 1], [1, 2, 3, 1], [2, 3, 1, 1]]) { lx.fillStyle = "#ff5a7a"; lx.fillRect(snap(s[0] - 5) + x * PX, snap(s[1]) + y * PX, w * PX, h * PX); } }
       else if (q.k === "anger") { for (const [x, y] of [[0, 0], [4, 0], [1, 1], [3, 1], [2, 2], [1, 3], [3, 3], [0, 4], [4, 4]]) { lx.fillStyle = "#e53935"; lx.fillRect(snap(s[0] - 5) + x * PX, snap(s[1]) + y * PX, PX, PX); } }
       else if (q.k.startsWith("stars")) { const n = Number(q.k.slice(5)); for (let i = 0; i < 5; i++) { const sx2 = snap(s[0] - 15 + i * 7), on = i < n; for (const [x, y] of [[2, 0], [1, 1], [2, 1], [3, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [1, 3], [3, 3]]) { lx.fillStyle = on ? "#ffd23f" : "#5a5a66"; lx.fillRect(sx2 + x * PX, snap(s[1]) + y * PX, PX, PX); } } }
-      else if (q.k === "order") { const bw = 18 * U, bx = snap(s[0] - bw / 2), by = snap(s[1] - 22 * U); lx.fillStyle = "#f8f8f4"; lx.fillRect(bx, by, bw, 11 * U); lx.fillStyle = "#1d1630"; lx.fillRect(bx, by, bw, U); lx.fillRect(bx, by + 10 * U, bw, U); lx.fillRect(bx, by, U, 11 * U); lx.fillRect(bx + bw - U, by, U, 11 * U); dish(lx, s[0], by + 10 * U, q.dt, false, false); }
+      else if (q.k === "order") { const bw = 24 * U, bx = snap(s[0] - bw / 2), by = snap(s[1] - 22 * U); lx.fillStyle = "#f8f8f4"; lx.fillRect(bx, by, bw, 11 * U); lx.fillStyle = "#1d1630"; lx.fillRect(bx, by, bw, U); lx.fillRect(bx, by + 10 * U, bw, U); lx.fillRect(bx, by, U, 11 * U); lx.fillRect(bx + bw - U, by, U, 11 * U); dish(lx, s[0], by + 10 * U, q.dt, false, false); }
     });
   }
   items.sort((a, b) => b.z - a.z); items.forEach((it) => it.fn()); void ptr;
@@ -756,6 +767,7 @@ function simDraw(t) {
   const fitS = (s, mw) => { cx.font = N; if (cx.measureText(s).width <= mw) return s; let x = s; while (x.length > 1 && cx.measureText(x + "…").width > mw) x = x.slice(0, -1); return x + "…"; };
   const led = simLedger(d); txt(simQueueLabel(), 0, 12, M, C.muted, "left", "hud"); txt(simRunLabel(), 0, 28, M, C.muted, "left", "hud"); txt("xong " + sim.okN + " · lỗi " + sim.failN, W - 8, 12, M, sim.failN ? C.bad : C.muted, "right", "hud");
   if (sim.bossBox) { cx.font = M; const tw = cx.measureText(bossLine).width + 14, bx = Math.min(g.Ws - tw - 4, Math.max(4, (sim.bossBox[0] + sim.bossBox[2]) / 2 - tw / 2)), by = sim.bossBox[1] - 40; cx.fillStyle = rgba(C.panel, 0.95); cx.strokeStyle = blocked ? C.bad : C.line; cx.lineWidth = 1.5; cx.fillRect(bx, by, tw, 20); cx.strokeRect(bx, by, tw, 20); txt(bossLine, bx + 7, by + 14, M, blocked ? C.bad : C.text, "left", "boss"); }
+  if (sim.cashBox && sim.cashSay && now < sim.cashSay.until) { cx.font = M; const tw = cx.measureText(sim.cashSay.text).width + 14, bx = Math.max(4, (sim.cashBox[0] + sim.cashBox[2]) / 2 - tw / 2), by = sim.cashBox[1] - 40; cx.fillStyle = rgba(C.panel, 0.95); cx.strokeStyle = C.accent; cx.lineWidth = 1.5; cx.fillRect(bx, by, tw, 20); cx.strokeRect(bx, by, tw, 20); txt(sim.cashSay.text, bx + 7, by + 14, M, C.text, "left", "cashier"); }
   const X0 = g.Ws, RW = g.RW, rowsMax = Math.floor((H - 64 - 52) / 18); cx.fillStyle = rgba(C.text, 0.05); cx.fillRect(X0, 36, RW, H - 64 - 36); cx.strokeStyle = C.line; cx.lineWidth = 1; cx.strokeRect(X0 + 0.5, 36.5, RW - 1, H - 64 - 36);
   const running = ents.filter((e) => e.state === "r" && e.ta > 0).sort((a, b) => a.slot - b.slot), waiting = ents.filter((e) => e.state === "q" && e.ta > 0).sort((a, b) => a.idx - b.idx); let ry = 52, used = 0;
   const kv = (k, v, col) => { txt(k, X0 + 10, ry, N, C.muted, "left", "list"); txt(v, X0 + RW - 8, ry, N, col || C.text, "right", "list"); ry += 18; used++; };
@@ -763,7 +775,7 @@ function simDraw(t) {
   const row = (e, tm) => { if (used >= rowsMax) return; sim.rows.push({ key: e.key, x: X0, y: ry - 13, w: RW, h: 18 }); if (e.key === simSel) { cx.fillStyle = rgba(C.text, 0.12); cx.fillRect(X0 + 1, ry - 13, RW - 2, 18); } cx.fillStyle = hslHex(e.hue, 55, 46); cx.fillRect(X0 + 8, ry - 9, 10, 10); txt(fitS(niceTitle(e.job.cmd), RW - 96), X0 + 24, ry, N, C.text, "left", "list"); txt(tm, X0 + RW - 8, ry, N, C.muted, "right", "list"); ry += 18; used++; };
   if (used < rowsMax) { txt("đang nấu " + running.length, X0 + 8, ry, M, C.muted, "left", "list"); ry += 18; used++; } for (const e of running) row(e, simClock(Date.now() / 1000 - e.job.started));
   ry += 4; if (used < rowsMax) { txt("khách chờ " + sim.waiting, X0 + 8, ry, M, C.muted, "left", "list"); ry += 18; used++; } for (const e of waiting) row(e, simClock(Date.now() / 1000 - e.job.queued));
-  const y0 = H - 40, y1 = H - 6; txt("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6, N, C.muted, "left", "legend"); txt("vào cửa → xếp hàng → gọi món → trả tiền → ăn → về · kéo chuột để xoay", 120, y0 - 6, N, C.muted, "left", "legend");
+  const y0 = H - 40, y1 = H - 6; const hud1 = "CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "% · RAM trống " + fmtMem(d.freeMb) + " (cần ≥" + fmtMem(d.minFreeMb) + ")", hud2 = "kéo chuột để xoay"; cx.font = N; txt(hud1, 0, y0 - 6, N, C.muted, "left", "legend"); const w1 = cx.measureText(hud1).width; if (w1 + 24 + cx.measureText(hud2).width < W - 4) txt(hud2, w1 + 24, y0 - 6, N, C.muted, "left", "legend");
   const top = Math.max(d.maxLoad * 1.25, ...loads, 1), yy = (v) => y1 - (Math.min(v, top) / top) * (y1 - y0);
   cx.save(); cx.setLineDash([3, 4]); cx.strokeStyle = rgba(C.faint, 0.6); cx.beginPath(); cx.moveTo(0, yy(d.maxLoad)); cx.lineTo(W, yy(d.maxLoad)); cx.stroke(); cx.restore();
   if (loads.length > 1) { cx.strokeStyle = loads[loads.length - 1] >= d.maxLoad ? C.bad : C.accent; cx.lineWidth = 1.5; cx.beginPath(); loads.forEach((v, i) => { const x = (i / (loads.length - 1)) * W; i ? cx.lineTo(x, yy(v)) : cx.moveTo(x, yy(v)); }); cx.stroke(); const lv = loads[loads.length - 1]; cx.fillStyle = cx.strokeStyle; cx.beginPath(); cx.arc(W - 2, yy(lv), 3 + Math.sin(t * 5), 0, 6.3); cx.fill(); }
