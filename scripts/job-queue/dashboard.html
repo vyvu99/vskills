@@ -93,7 +93,7 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 .p-sim{display:none;grid-column:2/-1}
 .grid.sim .mid,.grid.sim .p-info,.grid.sim .left{display:none}.grid.sim .p-sim{grid-column:1/-1}.grid.sim .p-sim{display:flex}
 .simbody{display:flex;flex-direction:column;gap:8px;overflow:auto;padding:16px 12px 12px}
-.simnote{font-size:12px;color:var(--muted);min-height:18px}.simhint{display:none}
+.simnote{font-size:12px;color:var(--muted);min-height:18px}.simnote:empty{display:none}.simhint{display:none}
 @media (max-width:760px){.simhint{display:block}}.simnote.warn{color:var(--warn)}
 #stage{position:relative;flex:1 1 auto;min-height:480px}
 #simCv{display:block;image-rendering:pixelated}#simCv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
@@ -342,7 +342,7 @@ function renderTab(d) {
 // Mô phỏng nông trại trung cổ nhìn phẳng 2D: kho hạt giống lợp rơm, cối xay gió, giếng đá, chuồng thu hoạch có cờ và lâu đài xa trên đồi. Mỗi lệnh đang chờ là một bao hạt giống xếp hàng trên đường kho, mỗi lệnh đang chạy là một cây mọc trên một luống đất (số luống mở theo hạn mức động), nông dân gánh hạt đi gieo và gánh thùng về chuồng khi cây chín. Lệnh xong là thùng quả, lỗi là thùng rau héo có dấu X, quá hạn là thùng có đồng hồ. Cối xay gió quay nhanh theo CPU, nắng gắt khi CPU nóng, mưa và mực nước giếng xuống khi RAM căng, kho hạt đóng cửa khi cổng của jobq chặn. Cả cảnh vẽ ở độ phân giải thấp rồi phóng to bằng nearest nên cạnh sắc nét; chữ chỉ nằm trên các tấm biển nhỏ nền đặc, đã được kiểm tra không đè lên nhau hay lên hình.
 const SIM_FPS = 24, PX = 3, U = 3; // máy yếu: 24 khung/giây; mỗi "điểm ảnh" hình là 3px màn hình
 let view = "list", simFirst = true, simSel = "", simSig = "";
-const simSlot = new Map(), sim = { ents: new Map(), parts: [], rain: [], cv: null, cx: null, lo: null, lx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", waiting: 0, running: 0, extra: 0, pressure: 1, idle: 0, texts: [], rects: [], okN: 0, failN: 0, avg: 0, med: 60, cause: "", d: null, say: null, used: null, free: 0, dog: null };
+const simSlot = new Map(), sim = { ents: new Map(), parts: [], rain: [], cv: null, cx: null, lo: null, lx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", waiting: 0, running: 0, extra: 0, pressure: 1, idle: 0, texts: [], rects: [], okN: 0, failN: 0, avg: 0, med: 60, cause: "", d: null, say: null, used: null, free: 0, dog: null, carts: [], pops: [], rev: 0, cost: 0, profit: 0 };
 function simColors() {
   const probe = el("i"); probe.style.cssText = "position:absolute;visibility:hidden"; document.body.append(probe); const c = {};
   for (const n of ["panel", "text", "muted", "faint", "line", "track", "accent", "warn", "bad"]) { probe.style.color = "var(--" + n + ")"; c[n] = getComputedStyle(probe).color; }
@@ -352,7 +352,7 @@ const rgba = (rgb, a) => rgb.replace(/rgba?\(([^)]+)\)/, (m, v) => "rgba(" + v.s
 const simClock = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60, p2 = (n) => String(n).padStart(2, "0"); return h ? h + ":" + p2(m) + ":" + p2(r) : p2(m) + ":" + p2(r); };
 const hueOf = (key) => [...key].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 const FN = "12px ui-monospace,Menlo,monospace", FB = "700 12px ui-monospace,Menlo,monospace";
-const simQueueLabel = () => sim.waiting + " hạt giống đang chờ" + (sim.g && sim.waiting > sim.g.qvis ? " (hiện " + sim.g.qvis + ")" : "");
+const simQueueLabel = () => sim.waiting + " đơn hàng đang chờ" + (sim.g && sim.waiting > sim.g.qvis ? " (hiện " + sim.g.qvis + ")" : "");
 const simRunLabel = () => "đang trồng " + sim.running + "/" + (sim.g ? sim.g.allow : 0) + " luống mở" + (sim.extra > 0 ? ", gieo thêm được " + sim.extra : "");
 const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const walkLeg = (a, b, tag, sp) => ({ a: a.slice(), b: b.slice(), dur: Math.max(0.25, dist2(a, b) / (sp || 130)), tag });
@@ -360,10 +360,18 @@ const stayLeg = (a, dur, tag) => ({ a: a.slice(), b: a.slice(), dur, tag });
 function legsFlow(e, legs, kind) { e.flow = { legs, i: 0, t: 0, kind, tag: legs[0].tag, facing: 1 }; e.a = 1; }
 // Loại cây theo độ nặng của lệnh: nhẹ là rau xà lách, vừa là cà rốt, nặng là bí ngô.
 const cropFor = (job) => { const w = job.mem != null ? (job.mem >= 1500 || job.cpu >= 200 ? 2 : job.mem >= 500 || job.cpu >= 100 ? 1 : 0) : ((job.secs || 0) >= 600 ? 2 : (job.secs || 0) >= 120 ? 1 : 0); return w; };
+// Tiền: mỗi đơn xong thu theo độ nặng (nhẹ 20k, vừa 45k, nặng 90k); chi phí gồm vốn theo độ nặng cộng chi phí máy theo thời gian chạy; đơn lỗi không thu mà còn bị phạt 30% giá.
+const hashStr = (str) => { let h = 7; for (const ch of str) h = (h * 31 + ch.charCodeAt(0)) % 100003; return h; };
+// Loại theo lệnh (ổn định với cùng một lệnh): 0-7 là cây (xà lách, cà rốt, bí ngô, lúa mì, ngô, cà chua, bắp cải, hướng dương), 8-11 là vật nuôi (gà, cừu, lợn, bê); khoảng một phần tư lệnh là chăn nuôi.
+const kindOf = (job) => { const r = hashStr(String(job.cmd || "").split(/\s+/).slice(0, 3).join(" ")) % 16; return r < 12 ? r % 8 : 8 + (r - 12); };
+const PRICE = [20000, 45000, 90000], BASE = [4000, 9000, 18000];
+function moneyOf(r) { const w = cropFor(r), ok = r.rc === 0, rev = ok ? PRICE[w] : 0, pen = ok ? 0 : Math.round(PRICE[w] * 0.3), cost = BASE[w] + Math.round((r.secs || 0) * 15) + pen; return { rev, cost, profit: rev - cost }; }
+const fmtVnd = (n) => { const a = Math.abs(Math.round(n)); return a >= 1e6 ? (a / 1e6).toFixed(1).replace(".", ",") + "tr" : a >= 1e3 ? Math.round(a / 1e3) + "k" : a + "đ"; };
+const moneyLine = (r) => { const m = moneyOf(r); return "thu " + fmtVnd(m.rev) + " · chi " + fmtVnd(m.cost) + " · " + (m.profit >= 0 ? "lãi +" : "lỗ −") + fmtVnd(m.profit); };
 // Bố cục: bầu trời trên cùng; hàng sau là kho hạt giống bên trái, cối xay gió, bể nước và chuồng thu hoạch bên phải; sân trước là đường xếp hạt giống chờ gieo và các thùng thu hoạch; dưới cùng là ruộng, mỗi luống đất là một chỗ chạy.
 function farmGeo(d, W) {
-  const skyH = 110, feet = skyH + 98, yard = skyH + 150, fieldTop = skyH + 190, cw = 112, rowH = 80, mx = 20;
-  const cols = Math.max(1, Math.floor((W - mx * 2) / cw)), nv = Math.max(1, Math.min(24, Math.max(d.jobs || 0, d.cap, d.running.length))), allow = Math.min(nv, Math.max(d.cap, d.running.length)), rows = Math.ceil(nv / cols), per = Math.ceil(nv / rows), fx = Math.round((W - per * cw) / 2), fieldBot = fieldTop + rows * rowH + 8, H = fieldBot + 36; // khung cao vừa đủ số hàng luống
+  const skyH = 96, feet = skyH + 98, yard = skyH + 150, fieldTop = skyH + 190, cw = 96, rowH = 80, mx = 20;
+  const cols = Math.max(1, Math.min(12, Math.floor((W - mx * 2) / cw))), nv = Math.max(1, Math.min(24, Math.max(d.jobs || 0, d.cap, d.running.length))), allow = Math.min(nv, Math.max(d.cap, d.running.length)), rows = Math.ceil(nv / cols), per = Math.ceil(nv / rows), fx = Math.round((W - per * cw) / 2), fieldBot = fieldTop + rows * rowH + 8, H = fieldBot + 36; // khung cao vừa đủ số hàng luống
   const shed = { x: mx, w: 120, h: 84 }, barn = { w: 150, h: 96 }; barn.x = W - mx - barn.w;
   const crateX0 = Math.max(shed.x + shed.w + 200, barn.x - 150), laneX0 = shed.x + shed.w + 36, laneW = Math.max(0, crateX0 - 28 - laneX0), qvis = Math.max(1, Math.floor(laneW / 96)), ccols = Math.max(1, Math.floor((W - mx - crateX0) / 52)), dcap = ccols * 2;
   return {
@@ -384,7 +392,7 @@ function simPut(key, state, tp, alpha, job, extra) {
     sim.ents.set(key, e);
   } else if (e.state !== state && !simFirst) {
     if (state === "r") {
-      if (e.qi > 0) sim.say = { text: ["Hạt nhẹ", "gieo trước."], until: now + 4 };
+      if (e.qi > 0) sim.say = { text: ["Đơn nhẹ", "làm trước."], until: now + 4 };
       const slotP = e.p.slice(), app = [tp[0], tp[1] + 14];
       legsFlow(e, [walkLeg(g.door, slotP, "walk"), stayLeg(slotP, 0.5, "pick"), walkLeg(slotP, app, "carry"), stayLeg(app, 0.8, "dig"), stayLeg(app, 0.7, "sow"), stayLeg(app, 0.6, "water"), walkLeg(app, g.door, "leave")], "plant"); e.p = g.door.slice(); e.slotP = slotP; e.plotP = tp.slice();
     }
@@ -394,7 +402,7 @@ function simPut(key, state, tp, alpha, job, extra) {
       legsFlow(e, [walkLeg(g.barnDoor, app, "walk"), stayLeg(app, 0.8, "harvest"), walkLeg(app, tp, "carry"), stayLeg(tp, 0.4, "place"), walkLeg(tp, g.barnDoor, "leave")], "harvest"); e.p = g.barnDoor.slice(); e.slotP = null;
     }
   }
-  e.state = state; e.tp = tp; e.ta = alpha; e.job = job; Object.assign(e, extra); e.crop = cropFor(job);
+  e.state = state; e.tp = tp; e.ta = alpha; e.job = job; Object.assign(e, extra); e.crop = kindOf(job);
   if (state === "r" && !e.flow) e.plotP = tp.slice();
   if (simFirst) { e.p = tp.slice(); e.a = alpha; }
   return e;
@@ -402,11 +410,11 @@ function simPut(key, state, tp, alpha, job, extra) {
 function renderSim(d, p) {
   const stage = $("stage"), W = Math.max(stage.clientWidth, 720); // màn hẹp: cảnh giữ chiều rộng tối thiểu và cuộn ngang trong khung
   if (stage.clientWidth < 80) return; // trang đang ẩn: chưa đo được
-  const g = farmGeo(d, W), room = Math.max(0, innerHeight - (stage.getBoundingClientRect().top + scrollY) - 24), H = Math.max(g.H, Math.min(g.H + 320, Math.round(room))); g.H = H; stage.style.flex = "none"; stage.style.height = H + "px"; stage.style.minHeight = "0";
+  const g = farmGeo(d, W), room = Math.max(0, innerHeight - (stage.getBoundingClientRect().top + scrollY) - 24), Z = room > 0 && room < g.H ? Math.max(0.75, room / g.H) : 1, H = Math.max(g.H, Math.min(g.H + 320, Math.round(room / Z))); g.H = H; sim.zoom = Z; stage.style.flex = "none"; stage.style.height = Math.round(H * Z) + "px"; stage.style.minHeight = "0";
   if (!sim.cv) { sim.cv = $("simCv"); sim.cx = sim.cv.getContext("2d"); sim.lo = document.createElement("canvas"); sim.lx = sim.lo.getContext("2d"); }
   const dpr = Math.max(1, Math.round(devicePixelRatio || 1)); if (sim.cv.width !== Math.round(W * dpr) || sim.cv.height !== Math.round(H * dpr)) { sim.cv.width = Math.round(W * dpr); sim.cv.height = Math.round(H * dpr); }
   const lw = Math.ceil(W / PX), lh = Math.ceil(H / PX); if (sim.lo.width !== lw || sim.lo.height !== lh) { sim.lo.width = lw; sim.lo.height = lh; }
-  sim.cv.style.width = W + "px"; sim.cv.style.height = H + "px"; sim.W = W; sim.H = H; sim.dpr = dpr; sim.C = simColors();
+  sim.cv.style.width = Math.round(W * sim.zoom) + "px"; sim.cv.style.height = Math.round(H * sim.zoom) + "px"; sim.W = W; sim.H = H; sim.dpr = dpr; sim.C = simColors();
   const seen = new Set(); sim.g = g; sim.waiting = p.waiting.length; sim.running = d.running.length; sim.extra = Math.max(0, d.cap - d.running.length); sim.pressure = d.pressure; sim.idle = d.idle || 0; sim.cause = p.cause || "";
   for (const [pid] of simSlot) if (!d.running.some((j) => j.pid === pid)) simSlot.delete(pid);
   const used = new Set(simSlot.values());
@@ -423,8 +431,9 @@ function renderSim(d, p) {
   const okRows = d.history.filter((r) => r.rc === 0); sim.okN = okRows.length; sim.failN = d.history.filter((r) => r.rc != null && r.rc !== 0).length;
   const secs = okRows.map((r) => r.secs).sort((a, b) => a - b); sim.med = secs.length ? secs[Math.floor(secs.length / 2)] : 60; // cây chín theo thời gian chạy điển hình của các lệnh trước
   sim.avg = okRows.length ? okRows.reduce((s, r) => s + r.secs, 0) / okRows.length : 0;
+  sim.rev = 0; sim.cost = 0; for (const r of d.history) if (r.rc != null) { const m = moneyOf(r); sim.rev += m.rev; sim.cost += m.cost; } sim.profit = sim.rev - sim.cost;
   for (const [k, e] of sim.ents) if (!seen.has(k) && !e.flow) { e.ta = 0; e.tp = e.p.slice(); }
-  sim.note = p.waiting.length ? (p.cause ? "Hạt giống đang chờ vì " + p.cause + "." : waitReason(p.waiting[0], 0, d, p).text) : "Không có hạt giống nào đang chờ.";
+  sim.note = p.waiting.length ? (p.cause ? "Đơn hàng đang chờ vì " + p.cause + "." : waitReason(p.waiting[0], 0, d, p).text) : "";
   $("simNote").textContent = sim.note; $("simNote").className = "simnote" + (p.waiting.length && p.cause ? " warn" : "");
   renderSimDetail(d, p); simFirst = false; sim.d = d; simKick();
 }
@@ -479,17 +488,32 @@ const bagSpr = () => sprite("bag", () => {
   const g = grid(10, 12); g.put(3, 0, 4, 2, "r"); g.put(1, 2, 8, 9, "t"); g.put(0, 4, 10, 6, "t"); g.put(3, 5, 4, 3, "w"); g.px(5, 6, "g");
   return [g.rows(), { r: RAMP(25, 40, 32), t: RAMP(38, 42, 58), w: "#f4ecd8", g: "#3d8b3d" }];
 });
-const FRUIT = [RAMP(92, 55, 60), RAMP(26, 88, 52), RAMP(28, 92, 48)];
+const FRUIT = [RAMP(92, 55, 60), RAMP(26, 88, 52), RAMP(28, 92, 48), RAMP(48, 78, 56), RAMP(52, 92, 56), RAMP(6, 78, 50), RAMP(150, 38, 52), RAMP(46, 98, 54), RAMP(45, 45, 88), RAMP(0, 0, 94), RAMP(350, 52, 72), RAMP(200, 30, 92)];
 const cropSpr = (type, st) => sprite("crop|" + type + "|" + st, () => {
   const g = grid(12, 10);
   if (st === 0) { g.put(5, 8, 2, 2, "g"); g.px(4, 7, "g"); g.px(7, 7, "g"); }
   else if (st === 1) { g.put(5, 5, 2, 5, "g"); g.put(3, 5, 2, 2, "g"); g.put(7, 4, 2, 2, "g"); }
+  else if (st === 2 || st === 5 && false) { g.put(5, 4, 2, 6, "g"); g.put(2, 5, 4, 3, "g"); g.put(6, 3, 4, 3, "g"); g.put(1, 7, 3, 2, "g"); g.put(8, 7, 3, 2, "g"); }
   else {
-    g.put(5, 4, 2, 6, "g"); g.put(2, 5, 4, 3, "g"); g.put(6, 3, 4, 3, "g"); g.put(1, 7, 3, 2, "g"); g.put(8, 7, 3, 2, "g");
-    if (st >= 3) { if (type === 0) { g.put(3, 2, 6, 5, "f"); g.put(4, 1, 4, 1, "f"); } else if (type === 1) { g.put(4, 6, 4, 3, "f"); g.put(5, 9, 2, 1, "f"); } else { g.put(2, 5, 8, 5, "f"); g.put(5, 5, 1, 5, "d"); } }
+    if (type === 3) { for (const x of [2, 5, 8]) { g.put(x + 1, 3, 1, 7, "g"); g.put(x, 0, 3, 4, "f"); } }
+    else if (type === 4) { g.put(5, 0, 2, 10, "g"); g.put(1, 4, 4, 2, "g"); g.put(7, 5, 4, 2, "g"); g.put(7, 1, 3, 4, "f"); }
+    else if (type === 5) { g.put(2, 3, 8, 6, "g"); g.put(3, 6, 10 > 0 ? 6 : 6, 4, "g"); for (const [x, y] of [[2, 4], [7, 5], [5, 3], [4, 7]]) g.put(x, y, 2, 2, "f"); }
+    else if (type === 6) { g.put(1, 8, 10, 2, "g"); g.put(2, 2, 8, 7, "f"); g.put(4, 4, 4, 3, "d"); }
+    else if (type === 7) { g.put(5, 4, 2, 6, "g"); g.put(2, 6, 3, 2, "g"); g.put(7, 7, 3, 2, "g"); g.put(2, 0, 8, 5, "f"); g.put(5, 1, 2, 3, "d"); }
+    else { g.put(5, 4, 2, 6, "g"); g.put(2, 5, 4, 3, "g"); g.put(6, 3, 4, 3, "g"); g.put(1, 7, 3, 2, "g"); g.put(8, 7, 3, 2, "g"); if (type === 0) { g.put(3, 2, 6, 5, "f"); g.put(4, 1, 4, 1, "f"); } else if (type === 1) { g.put(4, 6, 4, 3, "f"); g.put(5, 9, 2, 1, "f"); } else { g.put(2, 5, 8, 5, "f"); g.put(5, 5, 1, 5, "d"); } }
   }
   const wilt = st === 5;
-  return [g.rows(), { g: wilt ? RAMP(48, 36, 40) : RAMP(112, 55, 40), f: wilt ? RAMP(38, 28, 36) : FRUIT[type], d: RAMP(24, 80, 32) }];
+  return [g.rows(), { g: wilt ? RAMP(48, 36, 40) : RAMP(112, 55, 40), f: wilt ? RAMP(38, 28, 36) : FRUIT[type], d: type === 7 ? RAMP(24, 70, 28) : type === 6 ? RAMP(150, 30, 36) : RAMP(24, 80, 32) }];
+});
+// Sprite vật nuôi trong chuồng: gà, cừu, lợn, bê
+const animalSpr = (type, frame) => sprite("animal|" + type + "|" + frame, () => {
+  const g = grid(14, 10);
+  if (type === 8) { g.put(3, 4, 8, 5, "b"); g.put(9, 2, 4, 4, "b"); g.put(10, 0, 2, 2, "r"); g.put(13, 4, 1, 1, "o"); g.put(2, 3, 2, 3, "b"); g.px(4, 9, "o"); g.px(8, 9, "o"); if (frame) g.put(11, 3, 1, 2, "b"); }
+  else if (type === 9) { g.put(2, 2, 9, 6, "b"); g.put(1, 3, 11, 4, "b"); g.put(10, 3, 4, 4, "k"); g.px(12, 4, "w"); g.put(3, 8, 1, 2, "k"); g.put(9, 8, 1, 2, "k"); if (frame) g.put(2, 1, 8, 1, "b"); }
+  else if (type === 10) { g.put(2, 3, 9, 6, "b"); g.put(10, 4, 4, 4, "b"); g.px(13, 6, "k"); g.put(10, 2, 2, 2, "b"); g.put(3, 9, 1, 1, "k"); g.put(9, 9, 1, 1, "k"); g.put(0, 4, 2, 1, "b"); if (frame) g.px(1, 3, "b"); }
+  else { g.put(2, 2, 9, 6, "b"); g.put(10, 3, 4, 5, "b"); g.put(4, 3, 3, 3, "k"); g.put(11, 2, 2, 2, "k"); g.put(3, 8, 1, 2, "k"); g.put(9, 8, 1, 2, "k"); g.px(13, 6, "p"); if (frame) g.put(0, 3, 2, 1, "k"); }
+  const pal = [{ b: "#f4f1e8", r: "#d93a2f", o: "#ff9f1c" }, { b: "#f4f1e8", k: "#3a3a40", w: "#ffffff" }, { b: "#f0a3b8", k: "#c97a92" }, { b: "#f4f1e8", k: "#6b4528", p: "#e8a0a0" }][type - 8];
+  return [g.rows(), pal];
 });
 const crateSpr = (type, fail, timeout) => sprite("crate|" + type + "|" + (fail ? 1 : 0) + "|" + (timeout ? 1 : 0), () => {
   const g = grid(14, 9); g.put(0, 3, 14, 6, "w"); g.put(0, 3, 14, 1, "W"); g.put(0, 6, 14, 1, "D");
@@ -580,8 +604,24 @@ function drawRoad(g, t, night) { // đường phía sau có xe bò chở rơm ch
   if (ST()) R(0, g.skyH + 8, g.W, 14, mixHex("#c9a46c", "#6b5a3f", night * 0.5));
   if (!LV()) return;
   const x = ((t * 16) % (g.W + 360)) - 180, y = g.skyH + 17;
+  drawOxCart(x, y, t, null);
+
+}
+function drawOxCart(x, y, t, load) { // xe bò chở rơm; khi giao hàng thì chở thêm thùng của đơn vừa xong
   R(x - 52, y - 20, 40, 12, "#a37040"); R(x - 50, y - 30, 36, 10, "#d9b45a"); disc(x - 44, y - 4, 7, "#5a3a22"); disc(x - 22, y - 4, 7, "#5a3a22"); R(x - 36, y - 40, 8, 10, "#8a5a33"); R(x - 34, y - 46, 6, 6, "#e0b48a"); R(x - 12, y - 12, 14, 3, "#6b4528");
   R(x, y - 16, 30, 14, "#7a4b2a"); for (const l2 of [3, 10, 20, 26]) R(x + l2, y - 3, 4, 7, "#5a3a22"); R(x + 30, y - 20, 10, 10, "#7a4b2a"); R(x + 36, y - 24, 3, 5, "#e8dcc0"); R(x - 6, y - 17 + Math.round(Math.sin(t * 6)), 8, 3, "#6b4528");
+  if (load) blit(sim.lx, crateSpr(load.crop, load.fail, load.timeout), x - 32, y - 20, false);
+}
+function drawCarts(g, t) { // xe giao hàng chạy ra từ sau chuồng dọc đường phía sau, chuồng che xe lúc vừa ra
+  if (!sim.carts.length) return; const l = sim.lx; l.save(); l.beginPath(); l.rect(0, 0, g.W, g.H); l.rect(g.barn.x - 6, g.skyH - 40, g.barn.w + 12, 96); l.clip("evenodd");
+  for (const c of sim.carts) drawOxCart(c.x + 52, g.skyH + 17, t, c);
+  l.restore();
+}
+function deliver(e) { // đơn xong: xe chở thùng đi giao, tiền nổi lên và đồng xu bay
+  const g = sim.g, m = moneyOf(e.job), now = performance.now() / 1000, bx = g.barn.x + g.barn.w / 2;
+  if (sim.carts.length < 6) sim.carts.push({ x: bx, crop: e.crop, fail: e.fail, timeout: e.timeout, t0: now });
+  sim.pops.push({ x: bx, y: g.skyH + 6, text: (m.profit >= 0 ? "+" : "−") + fmtVnd(m.profit), ok: m.profit >= 0, t0: now });
+  for (let n = 0; n < 8; n++) sim.parts.push({ p: [bx, g.skyH + 14], v: [(Math.random() - 0.5) * 60, -50 - Math.random() * 40], life: 0.9, max: 0.9, s: PX, c: m.profit >= 0 ? "#ffd34e" : "#e5534b" });
 }
 function drawNightLife(g, t, night) { // đom đóm ban đêm
   if (night < 0.5) return; for (let k = 0; k < 14; k++) { const fx = (Math.sin(k * 12.9898) * 43758.5453) % 1, fy = (Math.sin(k * 78.233) * 12543.7) % 1, x = Math.abs(fx) * g.W + Math.sin(t * 0.6 + k) * 10, y = g.fieldTop - 10 + Math.abs(fy) * (g.H - g.fieldTop - 50) + Math.cos(t * 0.5 + k) * 8; if (Math.sin(t * 2 + k * 1.7) > -0.2) R(x, y, PX, PX, "#e8ff6a"); }
@@ -613,18 +653,59 @@ function drawGrass(g) { // cỏ tự nhiên: mảng màu, bụi cỏ, hoa, đá;
   sim.lx.save(); sim.lx.setTransform(1, 0, 0, 1, 0, 0); sim.lx.drawImage(sim.grassCv, 0, 0); sim.lx.restore();
 }
 function drawFarmland(g) { const x0 = g.mx - 4, y0 = g.fieldTop - 18, w = g.W - g.mx * 2 + 8, h = g.fieldBot - g.fieldTop + 24; R(x0, y0, w, h, mixHex(SEA.g3, SEA.snow ? "#b9c4c8" : "#7a5a35", 0.3)); for (let y = y0 + 6; y < y0 + h - 4; y += 12) R(x0 + 4, y, w - 8, PX, mixHex(SEA.g3, "#5e4128", 0.25)); }
-function drawVillagers(g, t, add) { // dân làng làm việc nhà, không gắn với lệnh nào: gánh nước từ giếng, chẻ củi, chăn cừu
-  const l = sim.lx, mid = Math.round((g.shed.x + g.shed.w + g.barn.x) / 2), well = [mid + 100, g.feet + 18], door = [g.door[0] + 26, g.door[1] + 20];
-  const cyc = (t % 26) / 26, seg = cyc < 0.12 ? 0 : cyc < 0.5 ? 1 : cyc < 0.62 ? 2 : 3, u = seg === 1 ? (cyc - 0.12) / 0.38 : seg === 3 ? (cyc - 0.62) / 0.38 : 0;
-  const wx = seg === 0 ? well[0] : seg === 1 ? well[0] + (door[0] - well[0]) * u : seg === 2 ? door[0] : door[0] + (well[0] - door[0]) * u, wy = seg === 0 ? well[1] : seg === 1 ? well[1] + (door[1] - well[1]) * u : seg === 2 ? door[1] : door[1] + (well[1] - door[1]) * u, wfc = seg === 1 ? -1 : 1, walking = seg === 1 || seg === 3;
-  add(wy, () => { shade(wx, wy, 30); blit(l, farmerSpr(walking ? Math.floor(t * 4) % 2 : 0, 2), wx, wy, wfc < 0); const full = seg === 1 || seg === 2; R(wx - 18, wy - 38, 36, 3, "#6b4528"); for (const dx of [-17, 15]) { R(wx + dx, wy - 34, 2, 8, "#6b4528"); R(wx + dx - 3, wy - 27 + (walking ? Math.round(Math.sin(t * 8)) * PX : 0), 8, 7, "#8a5a33"); if (full) R(wx + dx - 2, wy - 28, 6, 2, "#6fb7ff"); } });
-  const cx0 = g.shed.x + g.shed.w + 12, cy0 = g.feet + 36, swing = Math.sin(t * 5);
-  add(cy0, () => { shade(cx0, cy0, 30); blit(l, farmerSpr(swing > 0.3 ? 1 : 0, 3), cx0, cy0, false); farmTool(cx0 + 9, cy0 - 22, 1, -0.5 + swing * 0.9, "cut"); R(cx0 + 22, cy0 - 6, 14, 6, "#8a5a33"); R(cx0 + 24, cy0 - 12, 14, 6, "#a37040"); R(cx0 + 22, cy0 - 3, 4, 3, "#e0c08a"); });
-  const sx = Math.round(g.mx + (g.fx - 40 - g.mx) / 2) + 22, sy = g.fieldTop + 56;
-  if (g.fx - 40 - g.mx >= 90) add(sy, () => { shade(sx, sy, 30); blit(l, farmerSpr(0, 1), sx, sy, true); R(sx + 12, sy - 40, 2, 42, "#6b4528"); R(sx + 9, sy - 44, 8, 3, "#6b4528"); });
+// ===== Dân làng luân phiên nhiều việc: xong một việc là bốc một việc khác (không lặp lại việc vừa làm), mỗi người có danh sách việc riêng theo khu vực =====
+const nPts = (g) => { const mid = Math.round((g.shed.x + g.shed.w + g.barn.x) / 2), lx0 = Math.round(g.mx + (g.fx - 40 - g.mx) / 2), hasL = g.fx - 40 - g.mx >= 90; return { mid, well: [mid + 100, g.feet + 18], hut: [g.door[0] + 26, g.door[1] + 20], wood: [g.shed.x + g.shed.w + 12, g.feet + 36], hens: [g.mx + 50, g.feet + 66], barn: [g.barn.x + g.barn.w / 2 - 50, g.feet + 30], mill: [mid, g.feet + 18], hay: [lx0, g.fieldTop + 56], hasL }; };
+const nGo = (a, b, item, sp) => ({ a: a.slice(), b: b.slice(), dur: Math.max(0.4, dist2(a, b) / (sp || 70)), pose: "walk", item: item || null });
+const nStay = (p, dur, pose, item) => ({ a: p.slice(), b: p.slice(), dur, pose, item: item || null });
+const nMeadow = (g) => { const y0 = g.fieldBot + 12, y1 = g.H - 40, bh = y1 - y0, cy = y0 + Math.round(bh * 0.5), rw = Math.min(30, Math.floor(bh / 3)); return { ok: bh >= 90, y0, ry: (x) => cy + Math.sin(x * 0.012) * Math.min(18, bh * 0.16), rw, upY: y0 + Math.max(28, Math.round((cy - rw / 2 - y0) * 0.92)), loY: Math.min(y1 - 4, cy + rw / 2 + 40) }; };
+const NPC_TASKS = { // việc của từng người: hàm nhận (g, từ đâu, thời gian) và trả về các đoạn đi, làm
+  water: (g, f) => { const q = nPts(g); return [nGo(f, q.well), nStay(q.well, 2.5, "water"), nGo(q.well, q.hut, "yoke"), nStay(q.hut, 1.5, "water"), nGo(q.hut, q.well)]; },
+  wood: (g, f) => { const q = nPts(g); return [nGo(f, q.wood), nStay(q.wood, 6, "cut"), nGo(q.wood, q.hut, "log"), nStay(q.hut, 1, "walk")]; },
+  hens: (g, f) => { const q = nPts(g); return [nGo(f, q.hens), nStay(q.hens, 4, "sow"), nGo(q.hens, q.hut)]; },
+  mill: (g, f) => { const q = nPts(g); return [nGo(f, q.mill), nStay(q.mill, 3, "pick"), nGo(q.mill, q.well)]; },
+  barn: (g, f) => { const q = nPts(g); return [nGo(f, q.barn), nStay(q.barn, 5, "dig"), nGo(q.barn, q.mill)]; },
+  hay: (g, f) => { const q = nPts(g), m1 = [q.hay[0], g.feet + 26], m2 = [q.barn[0], g.feet + 26]; return [nGo(f, q.hay), nStay(q.hay, 2, "cut"), nGo(q.hay, m1, "bale"), nGo(m1, m2, "bale"), nGo(m2, q.barn, "bale"), nStay(q.barn, 1.5, "walk"), nGo(q.barn, q.mill)]; },
+  weed: (g, f) => { const i = Math.floor(Math.random() * g.allow), pt = g.plot(i); return [nGo(f, [pt[0], pt[1] + 14]), nStay([pt[0], pt[1] + 14], 4, "dig")]; },
+  waterCrop: (g, f) => { const used = [...(sim.used || [])], i = used.length ? used[Math.floor(Math.random() * used.length)] : Math.floor(Math.random() * g.allow), pt = g.plot(i); return [nGo(f, [pt[0], pt[1] + 14]), nStay([pt[0], pt[1] + 14], 3, "water")]; },
+  inspect: (g, f) => { const a = [g.fx + 10, g.fieldTop + 60], b = [g.fx + g.per * g.cw - 10, g.fieldTop + 60]; return [nGo(f, a), nGo(a, b, "staff", 50), nGo(b, a, "staff", 50)]; },
+  milk: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * 0.4 + Math.sin(performance.now() / 1000 * 0.07) * 70) - 34; return [nGo(f, [x, m.upY + 4]), nStay([x, m.upY + 4], 6, "milk")]; },
+  fish: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * 0.3), b = [x, m.ry(x) - m.rw / 2 - 10]; return [nGo(f, b), nStay(b, 12, "fish")]; },
+  apples: (g, f) => { const m = nMeadow(g), tr = [Math.round(g.W * 0.76) + (Math.floor(Math.random() * 3)) * 74 - 22, m.loY + 4]; return [nGo(f, tr), nStay(tr, 6, "pick"), nGo(tr, [g.W * 0.5, m.loY + 8], "basket")]; },
+  fence: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * (0.25 + Math.random() * 0.5)), b = [x, m.y0 + 8]; return [nGo(f, b), nStay(b, 5, "dig")]; },
+  herd: (g, f) => { const q = nPts(g), a = [q.hay[0] - 26, q.hay[1] + 30], b = [q.hay[0] + 26, q.hay[1] + 36]; return [nGo(f, a, "staff"), nGo(a, b, "staff", 45), nGo(b, a, "staff", 45)]; },
+  shear: (g, f) => { const q = nPts(g), a = [q.hay[0] - 20, q.hay[1] + 28]; return [nGo(f, a, "staff"), nStay(a, 5, "cut")]; },
+  feedSheep: (g, f) => { const q = nPts(g), a = [q.hay[0] + 22, q.hay[1] + 36]; return [nGo(f, a), nStay(a, 3, "sow")]; },
+};
+const NPC_POOLS = [["water", "wood", "hens", "mill"], ["hay", "barn", "wood", "mill"], ["weed", "waterCrop", "inspect"], ["milk", "fish", "apples", "fence"], ["herd", "shear", "feedSheep"]];
+function npcOk(g, id) { const q = nPts(g), m = nMeadow(g); if (["hay", "herd", "shear", "feedSheep"].includes(id)) return q.hasL; if (["milk", "fish", "apples", "fence"].includes(id)) return m.ok; return true; }
+function npcStep(dt, g) {
+  if (!sim.npcs) sim.npcs = NPC_POOLS.map((pool, k) => ({ k, pool, hue: k + 1, p: null, segs: null, i: 0, t: 0, fc: 1, last: "", walk: 0, pose: "walk", item: null }));
+  const q = nPts(g);
+  for (const n of sim.npcs) {
+    if (!n.p) n.p = (n.k === 2 ? [g.fx - 24, g.fieldTop + 60] : n.k === 3 ? [Math.round(g.W * 0.5), g.H - 80] : n.k === 4 ? [q.hay[0], q.hay[1] + 20] : n.k === 1 ? q.mill.slice() : q.well.slice());
+    if (!n.segs) { let ids = n.pool.filter((id) => id !== n.last && npcOk(g, id)); if (!ids.length) ids = ["water", "wood", "hens", "mill"].filter((id) => id !== n.last); const id = ids[Math.floor(Math.random() * ids.length)]; n.last = id; n.segs = NPC_TASKS[id](g, n.p); n.i = 0; n.t = 0; }
+    const sg = n.segs[n.i]; n.t += dt; if (n.t >= sg.dur) { n.t -= sg.dur; n.i++; if (n.i >= n.segs.length) { n.p = n.segs[n.segs.length - 1].b.slice(); n.segs = null; continue; } }
+    const c = n.segs[n.i], u = c.dur ? Math.min(1, n.t / c.dur) : 1; n.p = [c.a[0] + (c.b[0] - c.a[0]) * u, c.a[1] + (c.b[1] - c.a[1]) * u]; n.pose = c.pose; n.item = c.item; if (Math.abs(c.b[0] - c.a[0]) > 1) n.fc = c.b[0] > c.a[0] ? 1 : -1; if (c.pose === "walk" && (c.a[0] !== c.b[0] || c.a[1] !== c.b[1])) n.walk += dt * 7;
+  }
+}
+function drawNPCs(g, t, add) {
+  if (!sim.npcs) return; const l = sim.lx;
+  for (const n of sim.npcs) { if (!n.p) continue; add(n.p[1], () => {
+    const x = n.p[0], fc = n.fc, pose = n.pose, low = ["water", "cut", "dig", "sow", "milk", "fish"].includes(pose), y = n.p[1] + (low ? U : 0), moving = pose === "walk" && n.item !== "none";
+    if (n.item === "log" || n.item === "bale" || n.item === "basket") { /* vật đang vác sau lưng */ if (n.item === "log") { R(x - fc * 14, y - 30, 22, 6, "#8a5a33"); R(x - fc * 14, y - 30, 3, 6, "#e0c08a"); } else if (n.item === "bale") R(x - fc * 12, y - 36, 22, 14, "#d9b45a"); else R(x - fc * 12, y - 24, 14, 10, "#c9a24d"); }
+    shade(x, n.p[1], 32); blit(l, farmerSpr(low || pose === "pick" ? 0 : Math.floor(n.walk) % 2, n.hue), x, y, fc < 0);
+    if (n.item === "yoke") { R(x - 18, y - 38, 36, 3, "#6b4528"); for (const dx of [-17, 15]) { R(x + dx, y - 34, 2, 8, "#6b4528"); R(x + dx - 3, y - 27 + Math.round(Math.sin(t * 8)) * PX, 8, 7, "#8a5a33"); R(x + dx - 2, y - 28, 6, 2, "#6fb7ff"); } }
+    if (n.item === "staff") R(x + fc * 14, y - 40, 2, 42, "#6b4528");
+    if (pose === "cut") farmTool(x + fc * 9, y - 22, fc, -0.4 + Math.sin(t * 6) * 0.9, "cut"); else if (pose === "dig") farmTool(x + fc * 9, y - 22, fc, -0.9 + Math.sin(t * 7) * 0.7, "dig");
+    else if (pose === "water") { R(x + fc * 10, y - 24, 10, 7, "#8d939a"); R(x + fc * 18, y - 22, 8, 3, "#8d939a"); if (Math.floor(t * 6) % 2) R(x + fc * 26, y - 18, PX, PX * 2, "#6fb7ff"); }
+    else if (pose === "pick") { R(x - 8, y - 66 - (Math.floor(t * 3) % 2) * PX, 5, 5, "#e6b88a"); R(x + 5, y - 62, 5, 5, "#e6b88a"); R(x - 4, y - 70, 6, 6, "#d93a2f"); }
+    else if (pose === "milk") { R(x + fc * 14, y - 8, 10, 8, "#8d939a"); R(x + fc * 15, y - 9, 8, 2, "#f4f1e8"); }
+    else if (pose === "fish") { R(x + fc * 10, y - 30, 3, 3, "#6b4528"); R(fc > 0 ? x + 12 : x - 40, y - 34, 28, 2, "#6b4528"); R(x + fc * 40, y - 32, 1, 26 + Math.round(Math.sin(t * 2)) * PX, "#dfe8ff"); R(x + fc * 39, y - 6 + Math.round(Math.sin(t * 2)) * PX, 4, 4, "#d93a2f"); }
+    else if (pose === "sow" && Math.floor(t * 5) % 2) R(x + fc * 16, y - 14, PX, PX, "#e8d9a8");
+  }); }
 }
 function drawCat(g, t) { // mèo cuộn tròn ngủ trên mái kho hạt, đuôi khẽ động
-  const x = g.shed.x + 34, y = g.feet - 82, tw = Math.floor(t * 1.2) % 2 ? PX : 0; R(x, y - 8, 16, 8, "#e0903a"); R(x + 12, y - 11, 8, 7, "#e0903a"); R(x + 13, y - 14, 2, 3, "#e0903a"); R(x + 18, y - 14, 2, 3, "#e0903a"); R(x - 6, y - 4 - tw, 7, 3, "#c97a2a"); R(x + 4, y - 6, 2, 2, "#f3d9a8");
+  const ph = (t % 16) / 16, x = g.shed.x + 34 + (ph > 0.5 ? Math.round(Math.sin((ph - 0.5) * 12.566) * 26) : 0), y = g.feet - 82, tw = Math.floor(t * (ph > 0.5 ? 6 : 1.2)) % 2 ? PX : 0; R(x, y - 8, 16, 8, "#e0903a"); R(x + 12, y - 11, 8, 7, "#e0903a"); R(x + 13, y - 14, 2, 3, "#e0903a"); R(x + 18, y - 14, 2, 3, "#e0903a"); R(x - 6, y - 4 - tw, 7, 3, "#c97a2a"); R(x + 4, y - 6, 2, 2, "#f3d9a8");
 }
 function drawBonfire(g, t, night) { // đống lửa trại ban đêm cạnh đường, tàn lửa bay lên
   if (night < 0.4) return; const x = g.laneX0 - 40, y = g.yard + 34, fl = Math.floor(t * 8) % 3;
@@ -669,7 +750,7 @@ function paintScene(g, t, night, wet, heat, blocked, hr, d) { // cảnh gồm l�
     if (LV()) for (const [dx, dy, s] of [[-30, 14, 0], [26, 26, 1]]) { const sx = mx2 + dx + (Math.sin(t * 0.3 + s) * 6), sy = by + dy; R(sx - 12, sy - 14, 24, 12, "#f4f1e8"); R(sx - 14, sy - 12, 28, 8, "#f4f1e8"); R(sx + (s ? -18 : 12), sy - 12, 8, 8, "#3a3a40"); R(sx - 9, sy - 2, 3, 6, "#3a3a40"); R(sx + 6, sy - 2, 3, 6, "#3a3a40"); }
     if (ST()) for (const [dx, dy, c] of [[-36, 6, "#ff6b8a"], [36, 8, "#ffd34e"], [-8, 28, "#ffffff"], [14, 30, "#ff6b8a"]]) { R(mx2 + dx, by + dy, 3, 3, c); R(mx2 + dx, by + dy + 3, 3, 3, "#3f8f3a"); } };
   pasture(g.mx, g.fx - 40); pasture(g.fx + g.per * g.cw + 40, W - g.mx); drawMeadow(g, t);
-  if (lv) { drawHens(g, t); drawCrows(g, t); drawDog(g, t); drawCat(g, t); drawBonfire(g, t, night); }
+  if (lv) { drawHens(g, t); drawCrows(g, t); drawDog(g, t); drawCat(g, t); drawBonfire(g, t, night); drawCarts(g, t); }
   if (st) {
   for (let i = 0; i < g.nv; i++) { const pt = g.plot(i), occ = sim.used && sim.used.has(i); drawPlot(pt[0], pt[1], wet, blocked && i < g.allow, !occ, i >= g.allow); }
   }
@@ -691,7 +772,10 @@ function simDraw(t) {
   for (const e of sim.ents.values()) {
     if (e.a < 0.02) continue; e.hits = []; e.sb = null; const f = e.flow, al = Math.min(1, e.a), hot = e.job && e.job.cpu ? clamp01(e.job.cpu / 200) : 0, st = sim.d.timeout || 900;
     const put = (z, fn) => add(z, () => { lx.save(); lx.globalAlpha = al; fn(); lx.restore(); });
-    const crop = (pt, stage, sway) => { const x = pt[0] + sway, y0 = pt[1] - 24, b = blit(lx, cropSpr(e.crop, stage), x, y0 + 16, false); return [Math.min(b[0], pt[0] - 30), Math.min(b[1], y0 - 3), Math.max(b[2], pt[0] + 30), pt[1] + 3]; };
+    const crop = (pt, stage, sway) => {
+      const y0 = pt[1] - 24; if (e.crop >= 8) { /* chuồng nuôi: hàng rào thấp quanh luống, con vật đi lại bên trong */ R(pt[0] - 33, y0 - 6, 66, 3, "#a37040"); R(pt[0] - 33, y0 + 27, 66, 3, "#a37040"); for (const dx of [-33, -11, 11, 31]) R(pt[0] + dx, y0 - 8, 3, 38, "#8a5a33");
+        const wx = Math.sin(t * 0.5 + e.hue) * 14, dir = Math.cos(t * 0.5 + e.hue) >= 0, b = sblit(30, lx, animalSpr(e.crop, Math.floor(t * 2 + e.hue) % 2), pt[0] + wx, y0 + 20, !dir); return [Math.min(b[0], pt[0] - 33), Math.min(b[1], y0 - 8), Math.max(b[2], pt[0] + 34), pt[1] + 6]; }
+      const x = pt[0] + sway, b = blit(lx, cropSpr(e.crop, stage), x, y0 + 16, false); return [Math.min(b[0], pt[0] - 30), Math.min(b[1], y0 - 3), Math.max(b[2], pt[0] + 30), pt[1] + 3]; };
     const peasant = (p0, fade, pose) => { // dáng người theo việc đang làm: đi, cuốc, gieo, tưới, gặt
       const fc = f && f.facing < 0 ? -1 : 1, low = pose === "dig" || pose === "sow" || pose === "cut" || pose === "water", y = p0[1] + (low ? U : 0);
       shade(p0[0], p0[1], 32); const b = blit(lx, farmerSpr(low ? 0 : Math.floor(e.walk) % 2, e.hue), p0[0], y, fc < 0); lx.globalAlpha = al * fade; e.sb = e.sb || b; e.hits.push(b);
@@ -715,13 +799,13 @@ function simDraw(t) {
       if (dist2(e.p, e.tp) < 2) plate(e.key, e.p[0], e.p[1] + 4, [niceTitle(e.job.cmd), simClock(el)], wilt); // biển chỉ hiện khi cây đã đứng yên, tránh biển chồng nhau lúc đang trượt về chỗ mới
     } else if (e.state === "q") {
       const wait = now - (e.job.queued || now), head = e.idx === 0;
-      put(e.p[1], () => { const b = sblit(30, lx, bagSpr(), e.p[0], e.p[1] - (head && Math.floor(t * 2) % 2 ? PX : 0), false); e.sb = b; e.hits.push(b); reg(e.key, "hạt giống", "bag", b); if (head) { R(e.p[0] - 3, b[1] - 12, 6, 3, "#ffd34e"); R(e.p[0] - 6, b[1] - 9, 12, 3, "#ffd34e"); R(e.p[0] - 3, b[1] - 6, 6, 3, "#ffd34e"); } });
+      put(e.p[1], () => { const b = sblit(30, lx, bagSpr(), e.p[0], e.p[1] - (head && Math.floor(t * 2) % 2 ? PX : 0), false); e.sb = b; R(b[2] - 12, b[1] + 8, 9, 12, "#f4efe3"); R(b[2] - 11, b[1] + 11, 7, PX, "#c43a2c"); R(b[2] - 11, b[1] + 16, 7, PX, "#8a96a3"); /* tờ đơn hàng dán trên bao */ e.hits.push(b); reg(e.key, "hạt giống", "bag", b); if (head) { R(e.p[0] - 3, b[1] - 12, 6, 3, "#ffd34e"); R(e.p[0] - 6, b[1] - 9, 12, 3, "#ffd34e"); R(e.p[0] - 3, b[1] - 6, 6, 3, "#ffd34e"); } });
       if (e.ta > 0 && dist2(e.p, e.tp) < 2) plate(e.key, e.p[0], e.p[1] + 4, [niceTitle(e.job.cmd), simClock(wait)], wait > st / 3);
     } else if (e.state === "d") {
       put(e.p[1], () => { const b = sblit(46, lx, crateSpr(e.crop, e.fail, e.timeout), e.p[0], e.p[1], false); e.sb = b; e.hits.push(b); reg(e.key, "thùng thu hoạch", "crate", b); });
     }
   }
-  drawVillagers(g, t, add); items.sort((a, b) => a.z - b.z); for (const it of items) it.fn();
+  drawNPCs(g, t, add); items.sort((a, b) => a.z - b.z); for (const it of items) it.fn();
   for (const q of sim.parts) { const f = q.life / q.max; lx.fillStyle = q.c; lx.globalAlpha = Math.max(0, f); lx.fillRect(snap(q.p[0]), snap(q.p[1]), q.s, q.s); lx.globalAlpha = 1; }
   drawNightLife(g, t, night);
   const fogA = (hr >= 5 && hr < 8.5 ? 0.3 * (1 - (hr - 5) / 3.5) : 0) + wet * 0.1;
@@ -741,8 +825,9 @@ function simDraw(t) {
   for (const q of pl) { q.lines = q.lines.map((s, i) => (i ? s : fitText(cx, s, q.owner === "hud" ? 400 : sim.g.cw - 20))); draw(q.owner, q.mx0, q.y, q.lines, q.warn); }
   const say = sim.say && performance.now() / 1000 < sim.say.until ? sim.say.text : null;
   if (say) draw("gate", g.shed.x + 70, g.feet + 16, say, false); else if (sim.waiting > 0 && sim.cause) draw("gate", g.shed.x + 70, g.feet + 16, ["Kho hạt đóng,", fitText(cx, sim.cause, 130)], true);
+  { const nowS = performance.now() / 1000; cx.font = FB; cx.lineWidth = 3; cx.lineJoin = "round"; for (const q of sim.pops) { const age = nowS - q.t0; if (age < 0 || age > 2.4) continue; const x = Math.max(24, Math.min(W - 40, q.x)), y = q.y - age * 18; cx.globalAlpha = Math.max(0, 1 - age / 2.4); cx.strokeStyle = "rgba(0,0,0,0.7)"; cx.strokeText(q.text, x - 12, y); cx.fillStyle = q.ok ? "#4ade80" : "#ff6b6b"; cx.fillText(q.text, x - 12, y); } cx.globalAlpha = 1; } /* chữ tiền nổi là hiệu ứng thoáng qua, không đưa vào kiểm tra chữ đè nhau */
   draw("hud1", 8 + 90, 8, [simQueueLabel(), simRunLabel()], false);
-  const led = ["sổ thu hoạch", "xong " + sim.okN + " · lỗi " + sim.failN, "mất TB " + simClock(sim.avg)]; cx.font = FN; const lw0 = Math.ceil(Math.max(...led.map((s) => cx.measureText(s).width))) + 10; draw("ledger", W - 8 - lw0 / 2, 8, led, false);
+  const led = ["sổ thu chi " + (sim.okN + sim.failN) + " lệnh", "xong " + sim.okN + " · lỗi " + sim.failN, "thu " + fmtVnd(sim.rev) + " · chi " + fmtVnd(sim.cost), (sim.profit >= 0 ? "lãi +" : "lỗ −") + fmtVnd(sim.profit)]; cx.font = FN; const lw0 = Math.ceil(Math.max(...led.map((s) => cx.measureText(s).width))) + 10; draw("ledger", W - 8 - lw0 / 2, 8, led, sim.profit < 0);
   draw("hud2", 8 + 200, H - 28, ["CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "% · RAM trống " + fmtMem(d.freeMb) + " (cần ≥" + fmtMem(d.minFreeMb) + ")"], false);
 }
 function reg(owner, name, kind, b) { sim.rects.push({ owner, name, kind, x: b[0], y: b[1], w: b[2] - b[0], h: b[3] - b[1] }); }
@@ -753,14 +838,16 @@ function simStep(dt, t) {
     if (f) {
       f.t += dt; let L = f.legs[f.i];
       while (L && f.t >= L.dur) { f.t -= L.dur; f.i++; L = f.legs[f.i]; if (L && f.kind === "plant" && f.i === 3) for (let n = 0; n < 8; n++) sim.parts.push({ p: [e.plotP[0] + (Math.random() - 0.5) * 30, e.plotP[1] - 6], v: [(Math.random() - 0.5) * 40, -20 - Math.random() * 20], life: 0.7, max: 0.7, s: PX, c: "#a9825a" }); if (L && f.kind === "harvest" && f.i === 1) for (let n = 0; n < 8; n++) sim.parts.push({ p: [e.plotP[0] + (Math.random() - 0.5) * 30, e.plotP[1] - 20], v: [(Math.random() - 0.5) * 50, -30 - Math.random() * 30], life: 0.8, max: 0.8, s: PX, c: "#ffe066" }); }
-      if (!L) { e.flow = null; e.p = e.tp.slice(); } else { f.tag = L.tag; const u = L.dur ? f.t / L.dur : 1; e.p = [L.a[0] + (L.b[0] - L.a[0]) * u, L.a[1] + (L.b[1] - L.a[1]) * u]; if (Math.abs(L.b[0] - L.a[0]) > 1) f.facing = L.b[0] > L.a[0] ? 1 : -1; if (L.a[0] !== L.b[0] || L.a[1] !== L.b[1]) { e.walk += dt * 7; e.du = (e.du || 0) - dt; if (e.du <= 0) { e.du = 0.2; sim.parts.push({ p: [e.p[0], e.p[1] - 2], v: [(Math.random() - 0.5) * 12, -14], life: 0.5, max: 0.5, s: PX, c: sim.d && (sim.d.pressure >= sim.d.maxPressure || sim.d.freeMb < sim.d.minFreeMb) ? "#6a5a45" : "#d9c9a0" }); } }
+      if (!L) { if (f.kind === "harvest") deliver(e); e.flow = null; e.p = e.tp.slice(); } else { f.tag = L.tag; const u = L.dur ? f.t / L.dur : 1; e.p = [L.a[0] + (L.b[0] - L.a[0]) * u, L.a[1] + (L.b[1] - L.a[1]) * u]; if (Math.abs(L.b[0] - L.a[0]) > 1) f.facing = L.b[0] > L.a[0] ? 1 : -1; if (L.a[0] !== L.b[0] || L.a[1] !== L.b[1]) { e.walk += dt * 7; e.du = (e.du || 0) - dt; if (e.du <= 0) { e.du = 0.2; sim.parts.push({ p: [e.p[0], e.p[1] - 2], v: [(Math.random() - 0.5) * 12, -14], life: 0.5, max: 0.5, s: PX, c: sim.d && (sim.d.pressure >= sim.d.maxPressure || sim.d.freeMb < sim.d.minFreeMb) ? "#6a5a45" : "#d9c9a0" }); } }
       if (f.kind === "plant" && (f.i === 3 || f.i === 4 || f.i === 5)) { e.sp = (e.sp || 0) - dt; if (e.sp <= 0) { e.sp = f.i === 3 ? 0.22 : 0.08; const fc = f.facing < 0 ? -1 : 1; sim.parts.push({ p: [e.p[0] + fc * (f.i === 5 ? 20 : 10), e.p[1] - (f.i === 5 ? 20 : 14)], v: [fc * 18, f.i === 5 ? 10 : -10], life: 0.6, max: 0.6, s: PX, c: f.i === 5 ? "#6fb7ff" : f.i === 3 ? "#a9825a" : "#e8d9a8" }); } } }
     } else { const dx = e.tp[0] - e.p[0], dy = e.tp[1] - e.p[1], dd = Math.hypot(dx, dy); if (dd > 0.5) { const s = Math.min(dd, 150 * dt); e.p[0] += (dx / dd) * s; e.p[1] += (dy / dd) * s; } }
     e.a += Math.max(-1, Math.min(1, e.ta - e.a)) * Math.min(1, dt * 6); if (e.ta <= 0 && e.a < 0.02 && !e.flow) sim.ents.delete(k);
   }
+  npcStep(dt, g); for (const c of sim.carts) c.x -= 42 * dt; sim.carts = sim.carts.filter((c) => c.x > -160); sim.pops = sim.pops.filter((q) => now - q.t0 < 2.4);
   const home = [g.shed.x + 30, g.feet + 40]; if (!sim.dog) sim.dog = { p: home.slice(), face: 1, walk: 0, sleep: true };
   let tgt = null; for (const e of sim.ents.values()) if (e.flow && e.a > 0.5 && !tgt) tgt = [e.p[0] - 34, e.p[1] + 2];
-  { const dg = sim.dog, to = tgt || home, dx = to[0] - dg.p[0], dy = to[1] - dg.p[1], dd = Math.hypot(dx, dy); if (dd > 6) { const sp = Math.min(dd, (tgt ? 120 : 70) * dt); dg.p[0] += (dx / dd) * sp; dg.p[1] += (dy / dd) * sp; dg.face = dx >= 0 ? 1 : -1; dg.walk += dt * 9; dg.sleep = false; } else dg.sleep = !tgt; }
+  { const dg = sim.dog; if (!tgt && (!dg.roamT || now > dg.roamT)) { dg.roamT = now + 5 + Math.random() * 6; dg.roam = [g.mx + 30 + Math.random() * (g.W * 0.55), g.feet + 30 + Math.random() * 60]; }
+    const to = tgt || (NIGHT > 0.6 ? home : dg.roam || home), dx = to[0] - dg.p[0], dy = to[1] - dg.p[1], dd = Math.hypot(dx, dy); if (dd > 6) { const sp = Math.min(dd, (tgt ? 120 : 60) * dt); dg.p[0] += (dx / dd) * sp; dg.p[1] += (dy / dd) * sp; dg.face = dx >= 0 ? 1 : -1; dg.walk += dt * 9; dg.sleep = false; } else dg.sleep = !tgt && NIGHT > 0.6; }
   for (const q of sim.parts) { q.p[0] += q.v[0] * dt; q.p[1] += q.v[1] * dt; q.v[1] += 80 * dt; q.life -= dt; } sim.parts = sim.parts.filter((q) => q.life > 0);
   const wet = sim.d && (sim.d.pressure >= sim.d.maxPressure || sim.d.freeMb < sim.d.minFreeMb);
   const fall = wet ? 90 : SEA.snow ? 70 : SEA.leaf ? 14 : 0, sp = wet ? 360 : SEA.snow ? 38 : 24;
@@ -776,7 +863,7 @@ function simFrame(now) {
   const tt = performance.now() / 1000; simStep(dt, tt); simDraw(tt); sim.raf = requestAnimationFrame(simFrame);
 }
 function simKick() {
-  if (reduceMotion()) { for (const e of sim.ents.values()) { e.flow = null; e.p = e.tp.slice(); e.a = e.ta; } sim.parts.length = 0; simDraw(0); return; }
+  if (reduceMotion()) { for (const e of sim.ents.values()) { e.flow = null; e.p = e.tp.slice(); e.a = e.ta; } sim.parts.length = 0; sim.carts.length = 0; sim.pops.length = 0; simDraw(0); return; }
   simDraw(performance.now() / 1000); if (!sim.raf && !document.hidden) sim.raf = requestAnimationFrame(simFrame);
 }
 function simHit(x, y) {
@@ -837,12 +924,12 @@ function renderSimDetail(d, p) {
   const bold = (n) => { const b = el("b"); b.append(n); return b; };
   if (kind === "r") rows.push(row("Trạng thái", "Đang chạy"), row("Đã chạy", bold(timeSpan(job.started, "run", d.timeout))), row("Đang dùng", fmtCpu(job.cpu) + " nhân CPU, " + fmtMem(job.mem) + " RAM"), row("Tối đa", fmtTime(d.timeout)));
   else if (kind === "q") rows.push(row("Trạng thái", "Đang chờ, thứ " + (idx + 1) + " trong hàng"), row("Đã chờ", bold(timeSpan(job.queued, "wait", 0))), row("Lý do", waitReason(job, idx, d, p).text), row("Dự kiến cần", fmtCpu(job.cpu) + " nhân CPU, " + fmtMem(job.mem) + " RAM"));
-  else rows.push(row("Kết quả", job.rc === 0 ? "Xong" : job.rc === 124 ? "Quá hạn, nên chia nhỏ lệnh" : "Lỗi " + job.rc), row("Mất", fmtTime(job.secs)), row("Lúc", fmtStamp(job.start)), row("Thư mục", job.cwd));
+  else rows.push(row("Kết quả", job.rc === 0 ? "Xong" : job.rc === 124 ? "Quá hạn, nên chia nhỏ lệnh" : "Lỗi " + job.rc), row("Mất", fmtTime(job.secs)), row("Tiền", moneyLine(job)), row("Lúc", fmtStamp(job.start)), row("Thư mục", job.cwd));
   g.replaceChildren(...rows.flat());
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && simSel) selectSim(simSel); });
 $("simDetail").addEventListener("close", () => { if (simSel) selectSim(simSel); });
-const cvEl = $("simCv"), cvAt = (ev) => { const r = cvEl.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+const cvEl = $("simCv"), cvAt = (ev) => { const r = cvEl.getBoundingClientRect(), z = sim.zoom || 1; return [(ev.clientX - r.left) / z, (ev.clientY - r.top) / z]; }; // tọa độ chuột đổi về tọa độ cảnh khi cảnh bị thu nhỏ
 cvEl.addEventListener("click", (ev) => { simClickAt(...cvAt(ev)); });
 cvEl.addEventListener("mousemove", (ev) => { const pt = cvAt(ev), e = simHit(...pt), k = e ? e.key : ""; cvEl.title = e ? e.job.cmd || "" : ""; if (k !== sim.hover) { sim.hover = k; cvEl.style.cursor = k ? "pointer" : ""; simKick(); } });
 cvEl.addEventListener("mouseleave", () => { sim.hover = ""; cvEl.style.cursor = ""; simKick(); });
