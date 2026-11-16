@@ -229,7 +229,7 @@ function meter(label, big, unit, pct, cls, note, aria) {
 }
 function renderMachine(d, p) {
   const cpuPct = (d.load / d.maxLoad) * 100, cpuCls = cpuPct >= 100 ? "bad" : "";
-  const cpu = meter("CPU", fmtNum(Number(d.load).toFixed(1)), "trên " + d.maxLoad, cpuPct, cpuCls, cpuCls === "bad" ? "Quá bận, lệnh mới phải chờ." : cpuPct >= 75 ? "Khá bận." : "Còn rảnh.", "CPU so với mức tối đa");
+  const cpu = meter("CPU", fmtNum(Number(d.load).toFixed(0)) + "%", "trên " + d.maxLoad + "%", cpuPct, cpuCls, cpuCls === "bad" ? "Quá bận, lệnh mới phải chờ." : cpuPct >= 75 ? "Khá bận." : "Còn rảnh.", "CPU so với mức tối đa");
   cpu.append(spark(d.maxLoad));
   const total = d.totalMb || 0, usedPct = total ? ((total - d.freeMb) / total) * 100 : 0, ramCls = d.freeMb < d.minFreeMb ? "bad" : "";
   const ram = meter("RAM", fmtMem(d.freeMb), "còn trống" + (total ? " / " + fmtMem(total) : ""), total ? usedPct : null, ramCls, "Cần ít nhất " + fmtMem(d.minFreeMb) + " trống mới nhận thêm lệnh.", "RAM đã dùng");
@@ -537,7 +537,7 @@ function simDraw(t) {
   }
   // đường tải máy chạy như máy đo nhịp tim, kèm chú giải
   const y0 = H - 40, y1 = H - 6;
-  cx.font = mono; cx.fillStyle = C.faint; cx.fillText("tải máy " + Number(d.load).toFixed(0) + "/" + d.maxLoad, 0, y0 - 6); cx.fillText("vòng = thời gian · nước = RAM · bánh răng = CPU", 130, y0 - 6);
+  cx.font = mono; cx.fillStyle = C.faint; cx.fillText("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6); cx.fillText("vòng = thời gian · nước = RAM · bánh răng = CPU", 130, y0 - 6);
   const top = Math.max(d.maxLoad * 1.25, ...loads, 1), yy = (v) => y1 - (Math.min(v, top) / top) * (y1 - y0);
   cx.save(); cx.setLineDash([3, 4]); cx.strokeStyle = rgba(C.faint, 0.6); cx.beginPath(); cx.moveTo(0, yy(d.maxLoad)); cx.lineTo(W, yy(d.maxLoad)); cx.stroke(); cx.restore();
   if (loads.length > 1) { cx.strokeStyle = loads[loads.length - 1] >= d.maxLoad ? C.bad : C.accent; cx.lineWidth = 1.5; cx.beginPath(); loads.forEach((v, i) => { const x = (i / (loads.length - 1)) * W; i ? cx.lineTo(x, yy(v)) : cx.moveTo(x, yy(v)); }); cx.stroke(); const lv = loads[loads.length - 1]; cx.fillStyle = cx.strokeStyle; cx.beginPath(); cx.arc(W - 2, yy(lv), 3 + Math.sin(t * 5), 0, 6.3); cx.fill(); }
