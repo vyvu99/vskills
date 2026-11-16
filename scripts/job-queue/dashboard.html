@@ -93,9 +93,10 @@ details.run .info{margin:0 0 6px 20px;font-size:12px;color:var(--muted)}details.
 .p-sim{display:none;grid-column:2/-1}
 .grid.sim .mid,.grid.sim .p-info{display:none}.grid.sim .p-sim{display:flex}
 .simbody{display:flex;flex-direction:column;gap:8px;overflow:auto;padding:16px 12px 12px}
-.simnote{font-size:12px;color:var(--muted);min-height:18px}.simnote.warn{color:var(--warn)}
+.simnote{font-size:12px;color:var(--muted);min-height:18px}.simhint{display:none}
+@media (max-width:760px){.simhint{display:block}}.simnote.warn{color:var(--warn)}
 #stage{position:relative;flex:1 1 auto;min-height:440px}
-#simCv{display:block}
+#simCv{display:block}#simCv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 #stage{overflow-x:auto;overflow-y:hidden}
 #simDetail{flex:none;height:176px;overflow:auto;border:1px solid var(--line);background:var(--panel);padding:10px 12px}#simDetail .out{max-height:none}
 .sd-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.sd-head .title{font-weight:650;overflow-wrap:anywhere}
@@ -144,7 +145,7 @@ dl{margin:0;display:grid;gap:10px;max-width:62ch}dt{font-weight:650}dd{margin:0;
       <section class="panel" aria-labelledby="h-queue"><h2 id="h-queue">đang chờ</h2><div class="body"><ol id="queue"></ol></div></section>
     </div>
     <section class="panel p-sim" aria-labelledby="h-sim"><h2 id="h-sim">mô phỏng</h2>
-      <div class="body simbody"><div id="simNote" class="simnote"></div><div id="stage"><canvas id="simCv" tabindex="0" role="group" aria-label="Mô phỏng hàng đợi. Bấm vào một lệnh để xem chi tiết, dùng phím mũi tên để chuyển giữa các lệnh, Esc để bỏ chọn."></canvas></div><div id="simDetail" aria-live="polite"></div></div>
+      <div class="body simbody"><div id="simNote" class="simnote"></div><div class="simnote simhint">Cảnh rộng hơn màn hình, vuốt ngang để xem hết.</div><div id="stage"><canvas id="simCv" tabindex="0" role="group" aria-label="Mô phỏng hàng đợi. Bấm vào một lệnh để xem chi tiết, dùng phím mũi tên để chuyển giữa các lệnh, Esc để bỏ chọn."></canvas></div><div id="simDetail" aria-live="polite"></div></div>
     </section>
     <section class="panel p-info" aria-label="Thông tin thêm">
       <div class="tabs" role="tablist" aria-label="Thông tin thêm">
@@ -472,8 +473,9 @@ function simDraw(t) {
   const state = sim.waiting && sim.free > 0 ? "blocked" : sim.waiting ? "full" : "idle", vx = g.zq + 14;
   cx.save(); cx.translate(vx, vy); cx.rotate(Math.PI / 4 + sim.valve * (Math.PI / 4)); cx.fillStyle = C.panel; cx.fillRect(-7, -7, 14, 14);
   cx.strokeStyle = state === "blocked" ? C.warn : state === "full" ? C.faint : C.accent; cx.lineWidth = 2; cx.strokeRect(-7, -7, 14, 14);
-  if (state === "blocked") { cx.fillStyle = rgba(C.warn, 0.35 + 0.25 * Math.sin(t * 5)); cx.fillRect(-7, -7, 14, 14); cx.beginPath(); cx.moveTo(-4, 0); cx.lineTo(4, 0); cx.stroke(); }
+  if (state === "blocked") { cx.fillStyle = rgba(C.warn, 0.35 + 0.25 * Math.sin(t * 5)); cx.fillRect(-7, -7, 14, 14); }
   cx.restore();
+  if (state === "blocked") { cx.strokeStyle = C.warn; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(vx - 6, vy); cx.lineTo(vx + 6, vy); cx.stroke(); }
   if (sim.waiting && sim.head && nextFree !== undefined && state !== "blocked") { cx.fillStyle = C.accent; cx.beginPath(); const hy = g.top + g.qh / 2, bx = g.zq - 6 + Math.sin(t * 6) * 2; cx.moveTo(bx, hy - 5); cx.lineTo(bx + 7, hy); cx.lineTo(bx, hy + 5); cx.fill(); }
   // khay kết quả
   cx.save(); cx.strokeStyle = performance.now() / 1000 - sim.trayAt < 0.4 ? C.accent : C.line; cx.setLineDash([4, 4]); cx.strokeRect(g.tx0 + 0.5, g.top + 0.5, g.zd - 1, g.H - g.top - 4); cx.restore();
@@ -488,7 +490,7 @@ function simDraw(t) {
     cx.strokeStyle = busy ? rgba(C.accent, 0.8) : sim.waiting ? C.faint : C.line; cx.setLineDash(busy || sim.waiting ? [] : [4, 4]); cx.strokeRect(a.x + 0.5, a.y + 0.5, g.podW - 1, g.podH - 1); cx.setLineDash([]);
     if (!busy && sim.waiting) { cx.save(); cx.beginPath(); cx.rect(a.x, a.y, g.podW, g.podH); cx.clip(); cx.strokeStyle = rgba(C.faint, 0.25); for (let x = -g.podH; x < g.podW; x += 8) { cx.beginPath(); cx.moveTo(a.x + x, a.y + g.podH); cx.lineTo(a.x + x + g.podH, a.y); cx.stroke(); } cx.restore(); }
     cx.fillStyle = busy ? rgba(C.accent, 0.6 + 0.4 * Math.sin(t * 4)) : sim.waiting ? C.warn : C.faint; cx.beginPath(); cx.arc(a.x + 10, a.y + 12, 4, 0, 6.3); cx.fill();
-    cx.font = mono; cx.fillStyle = C.faint; cx.fillText("máy " + (i + 1), a.x + 20, a.y + 16);
+    cx.font = mono; cx.fillStyle = C.muted; cx.fillText("máy " + (i + 1), a.x + 20, a.y + 16);
     for (const px of [a.x, a.x + g.podW]) { cx.fillStyle = C.panel; cx.strokeStyle = busy ? C.accent : C.line; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(px, a.y + g.podH / 2, 4, 0, 6.3); cx.fill(); cx.stroke(); }
     cx.restore();
   }
@@ -537,7 +539,7 @@ function simDraw(t) {
   }
   // đường tải máy chạy như máy đo nhịp tim, kèm chú giải
   const y0 = H - 40, y1 = H - 6;
-  cx.font = mono; cx.fillStyle = C.faint; cx.fillText("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6); cx.fillText("vòng = thời gian · nước = RAM · bánh răng = CPU", 130, y0 - 6);
+  cx.font = mono; cx.fillStyle = C.muted; cx.fillText("CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "%", 0, y0 - 6); cx.fillText("vòng = thời gian · nước = RAM · bánh răng = CPU", 130, y0 - 6);
   const top = Math.max(d.maxLoad * 1.25, ...loads, 1), yy = (v) => y1 - (Math.min(v, top) / top) * (y1 - y0);
   cx.save(); cx.setLineDash([3, 4]); cx.strokeStyle = rgba(C.faint, 0.6); cx.beginPath(); cx.moveTo(0, yy(d.maxLoad)); cx.lineTo(W, yy(d.maxLoad)); cx.stroke(); cx.restore();
   if (loads.length > 1) { cx.strokeStyle = loads[loads.length - 1] >= d.maxLoad ? C.bad : C.accent; cx.lineWidth = 1.5; cx.beginPath(); loads.forEach((v, i) => { const x = (i / (loads.length - 1)) * W; i ? cx.lineTo(x, yy(v)) : cx.moveTo(x, yy(v)); }); cx.stroke(); const lv = loads[loads.length - 1]; cx.fillStyle = cx.strokeStyle; cx.beginPath(); cx.arc(W - 2, yy(lv), 3 + Math.sin(t * 5), 0, 6.3); cx.fill(); }
@@ -555,6 +557,13 @@ function simStats() {
   const c = { r: 0, q: 0, d: 0, f: 0, out: 0, fl: 0, pods: sim.g ? sim.g.n : 0 };
   for (const e of sim.ents.values()) { if (e.flow) c.fl++; if (e.ta <= 0) continue; c[e.state]++; if (e.fail) c.f++; if (e.tx < -1 || e.ty < -1 || e.tx + e.tw > sim.W + 1 || e.ty + e.th > sim.H + 1) c.out++; }
   return c;
+}
+// Kiểm tra tương phản các màu chữ và nét vẽ trong cảnh mô phỏng với nền panel (chữ 4,5:1, nét 3:1), dùng cho cả giao diện sáng lẫn tối.
+function simContrast() {
+  const C = simColors(), lum = (rgb) => { const [r, g, b] = rgb.match(/[\d.]+/g).slice(0, 3).map((v) => { v = Number(v) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }, bad = [];
+  for (const [k, min] of Object.entries({ text: 4.5, muted: 4.5, bad: 4.5, accent: 3, warn: 3 })) { const r = ratio(C[k], C.panel); if (r < min) bad.push(k + " " + r.toFixed(2) + "<" + min); }
+  return bad;
 }
 const simAdvance = (sec) => { for (let i = 0; i < sec / 0.04; i++) simStep(0.04, performance.now() / 1000); simDraw(performance.now() / 1000); };
 // Kiểm tra bố cục tĩnh: mọi khối (nhãn, máy, ô chờ, khay, van, chữ đáy) không đè nhau, ống không xuyên qua máy và hai ống song song khác nhau cách nhau ít nhất 14px.
