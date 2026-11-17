@@ -342,7 +342,7 @@ function renderTab(d) {
 // Mô phỏng nông trại trung cổ nhìn phẳng 2D: kho hạt giống lợp rơm, cối xay gió, giếng đá, chuồng thu hoạch có cờ và lâu đài xa trên đồi. Mỗi lệnh đang chờ là một bao hạt giống xếp hàng trên đường kho, mỗi lệnh đang chạy là một cây mọc trên một luống đất (số luống mở theo hạn mức động), nông dân gánh hạt đi gieo và gánh thùng về chuồng khi cây chín. Lệnh xong là thùng quả, lỗi là thùng rau héo có dấu X, quá hạn là thùng có đồng hồ. Cối xay gió quay nhanh theo CPU, nắng gắt khi CPU nóng, mưa và mực nước giếng xuống khi RAM căng, kho hạt đóng cửa khi cổng của jobq chặn. Cả cảnh vẽ ở độ phân giải thấp rồi phóng to bằng nearest nên cạnh sắc nét; chữ chỉ nằm trên các tấm biển nhỏ nền đặc, đã được kiểm tra không đè lên nhau hay lên hình.
 const SIM_FPS = 24, PX = 3, U = 3; // máy yếu: 24 khung/giây; mỗi "điểm ảnh" hình là 3px màn hình
 let view = "list", simFirst = true, simSel = "", simSig = "";
-const simSlot = new Map(), sim = { ents: new Map(), parts: [], rain: [], cv: null, cx: null, lo: null, lx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", waiting: 0, running: 0, extra: 0, pressure: 1, idle: 0, texts: [], rects: [], okN: 0, failN: 0, avg: 0, med: 60, cause: "", d: null, say: null, used: null, free: 0, dog: null, carts: [], pops: [], rev: 0, cost: 0, profit: 0 };
+const simSlot = new Map(), sim = { ents: new Map(), parts: [], rain: [], cv: null, cx: null, lo: null, lx: null, W: 0, H: 0, last: 0, raf: 0, C: null, g: null, hover: "", waiting: 0, running: 0, extra: 0, pressure: 1, idle: 0, texts: [], rects: [], okN: 0, failN: 0, avg: 0, med: 60, cause: "", d: null, say: null, used: null, free: 0, dog: null, carts: [], pops: [], rev: 0, cost: 0, profit: 0, wind: 0, clock: 0, mill: { ang: 0, w: 0.4 }, npcs: null };
 function simColors() {
   const probe = el("i"); probe.style.cssText = "position:absolute;visibility:hidden"; document.body.append(probe); const c = {};
   for (const n of ["panel", "text", "muted", "faint", "line", "track", "accent", "warn", "bad"]) { probe.style.color = "var(--" + n + ")"; c[n] = getComputedStyle(probe).color; }
@@ -376,9 +376,9 @@ function farmGeo(d, W) {
   const crateX0 = Math.max(shed.x + shed.w + 200, barn.x - 150), laneX0 = shed.x + shed.w + 36, laneW = Math.max(0, crateX0 - 28 - laneX0), qvis = Math.max(1, Math.floor(laneW / 96)), ccols = Math.max(1, Math.floor((W - mx - crateX0) / 52)), dcap = ccols * 2;
   return {
     W, H, skyH, feet, yard, fieldTop, fieldBot, cw, rowH, nv, allow, per, fx, shed, barn, crateX0, laneX0, qvis, ccols, dcap, mx,
-    plot: (i) => [fx + (i % per) * cw + cw / 2, fieldTop + Math.floor(i / per) * rowH + 46],
-    que: (i) => [laneX0 + Math.min(i, qvis - 1) * 96 + 48, yard],
-    crate: (i) => [crateX0 + (i % ccols) * 52 + 26, yard - Math.floor(i / ccols) * 46],
+    plot: (i) => [fx + (i % per) * cw + cw / 2 + Math.round((hash(i * 3 + 1) - 0.5) * 8), fieldTop + Math.floor(i / per) * rowH + 46 + Math.round((hash(i * 7 + 2) - 0.5) * 6)], // lệch nhẹ như người đặt tay, không thẳng hàng tăm tắp
+    que: (i) => [laneX0 + Math.min(i, qvis - 1) * 96 + 48 + Math.round((hash(i * 5 + 3) - 0.5) * 8), yard + Math.round((hash(i * 11 + 4) - 0.5) * 5)],
+    crate: (i) => [crateX0 + (i % ccols) * 52 + 26 + Math.round((hash(i * 13 + 5) - 0.5) * 5), yard - Math.floor(i / ccols) * 46 + Math.round((hash(i * 17 + 6) - 0.5) * 3)],
     door: [shed.x + shed.w / 2, feet + 6], barnDoor: [barn.x + barn.w / 2, feet + 6],
   };
 }
@@ -471,7 +471,8 @@ const SEASONS = [ // theo tháng thật: xuân hoa, hè xanh, thu vàng, đông 
   { g1: "#a5b24a", g2: "#9aa743", g3: "#93a03e", h1: "#c6c27a", h2: "#b4a95e", tree: "#d9822b", apple: "#d93a2f", snow: 0, leaf: 1 },
   { g1: "#dce8ee", g2: "#d0dfe8", g3: "#c8d8e2", h1: "#e4eef3", h2: "#d4e1e9", tree: "#aebbc2", apple: "#ffffff", snow: 1, leaf: 0 }];
 const seasonOf = (mo) => (mo >= 2 && mo <= 4 ? 0 : mo >= 5 && mo <= 7 ? 1 : mo >= 8 && mo <= 10 ? 2 : 3);
-const shade = (x, y, w) => R(x - w / 2, y - 2, w, 5, "rgba(20,30,10,0.26)");
+let SUNX = 0; // -1 sáng sớm (bóng đổ về trái, dài), 0 giữa trưa (bóng ngắn dưới chân), +1 chiều tối
+const shade = (x, y, w) => R(x - w / 2 + SUNX * 8, y - 2, w * (1 + Math.abs(SUNX) * 0.5), 5, "rgba(20,30,10,0.26)");
 const sblit = (sw, cx, cv, x, y, flip) => { shade(x, y, sw); return blit(cx, cv, x, y, flip); };
 function farmTool(x, y, fc, ang, kind) { const l = sim.lx; l.save(); l.translate(x, y); l.scale(fc, 1); l.rotate(ang); l.fillStyle = "#6b4528"; l.fillRect(-1.5, -4, 3, 30); l.fillStyle = "#aeb6bf"; if (kind === "dig") l.fillRect(-7, 24, 14, 5); else { l.fillRect(0, -4, 20, 3); l.fillRect(14, -1, 8, 3); } l.restore(); }
 // ===== Sprite nhân vật và đồ vật: lưới ký tự nhỏ, tự đổ bóng và viền =====
@@ -550,7 +551,7 @@ function drawTithe(g, t) { // chuồng thu hoạch xây đá có cờ
 }
 function drawMill(cx, y, t, heat) { // cối xay gió trụ gỗ, cánh quay theo CPU
   if (ST()) { R(cx - 12, y - 8, 24, 8, "#8a5a33"); R(cx - 10, y - 50, 20, 44, "#c9b48a"); R(cx - 12, y - 56, 24, 8, "#8f6a2a"); R(cx - 4, y - 20, 8, 20, "#4a2f1b"); R(cx - 3, y - 62, 6, 8, "#8f6a2a"); }
-  if (LV()) { const l = sim.lx, ang = t * (0.4 + heat * 3), hx = cx, hy = y - 40; l.save(); l.translate(hx, hy); l.rotate(ang);
+  if (LV()) { const l = sim.lx, ang = sim.mill.ang, hx = cx, hy = y - 40; l.save(); l.translate(hx, hy); l.rotate(ang);
   for (let k = 0; k < 4; k++) { l.rotate(Math.PI / 2); l.fillStyle = "#6b4528"; l.fillRect(0, -2, 34, 4); l.fillStyle = "#e8dcc0"; l.fillRect(8, -9, 24, 9); } l.restore(); disc(hx, hy, 5, "#4a2f1b"); }
 }
 function drawWell(cx, y, ram) { // giếng đá, cột nước bên cạnh cho thấy RAM còn trống
@@ -567,7 +568,13 @@ function drawCastle(x, y, haze) { // lâu đài xa trên đồi
   for (const bx of [x - 8, x + 58, x + 26]) for (let k = 0; k < 4; k++) R(bx + k * 6, y - 62 + (bx === x + 26 ? 6 : 0), 3, 6, c2);
   R(x + 34, y - 74, 2, 26, "#5a3a22"); R(x + 36, y - 74, 12, 8, "#c8433a");
 }
-function drawFence(x0, x1, y) { for (let x = x0; x <= x1; x += 24) { R(x, y - 12, 4, 14, "#8a5a33"); R(x, y - 14, 4, 3, "#a37040"); } R(x0, y - 9, x1 - x0, 3, "#a37040"); R(x0, y - 3, x1 - x0, 3, "#a37040"); }
+function drawFence(x0, x1, y) { // cọc cách nhau không đều, cao thấp và nghiêng khác nhau, thiếu cọc, gãy thanh, cả hàng lượn theo mặt đất
+  const seed = Math.round(y), xs = [], at = (x) => y + Math.round(wob(x, seed * 0.1, 2) / PX) * PX;
+  for (let x = x0, i = 0; x <= x1; i++) { if (hash(i * 7 + seed) <= 0.96 || !xs.length) xs.push(x); x += 24 + Math.round((hash(i * 5 + seed) - 0.5) * 2) * PX * 2; }
+  xs.forEach((x, i) => { const yy = at(x), lean = hash(i + seed) > 0.8 ? PX : 0, hgt = 14 + Math.round((hash(i * 3 + seed) - 0.5) * 2) * PX;
+    R(x + lean, yy - hgt + 2, 4, hgt, "#8a5a33"); R(x + lean, yy - hgt, 4, 3, "#a37040"); if (hash(i * 9 + seed) > 0.6) R(x - PX, yy, PX, PX * 2, SEA.g3);
+    if (i < xs.length - 1) { const w = xs[i + 1] - x; R(x, yy - 9, w, 3, "#a37040"); if (hash(i * 11 + seed) > 0.12) R(x, yy - 3 + (hash(i * 13 + seed) > 0.8 ? PX : 0), w, 3, "#a37040"); } }); // thanh dưới có chỗ gãy võng xuống hoặc mất
+}
 function drawCow(x, y, t, sd) {
   const bob = Math.floor(t * 1.2 + sd) % 2 ? PX : 0, dir = sd % 2 ? -1 : 1, hx = x + dir * 24; shade(x, y, 48);
   R(x - 20, y - 22, 40, 16, "#f4f1e8"); R(x - 8, y - 22, 10, 8, "#2a2a30"); R(x + 8, y - 16, 10, 7, "#2a2a30"); for (const l2 of [-16, -6, 6, 14]) R(x + l2, y - 6, 4, 8, "#e6e1d4");
@@ -600,10 +607,29 @@ function drawCrows(g, t) { // quạ đậu trên hàng rào, bay đi khi có ng�
     if (!near) { R(x - 5, y - 8, 10, 8, "#23232b"); R(x + 3, y - 13, 6, 6, "#23232b"); R(x + 8, y - 11, 3, 2, "#d9a441"); R(x - 8, y - 6, 4, 3, "#23232b"); }
     else { const fl = Math.floor(t * 8) % 2; R(x + 14, y - 30, 8, 3, "#23232b"); R(x + 22, y - 30 - fl * PX, 8, 3, "#23232b"); R(x + 20, y - 27, 4, 4, "#23232b"); } }
 }
+// Đường đất uốn lượn: tâm đường lượn theo hai sóng chồng nhau, bề rộng đổi dần, mép lởm chởm, có vệt bánh xe, sỏi và cỏ lấn vào mép; mưa thì có vũng nước
+const wob = (x, seed, amp) => Math.sin(x * 0.011 + seed) * amp + Math.sin(x * 0.029 + seed * 2) * amp * 0.4;
+function dirtRoad(x0, x1, cy, amp, w, seed, night) {
+  const body = mixHex("#d4b47a", "#6b5a3f", (night || 0) * 0.5), edge = mixHex("#b8945a", "#4f4230", (night || 0) * 0.5), rut = mixHex("#c2a064", "#5c4c36", (night || 0) * 0.5), st = PX * 2;
+  for (let x = x0; x < x1; x += st) {
+    const h = w + Math.sin(x * 0.017 + seed * 3) * w * 0.18, yc = cy + wob(x, seed, amp), jt = Math.round((hash(x + seed) - 0.5) * 2) * PX, jb = Math.round((hash(x * 3 + seed) - 0.5) * 2) * PX;
+    R(x, yc - h / 2 - PX + jt, st, h + PX * 2 - jt + jb, edge); R(x, yc - h / 2 + jt, st, h - jt + jb, body);
+    if (hash(x * 0.5 + seed) > 0.25) { R(x, yc - h / 4, st, PX, rut); R(x, yc + h / 4, st, PX, rut); } // hai vệt bánh xe, có chỗ đứt
+    if (hash(x * 7 + seed) > 0.93) R(x, yc + (hash(x * 3) - 0.5) * h * 0.7, PX, PX, "#9c8b6a"); // sỏi
+    if (hash(x * 5 + seed) > 0.9) R(x, yc - h / 2 - PX * 2 + jt, PX, PX * 2, SEA.g3); if (hash(x * 9 + seed) > 0.9) R(x, yc + h / 2 + jb, PX, PX * 2, SEA.g3); // cỏ lấn vào mép
+    if (sim.mud && hash(x * 11 + seed) > 0.96) R(x, yc - 2, PX * 5, PX, "#7fa9c6"); // vũng nước sau mưa
+  }
+}
+// Sân đất: hình chữ nhật cắt góc, mép lởm chởm, có vết đạp mòn và sỏi
+function plaza(x, y, w, h, seed) {
+  const body = "#d4b47a", edge = "#b8945a"; R(x + PX * 2, y - PX, w - PX * 4, h + PX * 2, edge); R(x - PX, y + PX * 2, w + PX * 2, h - PX * 4, edge); R(x + PX * 2, y, w - PX * 4, h, body); R(x, y + PX * 2, w, h - PX * 4, body); R(x + PX, y + PX, w - PX * 2, h - PX * 2, body);
+  for (let i = PX * 3; i < w - PX * 3; i += PX * 2) { if (hash(i + seed) > 0.7) R(x + i, y - PX * 2, PX, PX, SEA.g3); if (hash(i * 3 + seed) > 0.7) R(x + i, y + h + PX, PX, PX, SEA.g3); }
+  for (let k = 0; k < Math.floor(w * h / 400); k++) R(x + PX * 2 + hash(k * 7 + seed) * (w - PX * 5), y + PX * 2 + hash(k * 13 + seed) * (h - PX * 5), PX, PX, k % 3 ? "#c2a064" : "#9c8b6a");
+}
 function drawRoad(g, t, night) { // đường phía sau có xe bò chở rơm chạy qua
-  if (ST()) R(0, g.skyH + 8, g.W, 14, mixHex("#c9a46c", "#6b5a3f", night * 0.5));
+  if (ST()) dirtRoad(0, g.W, g.skyH + 15, 2.5, 13, 1, night);
   if (!LV()) return;
-  const x = ((t * 16) % (g.W + 360)) - 180, y = g.skyH + 17;
+  const x = ((t * 16) % (g.W + 360)) - 180, y = g.skyH + 17 + wob(x + 52, 1, 2.5); // xe chạy theo đúng đường cong
   drawOxCart(x, y, t, null);
 
 }
@@ -614,14 +640,15 @@ function drawOxCart(x, y, t, load) { // xe bò chở rơm; khi giao hàng thì c
 }
 function drawCarts(g, t) { // xe giao hàng chạy ra từ sau chuồng dọc đường phía sau, chuồng che xe lúc vừa ra
   if (!sim.carts.length) return; const l = sim.lx; l.save(); l.beginPath(); l.rect(0, 0, g.W, g.H); l.rect(g.barn.x - 6, g.skyH - 40, g.barn.w + 12, 96); l.clip("evenodd");
-  for (const c of sim.carts) drawOxCart(c.x + 52, g.skyH + 17, t, c);
+  for (const c of sim.carts) drawOxCart(c.x + 52, g.skyH + 17 + wob(c.x + 52, 1, 2.5) - (c.v > 5 && Math.sin(c.x * 0.4) > 0.7 ? PX : 0), t, c); // đường gồ ghề làm xe nảy nhẹ
   l.restore();
 }
 function deliver(e) { // đơn xong: xe chở thùng đi giao, tiền nổi lên và đồng xu bay
   const g = sim.g, m = moneyOf(e.job), now = performance.now() / 1000, bx = g.barn.x + g.barn.w / 2;
-  if (sim.carts.length < 6) sim.carts.push({ x: bx, crop: e.crop, fail: e.fail, timeout: e.timeout, t0: now });
+  if (sim.carts.length < 6) sim.carts.push({ x: bx, v: 0, crop: e.crop, fail: e.fail, timeout: e.timeout, t0: now });
   sim.pops.push({ x: bx, y: g.skyH + 6, text: (m.profit >= 0 ? "+" : "−") + fmtVnd(m.profit), ok: m.profit >= 0, t0: now });
-  for (let n = 0; n < 8; n++) sim.parts.push({ p: [bx, g.skyH + 14], v: [(Math.random() - 0.5) * 60, -50 - Math.random() * 40], life: 0.9, max: 0.9, s: PX, c: m.profit >= 0 ? "#ffd34e" : "#e5534b" });
+  const cheer = (sim.npcs || []).filter((q) => q.p && !q.say && !q.rider); if (cheer.length && Math.random() < 0.6) npcSay(cheer.find((q) => q.k === 1) || cheer[0], sayPick(e.fail ? SHOUT_FAIL : SHOUT_OK)); // có người reo khi đơn xong
+  for (let n = 0; n < 8; n++) sim.parts.push({ p: [bx, g.skyH + 14], v: [(Math.random() - 0.5) * 60, -30 - Math.random() * 20], life: 2.4, max: 2.4, s: PX, c: m.profit >= 0 ? "#ffd34e" : "#e5534b", floor: g.skyH + 24, bounce: 0.5 }); // xu rơi xuống mặt đường rồi nảy vài lần
 }
 function drawNightLife(g, t, night) { // đom đóm ban đêm
   if (night < 0.5) return; for (let k = 0; k < 14; k++) { const fx = (Math.sin(k * 12.9898) * 43758.5453) % 1, fy = (Math.sin(k * 78.233) * 12543.7) % 1, x = Math.abs(fx) * g.W + Math.sin(t * 0.6 + k) * 10, y = g.fieldTop - 10 + Math.abs(fy) * (g.H - g.fieldTop - 50) + Math.cos(t * 0.5 + k) * 8; if (Math.sin(t * 2 + k * 1.7) > -0.2) R(x, y, PX, PX, "#e8ff6a"); }
@@ -652,48 +679,231 @@ function drawGrass(g) { // cỏ tự nhiên: mảng màu, bụi cỏ, hoa, đá;
   }
   sim.lx.save(); sim.lx.setTransform(1, 0, 0, 1, 0, 0); sim.lx.drawImage(sim.grassCv, 0, 0); sim.lx.restore();
 }
-function drawFarmland(g) { const x0 = g.mx - 4, y0 = g.fieldTop - 18, w = g.W - g.mx * 2 + 8, h = g.fieldBot - g.fieldTop + 24; R(x0, y0, w, h, mixHex(SEA.g3, SEA.snow ? "#b9c4c8" : "#7a5a35", 0.3)); for (let y = y0 + 6; y < y0 + h - 4; y += 12) R(x0 + 4, y, w - 8, PX, mixHex(SEA.g3, "#5e4128", 0.25)); }
+function drawFarmland(g) { // mép ruộng lởm chởm, luống cày lượn sóng có chỗ đứt, rải cục đất và cỏ dại
+  const x0 = g.mx - 4, y0 = g.fieldTop - 18, w = g.W - g.mx * 2 + 8, h = g.fieldBot - g.fieldTop + 24, soil = mixHex(SEA.g3, SEA.snow ? "#b9c4c8" : "#7a5a35", 0.3), fur = mixHex(SEA.g3, "#5e4128", 0.25), st = PX * 2;
+  for (let x = x0; x < x0 + w; x += st) { const jt = Math.floor(hash(x * 0.37) * 3) * PX, jb = Math.floor(hash(x * 0.53 + 9) * 3) * PX; R(x, y0 + jt, st, h - jt - jb, soil); }
+  for (let y = y0 + 6, r = 0; y < y0 + h - 4; y += 12, r++) for (let x = x0 + 4; x < x0 + w - 4; x += st) if (hash(x * 0.5 + r * 17) > 0.08) R(x, y + Math.round(wob(x, r * 1.3, 1.5) / PX) * PX, st, PX, fur);
+  for (let k = 0; k < Math.floor(w * h / 900); k++) { const x = x0 + hash(k * 7) * (w - 8), y = y0 + 4 + hash(k * 13 + 1) * (h - 10); R(x, y, PX, PX, k % 4 ? "#6b4a2b" : SEA.g2); }
+}
 // ===== Dân làng luân phiên nhiều việc: xong một việc là bốc một việc khác (không lặp lại việc vừa làm), mỗi người có danh sách việc riêng theo khu vực =====
 const nPts = (g) => { const mid = Math.round((g.shed.x + g.shed.w + g.barn.x) / 2), lx0 = Math.round(g.mx + (g.fx - 40 - g.mx) / 2), hasL = g.fx - 40 - g.mx >= 90; return { mid, well: [mid + 100, g.feet + 18], hut: [g.door[0] + 26, g.door[1] + 20], wood: [g.shed.x + g.shed.w + 12, g.feet + 36], hens: [g.mx + 50, g.feet + 66], barn: [g.barn.x + g.barn.w / 2 - 50, g.feet + 30], mill: [mid, g.feet + 18], hay: [lx0, g.fieldTop + 56], hasL }; };
 const nGo = (a, b, item, sp) => ({ a: a.slice(), b: b.slice(), dur: Math.max(0.4, dist2(a, b) / (sp || 70)), pose: "walk", item: item || null });
-const nStay = (p, dur, pose, item) => ({ a: p.slice(), b: p.slice(), dur, pose, item: item || null });
+const nStay = (p, dur, pose, item) => ({ a: p.slice(), b: p.slice(), dur: pose === "walk" ? dur : dur * 2.2, pose, item: item || null }); // làm việc lâu hơn nhiều so với đi lại
 const nMeadow = (g) => { const y0 = g.fieldBot + 12, y1 = g.H - 40, bh = y1 - y0, cy = y0 + Math.round(bh * 0.5), rw = Math.min(30, Math.floor(bh / 3)); return { ok: bh >= 90, y0, ry: (x) => cy + Math.sin(x * 0.012) * Math.min(18, bh * 0.16), rw, upY: y0 + Math.max(28, Math.round((cy - rw / 2 - y0) * 0.92)), loY: Math.min(y1 - 4, cy + rw / 2 + 40) }; };
-const NPC_TASKS = { // việc của từng người: hàm nhận (g, từ đâu, thời gian) và trả về các đoạn đi, làm
+// Mỗi người một nghề riêng, làm tại chỗ khá lâu (không đi qua đi lại): Bác Ba thợ xay bột, Chị Tư bán hàng ở quầy chợ, Cu Tèo làm ruộng, Ông Sáu câu cá vá lưới sửa rào, Bà Bảy chăn nuôi, Chú Chín bán rong gõ cửa từng nhà, Cô Năm giặt giũ quét sân
+const benchPt = (g) => [nPts(g).mid + 62, g.feet + 22]; // ghế dài cạnh giếng, vẽ ở cảnh tĩnh
+const houseDoor = (g, dx) => { const h = sayPick(villageGeo(g).houses); return [h.x + h.w / 2 + (dx || 0), h.y + 14]; };
+const NPC_TASKS = { // hàm nhận (g, từ đâu) và trả về các đoạn đi, làm
   water: (g, f) => { const q = nPts(g); return [nGo(f, q.well), nStay(q.well, 2.5, "water"), nGo(q.well, q.hut, "yoke"), nStay(q.hut, 1.5, "water"), nGo(q.hut, q.well)]; },
-  wood: (g, f) => { const q = nPts(g); return [nGo(f, q.wood), nStay(q.wood, 6, "cut"), nGo(q.wood, q.hut, "log"), nStay(q.hut, 1, "walk")]; },
-  hens: (g, f) => { const q = nPts(g); return [nGo(f, q.hens), nStay(q.hens, 4, "sow"), nGo(q.hens, q.hut)]; },
-  mill: (g, f) => { const q = nPts(g); return [nGo(f, q.mill), nStay(q.mill, 3, "pick"), nGo(q.mill, q.well)]; },
-  barn: (g, f) => { const q = nPts(g); return [nGo(f, q.barn), nStay(q.barn, 5, "dig"), nGo(q.barn, q.mill)]; },
-  hay: (g, f) => { const q = nPts(g), m1 = [q.hay[0], g.feet + 26], m2 = [q.barn[0], g.feet + 26]; return [nGo(f, q.hay), nStay(q.hay, 2, "cut"), nGo(q.hay, m1, "bale"), nGo(m1, m2, "bale"), nGo(m2, q.barn, "bale"), nStay(q.barn, 1.5, "walk"), nGo(q.barn, q.mill)]; },
-  weed: (g, f) => { const i = Math.floor(Math.random() * g.allow), pt = g.plot(i); return [nGo(f, [pt[0], pt[1] + 14]), nStay([pt[0], pt[1] + 14], 4, "dig")]; },
-  waterCrop: (g, f) => { const used = [...(sim.used || [])], i = used.length ? used[Math.floor(Math.random() * used.length)] : Math.floor(Math.random() * g.allow), pt = g.plot(i); return [nGo(f, [pt[0], pt[1] + 14]), nStay([pt[0], pt[1] + 14], 3, "water")]; },
-  inspect: (g, f) => { const a = [g.fx + 10, g.fieldTop + 60], b = [g.fx + g.per * g.cw - 10, g.fieldTop + 60]; return [nGo(f, a), nGo(a, b, "staff", 50), nGo(b, a, "staff", 50)]; },
-  milk: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * 0.4 + Math.sin(performance.now() / 1000 * 0.07) * 70) - 34; return [nGo(f, [x, m.upY + 4]), nStay([x, m.upY + 4], 6, "milk")]; },
-  fish: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * 0.3), b = [x, m.ry(x) - m.rw / 2 - 10]; return [nGo(f, b), nStay(b, 12, "fish")]; },
-  apples: (g, f) => { const m = nMeadow(g), tr = [Math.round(g.W * 0.76) + (Math.floor(Math.random() * 3)) * 74 - 22, m.loY + 4]; return [nGo(f, tr), nStay(tr, 6, "pick"), nGo(tr, [g.W * 0.5, m.loY + 8], "basket")]; },
-  fence: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * (0.25 + Math.random() * 0.5)), b = [x, m.y0 + 8]; return [nGo(f, b), nStay(b, 5, "dig")]; },
-  herd: (g, f) => { const q = nPts(g), a = [q.hay[0] - 26, q.hay[1] + 30], b = [q.hay[0] + 26, q.hay[1] + 36]; return [nGo(f, a, "staff"), nGo(a, b, "staff", 45), nGo(b, a, "staff", 45)]; },
-  shear: (g, f) => { const q = nPts(g), a = [q.hay[0] - 20, q.hay[1] + 28]; return [nGo(f, a, "staff"), nStay(a, 5, "cut")]; },
-  feedSheep: (g, f) => { const q = nPts(g), a = [q.hay[0] + 22, q.hay[1] + 36]; return [nGo(f, a), nStay(a, 3, "sow")]; },
+  hens: (g, f) => { const q = nPts(g); return [nGo(f, q.hens), nStay(q.hens, 6, "sow"), nGo(q.hens, q.hut)]; },
+  sack: (g, f) => { const q = nPts(g); return [nGo(f, q.barn), nStay(q.barn, 2, "pick"), nGo(q.barn, q.mill, "sack"), nStay(q.mill, 3, "dig")]; },
+  grind: (g, f) => { const q = nPts(g); return [nGo(f, q.mill), nStay(q.mill, 10, "hammer")]; },
+  rest: (g, f) => { const b = benchPt(g); return [nGo(f, b), nStay(b, 9, "sit")]; },
+  stall: (g, f) => { const st = villageGeo(g).items.find((b) => b.kind === "stall"), pt = st ? [st.x + st.w / 2, st.y + 14] : nPts(g).barn; return [nGo(f, pt), nStay(pt, 11, "pick")]; },
+  count: (g, f) => { const st = villageGeo(g).items.find((b) => b.kind === "stall"), pt = st ? [st.x + st.w / 2 + 18, st.y + 14] : nPts(g).barn; return [nGo(f, pt), nStay(pt, 7, "sit")]; },
+  weed: (g, f) => { const i = Math.floor(Math.random() * g.allow), pt = g.plot(i); return [nGo(f, [pt[0], pt[1] + 14]), nStay([pt[0], pt[1] + 14], 7, "dig")]; },
+  waterCrop: (g, f) => { const used = [...(sim.used || [])], i = used.length ? sayPick(used) : Math.floor(Math.random() * g.allow), pt = g.plot(i); return [nGo(f, [pt[0], pt[1] + 14]), nStay([pt[0], pt[1] + 14], 6, "water")]; },
+  milk: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * 0.4 + Math.sin(performance.now() / 1000 * 0.07) * 70) - 34; return [nGo(f, [x, m.upY + 4]), nStay([x, m.upY + 4], 9, "milk")]; },
+  fish: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * 0.3), b = [x, m.ry(x) - m.rw / 2 - 10]; return [nGo(f, b), nStay(b, 14, "fish")]; },
+  mend: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * 0.3) + 34, b = [x, m.ry(x) - m.rw / 2 - 8]; return [nGo(f, b), nStay(b, 9, "sit")]; },
+  apples: (g, f) => { const m = nMeadow(g), tr = [Math.round(g.W * 0.76) + (Math.floor(Math.random() * 3)) * 74 - 22, m.loY + 4]; return [nGo(f, tr), nStay(tr, 7, "pick"), nGo(tr, [g.W * 0.5, m.loY + 8], "basket")]; },
+  fence: (g, f) => { const m = nMeadow(g), x = Math.round(g.W * (0.25 + Math.random() * 0.5)), b = [x, m.y0 + 8]; return [nGo(f, b), nStay(b, 8, "hammer")]; },
+  shear: (g, f) => { const q = nPts(g), a = [q.hay[0] - 20, q.hay[1] + 28]; return [nGo(f, a, "staff"), nStay(a, 7, "cut")]; },
+  feedSheep: (g, f) => { const q = nPts(g), a = [q.hay[0] + 22, q.hay[1] + 36]; return [nGo(f, a), nStay(a, 5, "sow")]; },
+  sweepBarn: (g, f) => { const q = nPts(g), a = [q.barn[0] - 14, q.barn[1] + 8]; return [nGo(f, a), nStay(a, 8, "sweep")]; },
+  peddle: (g, f) => { const y = g.yard + 24, x1 = Math.round(g.W * (0.1 + Math.random() * 0.3)), x2 = Math.round(g.W * (0.5 + Math.random() * 0.4)); return [nGo(f, [x1, y], "pack"), nStay([x1, y], 8, "pick", "pack"), nGo([x1, y], [x2, y], "pack"), nStay([x2, y], 8, "pick", "pack")]; }, // dừng rao ở hai điểm thay vì lê hết màn hình
+  sell: (g, f) => { const d = houseDoor(g); return [nGo(f, d, "pack"), nStay(d, 6, "pick", "pack"), nGo(d, [d[0] + 40, d[1] + 10], "pack")]; },
+  wash: (g, f) => { const q = nPts(g), w = [q.well[0] - 30, q.well[1] + 6]; return [nGo(f, w), nStay(w, 10, "wash")]; },
+  laundry: (g, f) => { const v = villageGeo(g), d = houseDoor(g), l = [v.line.x + v.line.w / 2, v.line.y + 14]; return [nGo(f, d), nStay(d, 1.5, "walk"), nGo(d, l, "basket"), nStay(l, 6, "pick"), nGo(l, d)]; },
+  sweepDoor: (g, f) => { const d = houseDoor(g, 22); return [nGo(f, d), nStay(d, 8, "sweep")]; },
 };
-const NPC_POOLS = [["water", "wood", "hens", "mill"], ["hay", "barn", "wood", "mill"], ["weed", "waterCrop", "inspect"], ["milk", "fish", "apples", "fence"], ["herd", "shear", "feedSheep"]];
-function npcOk(g, id) { const q = nPts(g), m = nMeadow(g); if (["hay", "herd", "shear", "feedSheep"].includes(id)) return q.hasL; if (["milk", "fish", "apples", "fence"].includes(id)) return m.ok; return true; }
-function npcStep(dt, g) {
-  if (!sim.npcs) sim.npcs = NPC_POOLS.map((pool, k) => ({ k, pool, hue: k + 1, p: null, segs: null, i: 0, t: 0, fc: 1, last: "", walk: 0, pose: "walk", item: null }));
+const NPC_POOLS = [["sack", "grind", "grind", "rest"], ["stall", "stall", "count", "water"], ["weed", "weed", "waterCrop", "hens", "rest"], ["fish", "fish", "mend", "fence", "apples"], ["milk", "milk", "feedSheep", "shear", "sweepBarn"], ["peddle", "sell", "sell"], ["wash", "wash", "laundry", "sweepDoor", "hens"]]; // việc chính của nghề được nhân đôi để chiếm nhiều thời gian hơn
+function npcOk(g, id) { const q = nPts(g), m = nMeadow(g); if (id === "laundry") { const v = villageGeo(g); return v.houses.length > 0 && !!v.line; } if (id === "sweepDoor" || id === "sell") return villageGeo(g).houses.length > 0; if (["shear", "feedSheep"].includes(id)) return q.hasL; if (["milk", "fish", "mend", "apples", "fence"].includes(id)) return m.ok; return true; }
+function npcStep(dt0, g, speed) {
+  const dt = dt0 * speed; // đường lầy khi mưa nên đi và làm chậm lại
+  if (!sim.npcs) sim.npcs = NPC_POOLS.map((pool, k) => ({ k, name: NPC_NAMES[k], say: null, nextSay: 0, lastLine: "", pool, hue: k + 1, p: null, segs: null, i: 0, t: 0, fc: 1, last: "", walk: 0, pose: "walk", item: null }));
+  if (sim.npcs.length === NPC_POOLS.length) sim.npcs.push({ k: 7, name: NPC_NAMES[7], rider: true, say: null, nextSay: 0, lastLine: "", hue: 2, p: null, fc: 1, vis: false });
   const q = nPts(g);
   for (const n of sim.npcs) {
-    if (!n.p) n.p = (n.k === 2 ? [g.fx - 24, g.fieldTop + 60] : n.k === 3 ? [Math.round(g.W * 0.5), g.H - 80] : n.k === 4 ? [q.hay[0], q.hay[1] + 20] : n.k === 1 ? q.mill.slice() : q.well.slice());
-    if (!n.segs) { let ids = n.pool.filter((id) => id !== n.last && npcOk(g, id)); if (!ids.length) ids = ["water", "wood", "hens", "mill"].filter((id) => id !== n.last); const id = ids[Math.floor(Math.random() * ids.length)]; n.last = id; n.segs = NPC_TASKS[id](g, n.p); const off = ((n.k % 3) - 1) * 16; n.segs.forEach((sg, j) => { if (j) sg.a[0] += off; sg.b[0] += off; }); /* mỗi người lệch ngang một chút để cùng đến một chỗ cũng không đứng chồng nhau */ n.i = 0; n.t = 0; }
+    if (n.rider) { riderStep(n, dt, g); continue; }
+    if (!n.p) n.p = (n.k === 5 ? [g.mx + 10, g.yard + 24] : n.k === 6 ? [q.well[0], q.well[1] + 20] : n.k === 2 ? [g.fx - 24, g.fieldTop + 60] : n.k === 3 ? [Math.round(g.W * 0.5), g.H - 80] : n.k === 4 ? [q.hay[0], q.hay[1] + 20] : n.k === 1 ? q.mill.slice() : q.well.slice());
+    if (!n.segs) { let ids = n.pool.filter((id) => id !== n.last && npcOk(g, id)); if (!ids.length) ids = ["water", "hens", "rest"].filter((id) => id !== n.last); const id = ids[Math.floor(Math.random() * ids.length)]; n.last = id; n.segs = NPC_TASKS[id](g, n.p); const off = ((n.k % 3) - 1) * 16; n.segs.forEach((sg, j) => { if (j) sg.a[0] += off; sg.b[0] += off; }); /* mỗi người lệch ngang một chút để cùng đến một chỗ cũng không đứng chồng nhau */ n.i = 0; n.t = 0; }
     const sg = n.segs[n.i]; n.t += dt; if (n.t >= sg.dur) { n.t -= sg.dur; n.i++; if (n.i >= n.segs.length) { n.p = n.segs[n.segs.length - 1].b.slice(); n.segs = null; continue; } }
-    const c = n.segs[n.i], u = c.dur ? Math.min(1, n.t / c.dur) : 1; n.p = [c.a[0] + (c.b[0] - c.a[0]) * u, c.a[1] + (c.b[1] - c.a[1]) * u]; n.pose = c.pose; n.item = c.item; if (Math.abs(c.b[0] - c.a[0]) > 1) n.fc = c.b[0] > c.a[0] ? 1 : -1; if (c.pose === "walk" && (c.a[0] !== c.b[0] || c.a[1] !== c.b[1])) n.walk += dt * 7;
+    const c = n.segs[n.i], u = c.dur ? Math.min(1, n.t / c.dur) : 1; n.p = [c.a[0] + (c.b[0] - c.a[0]) * u, c.a[1] + (c.b[1] - c.a[1]) * u]; n.pose = c.pose; n.item = c.item; if (Math.abs(c.b[0] - c.a[0]) > 1) n.fc = c.b[0] > c.a[0] ? 1 : -1; if (c.pose === "walk" && (c.a[0] !== c.b[0] || c.a[1] !== c.b[1])) { n.walk += dt * 7; n.du = (n.du || 0) - dt; if (n.du <= 0 && sim.parts.length < 300) { n.du = 0.3; sim.parts.push({ p: [n.p[0], n.p[1] - 2], v: [(Math.random() - 0.5) * 10, -12], life: 0.5, max: 0.5, s: PX, air: 1, c: sim.mud ? "#6a5a45" : "#d9c9a0" }); } }
+  }
+}
+// ===== Thoại: mỗi người một giọng, chuyện đời thường pha meme và chuyện công việc lấy từ số liệu thật của jobq; hai người đứng gần nhau thì đối đáp 2-3 lượt và đứng lại nghe nhau =====
+const NPC_NAMES = ["Bác Ba", "Chị Tư", "Cu Tèo", "Ông Sáu", "Bà Bảy", "Chú Chín", "Cô Năm", "Anh Hai"]; // chú Chín bán rong, cô Năm giặt phơi, anh Hai là kỵ sĩ đưa thư
+const NPC_OWN = {
+  0: ["Tý tuổi thôi, trung niên ấy mà.", "Đừng gọi bác, gọi anh cho trẻ.", "Ai bảo tôi già? Tôi là phiên bản cổ điển.", "Lưng đau là do trời trở gió, không phải do tuổi.", "Hồi trẻ tôi cuốc nguyên cái ruộng này một buổi."],
+  1: ["Chốt đơn!", "Mặc cả với tôi là mất thời gian của cả hai.", "Tiền trao cháo múc, không nợ nần.", "Giá này là giá hữu nghị rồi đấy.", "Hỏi giá một lần thôi, hỏi hai lần là tăng."],
+  2: ["Gét gô!", "Bác Ba mà trung niên thì tôi là tỷ phú.", "Ngủ sớm làm gì, ruộng có chạy đâu.", "Bác ơi, bác lỗi thời rồi.", "Chill đi mọi người ơi.", "Con cày xong rồi, cho con nghỉ nhé."],
+  3: ["Học thầy bao năm chắc chắn bạn chưa học đến bài này.", "Ai dạy được con bò này biết cày, tôi thưởng năm mươi bao xi măng.", "Nói ít thôi, ruộng nghe hết đấy.", "Đời như con bò: nhai đi nhai lại mới thấm.", "Cuộc sống mà, đâu ai học được chữ ngờ.", "Ngày xưa không có task, chỉ có cái cày."],
+  4: ["Chuyện này tôi chỉ nói với mười người thôi.", "Tôi không bép xép, tôi chỉ chia sẻ thông tin.", "Bà con ơi, hóng chuyện không?", "Tôi không tò mò, tôi chỉ quan tâm thôi."],
+  5: ["Hàng này nhà dùng thử, giờ bán lại, không phải hàng hãng đâu.", "Mua không mua thì đứng xê ra, đừng cản đường.", "Mua một tặng một, tặng cả lời chúc!", "Giá hôm nay hời lắm, mai lại khác."],
+  6: ["Ai nhìn tôi phơi đồ thì trả tiền xem.", "Cái áo này của ai mà thối thế?", "Áo này lấm bùn mãi không sạch.", "Hey Siri, tua về chủ nhật.", "Giặt đồ mà như giặt nỗi buồn."],
+  7: ["Phía trước thôi!", "Ai chắn đường ngựa của tôi là toang.", "Thư của lãnh chúa: nợ thuế chưa trả!", "Thư của lãnh chúa đây, ký nhận giùm!", "Tránh đường cho ngựa nào!", "Gét gô!"],
+};
+const TALK_ROUGH = true; // đổi false để tắt hết câu tục và chửi đổng khi cần chiếu cho người khác xem
+const CATCH = ["Tý tuổi thôi, trung niên ấy mà!", "Phía trước thôi!", "Anh nói chuyện như thằng đao ấy!"], CATCH_OF = { 0: 0, 7: 1, 2: 2 }; // ba câu cửa miệng: bác Ba, anh Hai, Cu Tèo mỗi người nói câu của mình nhiều nhất, người khác thỉnh thoảng nhại theo
+const TALK_PARODY = ["Cần cù bù siêng năng.", "Có công mài sắt có ngày hết sắt.", "Một con ngựa đau cả làng bỏ cuốc.", "Ăn quả nhớ kẻ trồng cây, ăn cà chua nhớ kẻ bón phân.", "Gần mực thì đen, gần bò thì bẩn.", "Một điều nhịn, chín điều ăn.", "Chậm mà chắc, nhanh mà trượt.", "Đói cho sạch, rách cho thơm, có vá.", "Nước chảy đá mòn, cuốc đi cuốc lại cũng mòn.", "Tránh vỏ dưa gặp con bò.", "Cháy ruộng ra mặt chuột.", "Học ăn học nói, học cuốc học cày.", "Thất bại là mẹ, cái cuốc là bố.", "Tiền nào của nấy, không tiền thì không có của.", "Rau nào sâu nấy, người nào cuốc nấy.", "Có chí làm quan, có gan thì làm pate.", "Gần mực thì đen, gần deadline thì hư máy.", "Con gà cục tác lá chanh, mới cục vài tiếng đã thành gà quay.", "Ăn kĩ no lâu, cày sâu mau mệt.", "Kiến tha lâu cũng có ngày mỏi cẳng.", "Có công mài sắt có ngày chai tay.", "Được ăn cả, ngã mang về.", "Con hơn cha là nhà cãi lộn.", "Đi một ngày đàng, giờ mỏi cả chân.", "Học ăn học nói, học gói mang về.", "Lời nói chẳng mất tiền mua, lựa lời mà nói cho vừa tiền mua.", "Trâu buộc ghét trâu đi về.", "Một nụ cười bằng mười tháng, sao chưa trả tiền công cho em?", "Đừng tự hào vì mình nghèo mà giỏi.", "Có ngày tiền bạc, cửa nhà biết bay.", "Tiên học phí, hậu học văn.", "Một thời để yêu và một đời để trả nợ.", "Ai bảo chăn trâu là khổ?", "Ăn quả nhớ kẻ chân mày.", "Được voi đòi thêm option.", "Ăn chưa no, lo feedback.", "Một con ngựa đau, cả tàu bỏ chạy.", "Học đi đôi với hành, hành đi đôi với tỏi.", "Dân thường chơi đẹp, đè bẹp dân chơi.", "Nhà sạch thì mát, bát sạch tốn xà bông.", "Lá lành đùm lá rách, lá rách đùm lá nát.", "Vạn sự khởi đầu nan, gian nan bắt đầu nản.", "Người chết hết của, người còn của cũng hết.", "Giấy rách giữ lấy bán ve chai.", "Còn thời lên ngựa bắn cung, hết thời xuống ngựa lấy thun bắn ruồi.", "Đường dài mới biết ngựa hay.", "Bầu ơi thương lấy bí cùng, tuy rằng khác giống nhưng nấu chung một nồi.", "Thương anh chín đợi mười chờ, đến khi mười một em liền bỏ anh.", "Yêu nhau cởi áo cho nhau, ghét nhau trợn mắt: Áo đâu, mặc vào!", "Yêu nhau chỉ ngại đường xa, đi bộ mòn dép, đi xe tốn dầu.", "Gió đưa vật giá về trời, bỏ lương ở lại chịu đời đắng cay.", "Chờ hoài chờ mãi chẳng thấy mẹ yêu gửi tiền.", "Lựa lời mà nói cho lòi vàng ra.", "Đi đâu cho thiếp theo cùng, no thì thiếp ở, lạnh lùng thiếp bye.", "Một cây làm chẳng nên non, ba cây chụm lại ăn đòn mới phê.", "Con về gặp mẹ, lấy tiền xong con lại xa quê.", "Thân em như tấm lụa đào, giá tiền trăm triệu đố chàng nào mua.", "Đói lòng ăn sạch thịt gà, để rau nuôi mẹ, mẹ già yếu răng.", "Ngoài cuộc gọi hai giờ đêm để sửa file, em xinh còn lại gì?", "Chồng cãi lại vợ ra đường bơm xe."];
+// thả thính chơi chữ kiểu Binz, lấy từ bài "Học Binz thả thính" trên VOH
+const TALK_BINZ = ["Gu của anh là Châu Á.", "Tán em bằng hai câu, anh thích đi Lai Châu.", "Có người nói anh không phải Lạc Long Quân, nhưng vẫn thích chờ Âu Cơ.", "Tay em anh đan vào không trơ trọi đâu, dắt em đi mọi nơi trừ đường Phan Bội Châu.", "Thích em anh phải nói, không thể để mặc kệ duyên. Nghe nhiều bolero nhưng không muốn thấy Lệ Quyên.", "Em trong trắng, nên không thích ngồi sau xe nếu không Thắng.", "Anh không tạo nghiệp, anh chỉ tạo trend.", "Em dễ thương, anh thả thính luôn, em dính chưa?", "Em thì vẫn chưa ai tán, anh thì văn thơ lai láng, sao còn vẫn hem tương tác.", "Không muốn thích em đâu nhưng thấy là đã kết.", "Nghe nói em đẹp tự nhiên không có sửa ha, nghe nói trai Sài Gòn không có cửa ha.", "Em không cần mang son môi mỗi khi gặp anh, năm phút sau son sẽ mờ ngay thôi.", "Không anh chứ ai, đố em tìm được ai giống anh thứ hai."];
+const TALK_MEME = ["Gét gô!", "Chốt đơn!", "Hết nước chấm!", "Toang rồi bà con ơi!", "Cạn lời.", "Tôi bận rồi bro.", "Chuẩn không cần chỉnh!", "Ủa alo?", "Tôi tưởng ai cũng có chứ ta.", "Nín.", "Bông đẹp quá kìa!", "Em nói không.", "Hey Siri, tua về chủ nhật.", "Dự án ma, hứa mãi không làm.", "Không thấy quầng thâm hay sao mà giao thêm task?", "Yên tâm, tôi là người an toàn.", "Kền kền nhiều quá không chịu được.", "Cuộc sống mà, đâu ai học được chữ ngờ.", "Mệt nhưng không nói."];
+const TALK_REPLY = ["Anh nói chuyện như thằng đao ấy!", "Ủa alo?", "Cạn lời.", "Ăn nói hàm hồ.", "Bớt bố đời đi.", "Đúng là trẻ trâu.", "Tôi mà là bác, tôi im.", "Thôi, đừng gáy.", "Ơ kìa, quá đáng lắm nha!", "Lươn lẹo vừa thôi.", "Giỡn mặt hả?", "Bông đẹp quá kìa!", "Em nói không.", "Tôi tưởng ai cũng có chứ ta.", "Nín.", "Tôi bận rồi bro."]; // chen ngang, không cần ăn khớp với câu trước
+const TALK_ROUGH_LINES = ["Đm, hôm nay cuốc muốn gãy lưng.", "Lười như con bò mà đòi lương như chủ.", "Mẹ nó, con gà lại đẻ rơi.", "Khốn nạn thật, cuốc lại cùn.", "Vãi cả ruộng!", "Đéo biết hôm nay làm gì cho xong.", "Cái ngày không có bò cũng buồn như cái ngày không có vợ.", "Cứ đà này tôi bán ruộng đi đánh bạc cho nhanh.", "Đời như cái ao tù, cuốc mãi cũng thấy bùn.", "Tôi chửi đổng cho đỡ mệt, đừng ai nhận.", "Làm trai phải có máu dê trong người!", "Trai có bồ như hoa có chậu.", "Muốn ngủ ngon thì đừng lấy vợ.", "Làm trai ai chẳng sở khanh đôi lần.", "Trái tim em chỉ hai lần mở cửa: đón anh vào và tống cổ anh ra.", "Thuận vợ thuận chồng... con đông mệt quá.", "Lỡ mê vợ bé, vợ nhà vẫn thương.", "Nửa đêm anh nhớ đến nhà em chơi.", "Câm cái miệng lại đi!", "Đồ mất nết!", "Mẹ nó, cuốc cái nỗi gì mà cuốc!", "Ăn nói như cái bãi phân bò.", "Đồ khốn nạn, trả tiền đây!", "Thằng nào lấy mất cái cuốc của tôi?", "Mày ngu như con bò.", "Vãi cả nồi, sao hôm nay nóng thế?", "Bò nhà bác đang động dục kìa.", "Cái mặt bác như cái đít nồi.", "Đồ ăn cắp, trả con gà đây!", "Bác thì biết cái gì mà nói!", "Con cu nhà tôi dạo này không chịu lớn.", "Ế vãi mà vẫn ngồi gáy được."];
+const TALK_DAILY = ["Hôm nay mệt nhưng không nói.", "Ai rồi cũng khác, trừ cái cuốc này.", "Gà nhà tôi gáy lúc ba giờ, nó cũng tăng ca.", "Bao giờ trúng số, tôi mua thêm con bò.", "Chill phết, nhưng cái lưng thì không.", "Cuốc đất mà như cuốc đời.", "Cà chua năm nay đỏ hơn cả mặt tôi.", "Cần cù bù siêng năng, nghe câu nào cũng thấy có lý.", "Gần mực thì đen, gần deadline thì hư máy.", "Con gà cục tác lá chanh, mới cục vài tiếng đã thành gà quay.", "Kiến tha lâu cũng có ngày mỏi cẳng.", "Có công mài sắt có ngày hết sắt.", "Một điều nhịn, chín điều ăn.", "Ế mấy mùa lúa rồi, ruộng còn có cặp, tôi thì chưa.", "Tôi không lười, tôi tiết kiệm năng lượng.", "Việc hôm nay để mai làm, mai thì để kiếp sau.", "Đừng hỏi tuổi tôi, hỏi là tôi trẻ lại.", "Gà trống nhà tôi còn có vợ, tôi thì chưa.", "Cuốc đất mệt lắm, chọc hàng xóm mới vui.", "Bò ơi mày nhìn tao làm gì?", "Cái ngày tôi nghỉ hưu, ruộng sẽ khóc.", "Hôm nay lười, nhưng lười có kế hoạch.", "Đời nông dân: sáng cuốc, trưa cuốc, tối cuốc, mai tiếp.", "Tôi không hề hấp, tôi chỉ có vấn đề về cách thể hiện.", "Nắng thế này, người yêu cũ cũng tan.", "Muốn giàu thì phải cày, muốn nghèo thì ngồi ngắm.", "Con cừu nhà bác nhìn tôi bằng ánh mắt khinh.", "Mùa sau tôi sẽ mua nổi cái áo mới, hy vọng thế.", "Ai bảo nông dân không biết tiếng Anh? Tôi biết okay con dê."];
+const SHOUT_OK = ["Chốt đơn!", "Hết nước chấm!", "Cân hết!", "Ngon luôn!", "Lãi rồi bà con!", "Chốt đơn, mai tính tiếp!"], SHOUT_FAIL = ["Toang rồi!", "Thôi xong.", "Cạn lời.", "Ăn hại thật!", "Ai làm héo đấy?", "Mất tiền oan!"];
+// Chuyện công việc, câu nào cũng chỉ có mặt khi số liệu thật đang đúng như vậy
+function talkWork(g, d) {
+  const L = [], w = sim.waiting, r = sim.running, timeouts = d ? d.history.filter((x) => x.rc === 124).length : 0;
+  if (w > 0 && sim.cause) L.push("Còn " + w + " đơn chờ, kho đóng vì " + sim.cause + ". Dự án ma luôn.");
+  if (w > 0 && sim.free > 0) L.push("Còn " + sim.free + " luống trống mà " + w + " bao hạt chưa gieo? Ủa alo?");
+  if (w > 3) L.push("Hàng chờ " + w + " bao, không thấy quầng thâm hay sao mà giao thêm task?");
+  if (r > 0) L.push("Cây chín cỡ " + simClock(sim.med) + " nữa, đừng nhìn nó chằm chằm, nó ngại.");
+  if (r === 0 && w === 0) L.push("Chưa có đơn nào. Hey Siri, tua về chủ nhật.");
+  if (d && d.load >= d.maxLoad * 0.9) L.push("Cối xay quay hết cỡ, máy nóng rồi. Tôi bận rồi bro!");
+  if (d && (d.pressure >= d.maxPressure || d.freeMb < d.minFreeMb)) L.push("Giếng cạn nước rồi, đừng gieo thêm. Cạn lời.");
+  if (sim.failN > 0) L.push("Có " + sim.failN + " thùng héo. Toang rồi bà con ơi!");
+  if (timeouts > 0) L.push("Có " + timeouts + " đơn quá hạn, chia nhỏ ra đừng ôm đồm.");
+  if (sim.okN + sim.failN > 0) L.push(sim.profit >= 0 ? "Sổ sách lãi " + fmtVnd(sim.profit) + ". Hết nước chấm!" : "Sổ sách lỗ " + fmtVnd(sim.profit) + ", thôi xong.");
+  return L;
+}
+const wrapSay = (s, n) => { const out = []; let cur = ""; for (const w of s.split(" ")) { if (cur && (cur + " " + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + " " + w : w; } if (cur) out.push(cur); return out; };
+const sayPick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+function npcSay(n, line) { n.say = { text: wrapSay(n.name + ": " + line, 22), at: sim.clock, until: sim.clock + 3 }; n.nextSay = sim.clock + 10 + Math.random() * 8; }
+// Mỗi người tự quăng một câu, không cần ăn khớp: câu cửa miệng, tục ngữ chế, meme, câu tục, số liệu thật
+function pickLine(n, g, d) {
+  const k = n.k;
+  if (Math.random() < (k in CATCH_OF ? 0.35 : 0.12)) return k in CATCH_OF ? CATCH[CATCH_OF[k]] : sayPick(CATCH);
+  const q = Math.random(), work = talkWork(g, d);
+  const pool = q < 0.28 ? TALK_PARODY : q < 0.46 && TALK_ROUGH ? TALK_ROUGH_LINES : q < 0.58 && work.length ? work : q < 0.72 ? TALK_MEME : q < 0.79 ? TALK_BINZ : [...(NPC_OWN[k] || []), ...TALK_DAILY];
+  const cand = pool.filter((x) => x !== n.lastLine); return sayPick(cand.length ? cand : pool);
+}
+function npcTalk(now, g) {
+  if (!sim.npcs || !sim.d) return; const d = sim.d;
+  const turn = (name, text, at) => { const lines = wrapSay(name + ": " + text, 22); return { text: lines, at, until: at + 2.4 + lines.join(" ").length * 0.05 }; };
+  for (const n of sim.npcs) {
+    if (n.say && now > n.say.until) n.say = null;
+    if (!n.p || n.say || now < n.nextSay || (n.rider && !n.vis)) continue;
+    if (!n.nextSay) { n.nextSay = now + 2 + n.k * 2.5 + Math.random() * 3; continue; } // mỗi người bắt đầu lệch nhau, không cùng mở miệng một lúc
+    const line = pickLine(n, g, d), A = turn(n.name, line, now); n.lastLine = line; n.say = A; n.nextSay = A.until + 3 + Math.random() * 7;
+    const nb = sim.npcs.find((o) => o !== n && o.p && !o.say && (!o.rider || o.vis) && dist2(o.p, n.p) < 170);
+    if (nb && Math.random() < 0.6) { const B = turn(nb.name, sayPick(TALK_REPLY), now + 1.2); nb.say = B; nb.nextSay = B.until + 3 + Math.random() * 7; }
+  }
+}
+// ===== Ngựa: kỵ sĩ đưa thư cưỡi ngựa chạy dọc đường trước nhà, phanh và tăng tốc theo vật lý, và một con ngựa thả ở bãi chăn =====
+const COATS = [{ b: RAMP(24, 55, 34), m: RAMP(20, 35, 14) }, { b: RAMP(40, 8, 86), m: RAMP(40, 8, 68) }, { b: RAMP(18, 65, 42), m: RAMP(18, 50, 24) }];
+const horseSpr = (frame, graze, coat, tack) => sprite("horse|" + frame + "|" + (graze ? 1 : 0) + "|" + coat + "|" + (tack ? 1 : 0), () => {
+  const g = grid(23, 15);
+  g.put(4, 5, 13, 5, "b");
+  if (graze) { g.put(15, 5, 3, 3, "b"); g.put(17, 7, 4, 3, "b"); g.put(20, 9, 2, 1, "n"); g.put(14, 4, 2, 3, "m"); g.px(19, 8, "k"); }
+  else { g.put(15, 2, 3, 5, "b"); g.put(17, 1, 4, 3, "b"); g.put(20, 2, 2, 2, "n"); g.px(17, 0, "b"); g.px(19, 2, "k"); g.put(14, 1, 2, 6, "m"); }
+  g.put(2, 5, 2, 6 - frame, "m");
+  const a = frame ? 5 : 4, bb = frame ? 4 : 5; // hai cặp chân đi so le, chân nhấc lên thì ngắn đi một hàng
+  for (const [x, len] of [[5, a], [8, bb], [13, bb], [15, a]]) { g.put(x, 10, 2, len, "b"); g.put(x, 10 + len - 1, 2, 1, "d"); }
+  if (tack) { g.put(8, 4, 5, 2, "s"); g.put(9, 6, 3, 3, "s"); }
+  return [g.rows(), { ...COATS[coat], n: "#c9a98a", k: "#1d1630", d: "#2a1d14", s: RAMP(8, 60, 34) }];
+});
+// Kỵ sĩ Anh Hai sống tự do và ngẫu nhiên: lúc đi bộ làm việc vặt hay vuốt ve ngựa, rồi đến bên ngựa leo lên yên, cưỡi tới một chỗ bất kỳ, xuống ngựa, nghỉ, làm việc khác; thỉnh thoảng phi ra khỏi cảnh rồi quay lại.
+const riderSpot = (g) => [Math.max(60, Math.min(g.W - 60, g.W * (0.12 + Math.random() * 0.76))), g.feet + 44 + Math.random() * (g.yard - g.feet - 24)];
+const RIDER_MOUNT = ["Gét gô!", "Phía trước thôi!", "Nào, đi thôi bạn già."], RIDER_DISMOUNT = ["Đứng đây chờ nhé, ai dắt trộm là toang.", "Ngoan nào, nghỉ chút đi.", "Đỗ xe ở đây, không thu phí."];
+// Chạy thẳng tới đích: tăng tốc dần, phanh đủ sớm theo v²/(2a) để dừng đúng chỗ; trả về quãng còn lại
+function driveTo(o, dest, dt, vmax, acc, brk) {
+  const dx = dest[0] - o.p[0], dy = dest[1] - o.p[1], d = Math.hypot(dx, dy); if (d < 0.5) { o.v = 0; return 0; }
+  o.v += Math.max(-brk * dt, Math.min(acc * dt, Math.min(vmax, Math.sqrt(2 * brk * d)) - o.v));
+  const st = Math.min(d, Math.max(o.v, 6) * dt); o.p[0] += dx / d * st; o.p[1] += dy / d * st; o.u = [dx / d, dy / d]; if (Math.abs(dx) > 1) o.dir = dx > 0 ? 1 : -1; return d - st;
+}
+function riderStep(n, dt, g) {
+  const clk = sim.clock, pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const hs = sim.mount || (sim.mount = { p: riderSpot(g), dir: -1, ph: 0, v: 0, graze: false, u: [1, 0], gt: 4, du: 0 });
+  if (!n.p) { n.p = [hs.p[0] - 36, hs.p[1]]; n.st = "idle"; n.t = 2 + Math.random() * 3; n.mounted = false; n.z = 0; n.v = 0; n.dir = 1; n.vis = true; n.pose = "walk"; n.walk = 0; n.gal = false; n.away = false; }
+  n.fc = n.mounted ? hs.dir : n.dir;
+  hs.gt -= dt; if (!n.mounted && hs.gt <= 0) { hs.graze = !hs.graze; hs.gt = 4 + Math.random() * 8; } // ngựa đứng yên thì lúc cúi gặm cỏ lúc ngẩng đầu
+  switch (n.st) {
+    case "idle": n.v = 0; n.pose = "walk"; n.t -= dt; if (n.t <= 0) { const r = Math.random(); if (r < 0.5) n.st = "toHorse"; else if (r < 0.8) { n.dest = riderSpot(g); n.st = "errand"; } else n.st = "pet"; } break;
+    case "errand": { const d = driveTo(n, n.dest, dt, 50, 120, 150); n.walk += n.v * dt / 8; n.pose = "walk"; if (d < 1.5) { n.st = "work"; n.pose = pick(["cut", "dig", "water"]); n.t = 4 + Math.random() * 5; n.v = 0; } break; }
+    case "work": n.v = 0; n.t -= dt; if (n.t <= 0) { n.st = "idle"; n.pose = "walk"; n.t = 2 + Math.random() * 6; } break;
+    case "pet": case "toHorse": { const side = n.p[0] < hs.p[0] ? -1 : 1, d = driveTo(n, [hs.p[0] + side * 34, hs.p[1] + 2], dt, 55, 120, 150); n.walk += n.v * dt / 8; n.pose = "walk";
+      if (d < 1.5) { n.v = 0; n.dir = -side; if (n.st === "toHorse") { n.st = "mount"; n.t = 0; n.from = n.p.slice(); hs.v = 0; hs.graze = false; npcSay(n, pick(RIDER_MOUNT)); } else { n.st = "work"; n.pose = "walk"; n.t = 3 + Math.random() * 3; } } break; }
+    case "mount": { n.t += dt; const u = Math.min(1, n.t / 0.9); n.p = [n.from[0] + (hs.p[0] - n.from[0]) * u, n.from[1] + (hs.p[1] - n.from[1]) * u]; n.z = 12 * u + 9 * Math.sin(Math.PI * u); // nhún người lên yên theo một vòng cung
+      if (u >= 1) { n.mounted = true; n.z = 12; n.gal = Math.random() < 0.3; n.away = Math.random() < 0.15; n.dest = n.away ? [Math.random() < 0.5 ? -80 : g.W + 80, hs.p[1]] : riderSpot(g); n.st = "ride"; } break; }
+    case "ride": { const vmax = (n.gal ? 150 : 75) + Math.min(60, sim.waiting * 10) - (sim.mud ? 20 : 0), d = driveTo(hs, n.dest, dt, vmax, 45, 70); hs.ph += hs.v * dt / 14; n.p = hs.p.slice(); n.pose = "walk"; if (hs.v > 40 && !n.say && Math.random() < dt * 0.04) npcSay(n, pick(["Phía trước thôi!", "Gét gô!", "Tránh đường cho ngựa nào!"])); // thỉnh thoảng hô to khi đang phi
+      hs.du -= dt; if (hs.v > 40 && hs.du <= 0 && sim.parts.length < 300) { hs.du = 0.12; sim.parts.push({ p: [hs.p[0] - hs.dir * 24, hs.p[1] - 2], v: [-hs.dir * 14, -16], life: 0.6, max: 0.6, s: PX, air: 1, c: sim.mud ? "#6a5a45" : "#d9c9a0" }); }
+      if (d < 1.5) { hs.v = 0; if (n.away) { n.st = "gone"; n.vis = false; n.t = 15 + Math.random() * 30; } else { n.st = "dismount"; n.t = 0; n.side = Math.random() < 0.5 ? -1 : 1; n.dir = n.side; } } break; }
+    case "dismount": { n.t += dt; const u = Math.min(1, n.t / 0.8); n.p = [hs.p[0] + n.side * 34 * u, hs.p[1] + 2 * u]; n.z = 12 * (1 - u) + 6 * Math.sin(Math.PI * u); // nhảy xuống đất, chạm đất thì ngựa đứng chờ
+      if (u >= 1) { n.mounted = false; n.z = 0; n.st = "idle"; n.t = 3 + Math.random() * 9; n.v = 0; hs.gt = 1.5 + Math.random() * 2; hs.graze = false; npcSay(n, pick(RIDER_DISMOUNT)); } break; }
+    case "gone": { n.vis = false; n.t -= dt; if (n.t <= 0) { const left = Math.random() < 0.5; hs.p = [left ? -80 : g.W + 80, riderSpot(g)[1]]; hs.dir = left ? 1 : -1; n.p = hs.p.slice(); n.mounted = true; n.z = 12; n.gal = Math.random() < 0.4; n.away = false; n.dest = riderSpot(g); n.vis = true; n.st = "ride"; } break; }
+  }
+}
+// Ngựa thả ở bãi chăn: đứng gặm cỏ một lúc rồi thong thả đi chỗ khác; mưa thì ngẩng đầu
+function horseStep(dt, g) {
+  const m = nMeadow(g); if (!m.ok) { sim.horse = null; return; }
+  const h = sim.horse || (sim.horse = { p: [g.W * 0.22, m.upY + 6], tp: null, mode: "graze", t: 5, dir: 1, ph: 0 });
+  if (h.mode === "graze") { h.t -= dt; h.ph += dt * 0.6; if (h.t <= 0) { h.mode = "walk"; h.tp = [g.W * (0.12 + Math.random() * 0.22), m.upY + 2 + Math.random() * 10]; } return; }
+  const dx = h.tp[0] - h.p[0], dy = h.tp[1] - h.p[1], dd = Math.hypot(dx, dy); if (dd < 2) { h.mode = "graze"; h.t = 5 + Math.random() * 6; return; }
+  const sp = Math.min(dd, 18 * dt); h.p[0] += dx / dd * sp; h.p[1] += dy / dd * sp; h.dir = dx >= 0 ? 1 : -1; h.ph += sp / 8;
+}
+function drawHorses(g, t, add) {
+  const l = sim.lx, r = (sim.npcs || []).find((n) => n.rider), hs = sim.mount;
+  if (r && r.p && hs && r.vis) {
+    const moving = hs.v > 5, gal = hs.v > 110, bob = moving ? Math.abs(Math.sin(hs.ph * Math.PI)) * (gal ? 2 : 1) * PX : 0;
+    add(hs.p[1], () => { const x = Math.round(hs.p[0]), y = hs.p[1] - bob; shade(x, hs.p[1], 64); blit(l, horseSpr(moving ? Math.floor(hs.ph) % 2 : 0, !r.mounted && hs.graze && !sim.mud, 0, true), x, y, hs.dir < 0); });
+    const up = r.mounted || r.st === "mount" || r.st === "dismount";
+    add(up ? hs.p[1] + 0.5 : r.p[1], () => {
+      const fc = r.fc, pose = r.pose, low = !up && (pose === "cut" || pose === "dig" || pose === "water"), x = r.mounted ? Math.round(hs.p[0]) - fc * 2 : Math.round(r.p[0]), y = (r.mounted ? hs.p[1] - bob : r.p[1]) - r.z + (low ? U : 0);
+      if (!up) shade(x, r.p[1], 32);
+      blit(l, farmerSpr(r.v > 5 && !up ? Math.floor(r.walk) % 2 : 0, r.hue), x, y, fc < 0);
+      if (!up) { if (pose === "cut") farmTool(x + fc * 9, y - 22, fc, -0.4 + Math.sin(t * 6) * 0.9, "cut"); else if (pose === "dig") farmTool(x + fc * 9, y - 22, fc, -0.9 + Math.sin(t * 7) * 0.7, "dig"); else if (pose === "water") { R(x + fc * 10, y - 24, 10, 7, "#8d939a"); R(x + fc * 18, y - 22, 8, 3, "#8d939a"); } }
+      if (r.mounted) { const poleX = x - fc * 22, tr = hs.v > 8 ? -fc : (sim.wind >= 0 ? 1 : -1), amp = hs.v > 8 ? 1 + Math.floor(hs.v / 60) : 1; // cờ bay ngược chiều chạy, đứng yên thì bay theo gió
+        R(poleX, y - 72, 2, 36, "#6b4528"); for (let k = 0; k < 4; k++) R(tr > 0 ? poleX + 2 + k * 4 : poleX - 4 - k * 4, y - 72 + Math.round(Math.sin(t * 9 + k * 1.3) * amp) * PX, 4, 9 - k * 2, "#c43a2c"); }
+    });
+  }
+  const h = sim.horse; if (h) add(h.p[1], () => { const graze = h.mode === "graze" && !sim.mud, fr = h.mode === "walk" ? Math.floor(h.ph) % 2 : 0; shade(h.p[0], h.p[1], 62); blit(l, horseSpr(fr, graze, 2, false), h.p[0], h.p[1], h.dir < 0); });
+}
+// ===== Ngôi làng: lấp hai khoảng trống giữa kho hạt, cối xay, giếng và chuồng bằng nhà dân, nhà thờ nhỏ có chuông, quầy chợ và dây phơi đồ, nối nhau bằng đường làng; chỗ hẹp thì tự bỏ bớt =====
+function villageGeo(g) {
+  const key = [g.W, g.feet, g.shed.x, g.barn.x].join("|"); if (sim.vg && sim.vg.key === key) return sim.vg;
+  const mid = Math.round((g.shed.x + g.shed.w + g.barn.x) / 2), gaps = [[[g.shed.x + g.shed.w + 78, mid - 54], ["chapel", "cottageB", "cottageA"]], [[mid + 150, g.barn.x - 18], ["cottageA", "line", "stall", "cottageB"]]], WID = { chapel: 76, cottageA: 84, cottageB: 84, stall: 64, line: 74 }, items = [];
+  for (const [[a, b], kinds] of gaps) { let x = a, i = 0; while (i < 8) { let kind = kinds[i % kinds.length]; if (kind !== "cottageA" && kind !== "cottageB" && items.some((q) => q.kind === kind)) kind = "cottageA"; /* nhà thờ, quầy chợ, dây phơi chỉ có một */ const w = WID[kind]; if (x + w > b) break; items.push({ kind, x, w, y: g.feet - (items.length % 2) * 5 }); x += w + 14; i++; } }
+  const houses = items.filter((b) => b.kind.startsWith("cottage") || b.kind === "chapel");
+  return (sim.vg = { key, items, houses, line: items.find((b) => b.kind === "line") || null, laneX0: g.shed.x + g.shed.w - 10, laneX1: g.barn.x + 20 });
+}
+function drawVillage(g, t) {
+  const v = villageGeo(g); if (!v.items.length) return; const st = ST(), lv = LV(), lit = mixHex("#7fb3d5", "#ffd34e", NIGHT), glow = (x, y, r) => { if (NIGHT > 0.3) disc(x, y, r, "rgba(255,210,100," + (0.14 * NIGHT).toFixed(2) + ")"); };
+  if (st) { dirtRoad(v.laneX0, v.laneX1, g.feet + 35, 4, 13, 2, NIGHT); for (const b of v.items) { const dx = b.x + b.w / 2, ly = g.feet + 35 + wob(dx, 2, 4); for (let yy = b.y; yy < ly; yy += PX * 2) { const xo = Math.round(Math.sin(yy * 0.25 + b.x) * 2.5 / PX) * PX; R(dx - 7 + xo, yy, PX, PX * 2, "#b8945a"); R(dx - 4 + xo, yy, 8, PX * 2, "#d4b47a"); R(dx + 4 + xo, yy, PX, PX * 2, "#b8945a"); } } } // đường làng chạy dọc, mỗi cửa nhà có lối nhỏ ra đường
+  for (const b of v.items) {
+    const x = b.x, y = b.y, w = b.w;
+    if (b.kind === "cottageA") {
+      if (st) { R(x + 4, y - 34, w - 8, 34, "#e6d6a8"); R(x + 4, y - 34, 3, 34, "#6b4528"); R(x + w - 7, y - 34, 3, 34, "#6b4528"); R(x + 4, y - 37, w - 8, 4, "#6b4528"); R(x + 4, y - 5, w - 8, 5, "#a89a78"); R(x + w / 2 - 9, y - 24, 18, 24, "#3a2414"); R(x + w / 2 - 7, y - 22, 14, 22, "#5a3a22");
+        for (const dx of [10, w - 24]) { R(x + dx, y - 27, 12, 12, "#3a2414"); R(x + dx + 2, y - 25, 8, 8, lit); R(x + dx - 1, y - 14, 14, 3, "#6b4528"); }
+        for (let r = 0; r < 10; r++) { const inset = r * 4; R(x - 6 + inset, y - 37 - r * 3, w + 12 - inset * 2, 3, r % 4 === 3 ? "#8f6a2a" : r % 2 ? "#c9a24d" : "#b58a3a"); } glow(x + 16, y - 21, 14); }
+    } else if (b.kind === "cottageB") {
+      if (st) { R(x + 4, y - 38, w - 8, 38, "#b9b4a6"); for (let r = 0; r < 5; r++) R(x + 4, y - 38 + r * 8, w - 8, 1, "#9c978a"); R(x + 4, y - 5, w - 8, 5, "#8f8b7e"); R(x + 10, y - 26, 16, 26, "#3a2414"); R(x + 12, y - 24, 12, 24, "#6b4528"); R(x + w - 34, y - 28, 14, 14, "#3a2414"); R(x + w - 32, y - 26, 10, 10, lit); R(x + w - 36, y - 14, 18, 3, "#6b4528");
+        for (let r = 0; r < 8; r++) { const inset = r * 5; R(x - 6 + inset, y - 38 - r * 3, w + 12 - inset * 2, 3, r % 2 ? "#a4452f" : "#8c3a28"); } R(x + w - 26, y - 74, 9, 28, "#8d6a5a"); R(x + w - 28, y - 76, 13, 3, "#6b5040"); glow(x + w - 27, y - 21, 14); }
+      if (lv) for (let k = 0; k < 4; k++) { const age = (t * 0.35 + k * 0.25 + x * 0.013) % 1; R(x + w - 24 + age * sim.wind * 1.2 + Math.sin(t + k) * 2, y - 80 - age * 44, 5 + age * 8, 5 + age * 6, "rgba(235,235,235," + (0.5 * (1 - age)).toFixed(2) + ")"); } // khói bếp trôi theo gió
+    } else if (b.kind === "chapel") {
+      const tx = x + 4, ty = y - 78; // tháp chuông bên trái, gian chính bên phải
+      if (st) { R(x + 30, y - 36, w - 34, 36, "#c9c4b4"); R(x + 30, y - 5, w - 34, 5, "#a8a393"); for (let r = 0; r < 5; r++) R(x + 26 + r * 4, y - 36 - r * 3, w - 26 - r * 8 + 4, 3, r % 2 ? "#a4452f" : "#8c3a28"); R(x + 46, y - 24, 14, 24, "#3a2414"); R(x + 48, y - 22, 10, 22, "#5a3a22"); disc(x + 38, y - 28, 4, "#3a2414");
+        R(tx, ty, 26, 78, "#c9c4b4"); R(tx, ty + 40, 26, 1, "#a8a393"); R(tx + 7, ty + 8, 12, 16, "#2a2a30"); for (let r = 0; r < 5; r++) R(tx - 3 + r * 3, ty - 4 - r * 4, 32 - r * 6, 4, r % 2 ? "#a4452f" : "#8c3a28"); R(tx + 12, ty - 32, 2, 12, "#d9b45a"); R(tx + 9, ty - 28, 8, 2, "#d9b45a"); R(tx + 8, y - 22, 10, 14, "#3a2414"); R(tx + 10, y - 20, 6, 12, lit); glow(tx + 13, y - 14, 14); }
+      if (lv) { const d = new Date(), ring = d.getMinutes() === 0 && d.getSeconds() < 8, sw = ring ? Math.round(Math.sin(t * 10) * 3) : 0; R(tx + 9 + sw, ty + 10, 8, 8, "#d9b45a"); R(tx + 12 + sw * 2, ty + 18, 2, 3, "#8f6a2a"); } // đúng giờ chẵn chuông đánh trong tám giây
+    } else if (b.kind === "stall") {
+      if (st) { R(x + 4, y - 40, 3, 40, "#6b4528"); R(x + w - 7, y - 40, 3, 40, "#6b4528"); for (let k = 0; k < 8; k++) R(x + k * 8, y - 46 + (k % 2) * PX, 8, 9, k % 2 ? "#c43a2c" : "#f4efe3"); R(x + 4, y - 14, w - 8, 6, "#8a5a33"); R(x + 4, y - 8, w - 8, 8, "#6b4528"); for (const [dx, c] of [[8, "#d93a2f"], [22, "#e6b020"], [36, "#6aa84f"], [48, "#d93a2f"]]) { R(x + dx, y - 20, 10, 6, c); R(x + dx + 1, y - 22, 8, 3, c); } }
+    } else if (b.kind === "line") {
+      if (st) { R(x + 2, y - 34, 3, 34, "#6b4528"); R(x + w - 5, y - 34, 3, 34, "#6b4528"); R(x + 2, y - 33, w - 4, 1, "#8d939a"); }
+      if (lv) for (let k = 0; k < 4; k++) { const sx = x + 8 + k * 16, sway = Math.round(Math.sin(t * 1.6 + k) * (1 + Math.abs(sim.wind) * 0.12)); R(sx + sway, y - 32, 12, 14, k % 2 ? "#f4efe3" : ["#7fb3d5", "#e8a0a0", "#d9d27a"][k % 3]); R(sx + sway, y - 32, 12, 2, "rgba(0,0,0,0.12)"); } // đồ phơi đung đưa theo gió
+    }
   }
 }
 function drawNPCs(g, t, add) {
   if (!sim.npcs) return; const l = sim.lx;
-  for (const n of sim.npcs) { if (!n.p) continue; add(n.p[1], () => {
-    const x = n.p[0], fc = n.fc, pose = n.pose, low = ["water", "cut", "dig", "sow", "milk", "fish"].includes(pose), y = n.p[1] + (low ? U : 0), moving = pose === "walk" && n.item !== "none";
+  for (const n of sim.npcs) { if (!n.p || n.rider) continue; add(n.p[1], () => {
+    const x = n.p[0], fc = n.fc, pose = n.pose, low = ["water", "cut", "dig", "sow", "milk", "fish", "wash"].includes(pose), sit = pose === "sit", y = n.p[1] + (low ? U : sit ? U * 2 : 0), moving = pose === "walk" && n.item !== "none";
+    if (sit) R(x - 10, n.p[1] - 8, 20, 6, "#8a5a33"); // ghế đẩu dưới người ngồi
+    if (n.item === "sack") { R(x - fc * 12, y - 34, 14, 18, "#e8dcc0"); R(x - fc * 12, y - 36, 14, 3, "#8a5a33"); }
+    if (n.item === "pack") { R(x - fc * 12, y - 36, 16, 18, "#a37040"); R(x - fc * 12, y - 38, 16, 3, "#6b4528"); R(x - fc * 4, y - 43, 6, 5, "#8d939a"); }
     if (n.item === "log" || n.item === "bale" || n.item === "basket") { /* vật đang vác sau lưng */ if (n.item === "log") { R(x - fc * 14, y - 30, 22, 6, "#8a5a33"); R(x - fc * 14, y - 30, 3, 6, "#e0c08a"); } else if (n.item === "bale") R(x - fc * 12, y - 36, 22, 14, "#d9b45a"); else R(x - fc * 12, y - 24, 14, 10, "#c9a24d"); }
-    shade(x, n.p[1], 32); blit(l, farmerSpr(low || pose === "pick" ? 0 : Math.floor(n.walk) % 2, n.hue), x, y, fc < 0);
+    shade(x, n.p[1], 32); blit(l, farmerSpr(low || sit || pose === "pick" || pose === "hammer" || pose === "sweep" ? 0 : Math.floor(n.walk) % 2, n.hue), x, y, fc < 0);
     if (n.item === "yoke") { R(x - 18, y - 38, 36, 3, "#6b4528"); for (const dx of [-17, 15]) { R(x + dx, y - 34, 2, 8, "#6b4528"); R(x + dx - 3, y - 27 + Math.round(Math.sin(t * 8)) * PX, 8, 7, "#8a5a33"); R(x + dx - 2, y - 28, 6, 2, "#6fb7ff"); } }
     if (n.item === "staff") R(x + fc * 14, y - 40, 2, 42, "#6b4528");
     if (pose === "cut") farmTool(x + fc * 9, y - 22, fc, -0.4 + Math.sin(t * 6) * 0.9, "cut"); else if (pose === "dig") farmTool(x + fc * 9, y - 22, fc, -0.9 + Math.sin(t * 7) * 0.7, "dig");
@@ -702,6 +912,10 @@ function drawNPCs(g, t, add) {
     else if (pose === "milk") { R(x + fc * 14, y - 8, 10, 8, "#8d939a"); R(x + fc * 15, y - 9, 8, 2, "#f4f1e8"); }
     else if (pose === "fish") { R(x + fc * 10, y - 30, 3, 3, "#6b4528"); R(fc > 0 ? x + 12 : x - 40, y - 34, 28, 2, "#6b4528"); R(x + fc * 40, y - 32, 1, 26 + Math.round(Math.sin(t * 2)) * PX, "#dfe8ff"); R(x + fc * 39, y - 6 + Math.round(Math.sin(t * 2)) * PX, 4, 4, "#d93a2f"); }
     else if (pose === "sow" && Math.floor(t * 5) % 2) R(x + fc * 16, y - 14, PX, PX, "#e8d9a8");
+    else if (pose === "hammer") { const sw = Math.round(Math.sin(t * 9)) * PX * 2; R(x + fc * 11, y - 34 + sw, 3, 16, "#6b4528"); R(x + fc * 9, y - 38 + sw, 9, 5, "#8d939a"); if (Math.floor(t * 4) % 2) R(x + fc * 20, y - 30, PX, PX, "#f4f1e8"); }
+    else if (pose === "wash") { R(x + fc * 14, y - 10, 20, 10, "#8a5a33"); R(x + fc * 14, y - 12, 20, 3, "#6fb7ff"); R(x + fc * 10, y - 18 + Math.round(Math.sin(t * 7)) * PX, 4, 4, "#e6b88a"); if (Math.floor(t * 5) % 2) R(x + fc * 18, y - 16, 5, 4, "#ffffff"); }
+    else if (pose === "sweep") { const sw = Math.round(Math.sin(t * 5) * 6 / PX) * PX; R(x + fc * 12 + sw, y - 38, 2, 38, "#6b4528"); R(x + fc * 8 + sw, y - 4, 10, 6, "#c9a24d"); if (Math.floor(t * 5) % 2) R(x + fc * 20 + sw, y - 6, PX, PX, "#d9c9a0"); }
+    else if (sit) R(x + fc * 6, y - 62 - (Math.floor(t * 2) % 3) * PX * 2, PX * 2, PX * 2, "rgba(225,225,225,0.6)");
   }); }
 }
 function drawCat(g, t) { // mèo cuộn tròn ngủ trên mái kho hạt, đuôi khẽ động
@@ -738,13 +952,12 @@ function paintScene(g, t, night, wet, heat, blocked, hr, d) { // cảnh gồm l�
   drawRoad(g, t, night);
   if (st) {
   R(0, g.skyH + 18, W, H - g.skyH - 18, SEA.g1); drawGrass(g);
-  R(g.laneX0 - 22, g.yard - 8, g.crateX0 - g.laneX0 + 10, 26, "#d4b47a"); R(g.laneX0 - 22, g.yard + 18, g.crateX0 - g.laneX0 + 10, 3, "#b8945a"); for (const dy of [2, 11]) R(g.laneX0 - 22, g.yard + dy, g.crateX0 - g.laneX0 + 10, PX, "#c2a064");
-  R(g.crateX0 - 10, g.feet + 4, W - g.mx - g.crateX0 + 20, g.yard + 22 - g.feet - 4, "#d4b47a");
+  dirtRoad(g.laneX0 - 22, g.crateX0 - 8, g.yard + 5, 2.5, 26, 3, NIGHT); plaza(g.crateX0 - 10, g.feet + 4, W - g.mx - g.crateX0 + 20, g.yard + 22 - g.feet - 4, 5);
   drawFarmland(g); drawFence(g.mx - 4, W - g.mx + 4, g.fieldTop - 14);
-  drawTree(g.shed.x + g.shed.w + 40, g.feet + 4, SEA.tree); drawWell(mid + 100, g.feet, clamp01(d.freeMb / Math.max(1, d.totalMb || d.freeMb * 2)));
+  drawTree(g.shed.x + g.shed.w + 40, g.feet + 4, SEA.tree); drawWell(mid + 100, g.feet, clamp01(d.freeMb / Math.max(1, d.totalMb || d.freeMb * 2))); { const b = benchPt(g); R(b[0] - 16, b[1] - 12, 32, 4, "#8a5a33"); R(b[0] - 14, b[1] - 8, 3, 8, "#6b4528"); R(b[0] + 11, b[1] - 8, 3, 8, "#6b4528"); }
   }
   drawMill(mid, g.feet, t, heat);
-  drawHut(g, t, blocked); drawTithe(g, t);
+  drawHut(g, t, blocked); drawTithe(g, t); drawVillage(g, t);
   const pasture = (x0, x1) => { if (x1 - x0 < 90) return; const mx2 = (x0 + x1) / 2, by = g.fieldTop + 44; // đồng cỏ hai bên ruộng
     if (ST()) { R(mx2 - 22, by - 22, 44, 22, "#c9a24d"); R(mx2 - 16, by - 32, 32, 12, "#d9b45a"); R(mx2 - 8, by - 40, 16, 10, "#e8c86a"); R(mx2 - 22, by - 6, 44, 4, "#8f6a2a"); }
     if (LV()) for (const [dx, dy, s] of [[-30, 14, 0], [26, 26, 1]]) { const sx = mx2 + dx + (Math.sin(t * 0.3 + s) * 6), sy = by + dy; R(sx - 12, sy - 14, 24, 12, "#f4f1e8"); R(sx - 14, sy - 12, 28, 8, "#f4f1e8"); R(sx + (s ? -18 : 12), sy - 12, 8, 8, "#3a3a40"); R(sx - 9, sy - 2, 3, 6, "#3a3a40"); R(sx + 6, sy - 2, 3, 6, "#3a3a40"); }
@@ -760,7 +973,7 @@ function simDraw(t) {
   const W = sim.W, H = sim.H, now = Date.now() / 1000; sim.texts = []; sim.rects = [];
   const heat = clamp01(d.load / Math.max(1, d.maxLoad)), wet = d.pressure >= d.maxPressure || d.freeMb < d.minFreeMb ? 1 : 0, blocked = sim.waiting > 0 && sim.free > 0, tm = new Date(), hr = tm.getHours() + tm.getMinutes() / 60; SEA = SEASONS[seasonOf(tm.getMonth())];
   const night = hr < 5.5 || hr >= 19.5 ? 1 : hr < 7 ? (7 - hr) / 1.5 : hr > 18 ? (hr - 18) / 1.5 : 0;
-  NIGHT = night; lx.setTransform(1 / PX, 0, 0, 1 / PX, 0, 0); lx.clearRect(0, 0, W, H); lx.imageSmoothingEnabled = false;
+  SUNX = Math.max(-1, Math.min(1, (hr - 12.5) / 6)); NIGHT = night; lx.setTransform(1 / PX, 0, 0, 1 / PX, 0, 0); lx.clearRect(0, 0, W, H); lx.imageSmoothingEnabled = false;
   const bgKey = [W, H, g.skyH, seasonOf(tm.getMonth()), Math.round(night * 10), Math.floor(hr * 20), wet, blocked ? 1 : 0, g.allow, g.nv, g.laneX0, [...(sim.used || [])].join(","), Math.round(clamp01(d.freeMb / Math.max(1, d.totalMb || d.freeMb * 2)) * 20), Math.round(heat * 10)].join("|");
   if (!sim.bgCv) { sim.bgCv = document.createElement("canvas"); sim.bgCx = sim.bgCv.getContext("2d"); }
   if (sim.bgCv.width !== sim.lo.width || sim.bgCv.height !== sim.lo.height) { sim.bgCv.width = sim.lo.width; sim.bgCv.height = sim.lo.height; sim.bgKey = ""; }
@@ -805,7 +1018,7 @@ function simDraw(t) {
       put(e.p[1], () => { const b = sblit(46, lx, crateSpr(e.crop, e.fail, e.timeout), e.p[0], e.p[1], false); e.sb = b; e.hits.push(b); reg(e.key, "thùng thu hoạch", "crate", b); });
     }
   }
-  drawNPCs(g, t, add); items.sort((a, b) => a.z - b.z); for (const it of items) it.fn();
+  drawNPCs(g, t, add); drawHorses(g, t, add); items.sort((a, b) => a.z - b.z); for (const it of items) it.fn();
   for (const q of sim.parts) { const f = q.life / q.max; lx.fillStyle = q.c; lx.globalAlpha = Math.max(0, f); lx.fillRect(snap(q.p[0]), snap(q.p[1]), q.s, q.s); lx.globalAlpha = 1; }
   drawNightLife(g, t, night);
   const fogA = (hr >= 5 && hr < 8.5 ? 0.3 * (1 - (hr - 5) / 3.5) : 0) + wet * 0.1;
@@ -823,12 +1036,25 @@ function simDraw(t) {
     lines.forEach((s, i) => { cx.fillStyle = i ? C.muted : C.text; cx.fillText(s, x + 5, y + 3 + i * 14 + 10); sim.texts.push({ x: x + 5, y: y + 3 + i * 14, w: ws[i], h: 12, s, owner }); });
   };
   for (const q of pl) { q.lines = q.lines.map((s, i) => (i ? s : fitText(cx, s, q.owner === "hud" ? 400 : sim.g.cw - 20))); draw(q.owner, q.mx0, q.y, q.lines, q.warn); }
+  const bubbles = () => { /* bong bóng thoại của dân làng: hiệu ứng thoáng qua, không đưa vào kiểm tra chữ; tự bỏ qua khi sắp đè chữ khác để không che biển lệnh */
+    const nowS = sim.clock, shown = []; cx.font = FN;
+    const clash = (a, b) => a.x < b.x + b.w + 2 && b.x < a.x + a.w + 2 && a.y < b.y + b.h + 2 && b.y < a.y + a.h + 2;
+    for (const n of sim.npcs || []) {
+      if (!n.say || !n.p || (n.rider && !n.vis) || nowS < n.say.at || nowS > n.say.until) continue;
+      const ws = n.say.text.map((s) => tw(cx, s)), w = Math.ceil(Math.max(...ws)) + 10, h = n.say.text.length * 14 + 6, x = Math.max(2, Math.min(W - w - 2, Math.round(n.p[0] - w / 2))), y = Math.max(2, Math.round(n.p[1] - (n.rider && n.mounted ? 98 : 74) - h)), box = { x, y, w, h };
+      if (sim.texts.some((q) => clash(box, q)) || shown.some((q) => clash(box, q))) continue;
+      shown.push(box); cx.fillStyle = rgba(C.panel, 0.96); cx.fillRect(x, y, w, h); cx.strokeStyle = C.line; cx.lineWidth = 1.5; cx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      const tx = Math.max(x + 6, Math.min(x + w - 6, Math.round(n.p[0]))); cx.fillStyle = rgba(C.panel, 0.96); cx.fillRect(tx - 3, y + h, 7, 4); cx.fillStyle = C.line; cx.fillRect(tx - 3, y + h, 1, 4); cx.fillRect(tx + 3, y + h, 1, 4); /* đuôi bong bóng chỉ xuống người nói */
+      n.say.text.forEach((s, i) => { cx.fillStyle = C.text; cx.fillText(s, x + 5, y + 3 + i * 14 + 10); });
+    }
+  };
   const say = sim.say && performance.now() / 1000 < sim.say.until ? sim.say.text : null;
   if (say) draw("gate", g.shed.x + 70, g.feet + 16, say, false); else if (sim.waiting > 0 && sim.cause) draw("gate", g.shed.x + 70, g.feet + 16, ["Kho hạt đóng,", fitText(cx, sim.cause, 130)], true);
   { const nowS = performance.now() / 1000; cx.font = FB; cx.lineWidth = 3; cx.lineJoin = "round"; for (const q of sim.pops) { const age = nowS - q.t0; if (age < 0 || age > 2.4) continue; const x = Math.max(24, Math.min(W - 40, q.x)), y = q.y - age * 18; cx.globalAlpha = Math.max(0, 1 - age / 2.4); cx.strokeStyle = "rgba(0,0,0,0.7)"; cx.strokeText(q.text, x - 12, y); cx.fillStyle = q.ok ? "#4ade80" : "#ff6b6b"; cx.fillText(q.text, x - 12, y); } cx.globalAlpha = 1; } /* chữ tiền nổi là hiệu ứng thoáng qua, không đưa vào kiểm tra chữ đè nhau */
   draw("hud1", 8 + 90, 8, [simQueueLabel(), simRunLabel()], false);
   const led = ["sổ thu chi " + (sim.okN + sim.failN) + " lệnh", "xong " + sim.okN + " · lỗi " + sim.failN, "thu " + fmtVnd(sim.rev) + " · chi " + fmtVnd(sim.cost), (sim.profit >= 0 ? "lãi +" : "lỗ −") + fmtVnd(sim.profit)]; cx.font = FN; const lw0 = Math.ceil(Math.max(...led.map((s) => cx.measureText(s).width))) + 10; draw("ledger", W - 8 - lw0 / 2, 8, led, sim.profit < 0);
   draw("hud2", 8 + 200, H - 28, ["CPU " + Number(d.load).toFixed(0) + "%/" + d.maxLoad + "% · RAM trống " + fmtMem(d.freeMb) + " (cần ≥" + fmtMem(d.minFreeMb) + ")"], false);
+  bubbles();
 }
 function reg(owner, name, kind, b) { sim.rects.push({ owner, name, kind, x: b[0], y: b[1], w: b[2] - b[0], h: b[3] - b[1] }); }
 function simStep(dt, t) {
@@ -838,20 +1064,29 @@ function simStep(dt, t) {
     if (f) {
       f.t += dt; let L = f.legs[f.i];
       while (L && f.t >= L.dur) { f.t -= L.dur; f.i++; L = f.legs[f.i]; if (L && f.kind === "plant" && f.i === 3) for (let n = 0; n < 8; n++) sim.parts.push({ p: [e.plotP[0] + (Math.random() - 0.5) * 30, e.plotP[1] - 6], v: [(Math.random() - 0.5) * 40, -20 - Math.random() * 20], life: 0.7, max: 0.7, s: PX, c: "#a9825a" }); if (L && f.kind === "harvest" && f.i === 1) for (let n = 0; n < 8; n++) sim.parts.push({ p: [e.plotP[0] + (Math.random() - 0.5) * 30, e.plotP[1] - 20], v: [(Math.random() - 0.5) * 50, -30 - Math.random() * 30], life: 0.8, max: 0.8, s: PX, c: "#ffe066" }); }
-      if (!L) { if (f.kind === "harvest") deliver(e); e.flow = null; e.p = e.tp.slice(); } else { f.tag = L.tag; const u = L.dur ? f.t / L.dur : 1; e.p = [L.a[0] + (L.b[0] - L.a[0]) * u, L.a[1] + (L.b[1] - L.a[1]) * u]; if (Math.abs(L.b[0] - L.a[0]) > 1) f.facing = L.b[0] > L.a[0] ? 1 : -1; if (L.a[0] !== L.b[0] || L.a[1] !== L.b[1]) { e.walk += dt * 7; e.du = (e.du || 0) - dt; if (e.du <= 0) { e.du = 0.2; sim.parts.push({ p: [e.p[0], e.p[1] - 2], v: [(Math.random() - 0.5) * 12, -14], life: 0.5, max: 0.5, s: PX, c: sim.d && (sim.d.pressure >= sim.d.maxPressure || sim.d.freeMb < sim.d.minFreeMb) ? "#6a5a45" : "#d9c9a0" }); } }
+      if (!L) { if (f.kind === "harvest") deliver(e); e.flow = null; e.p = e.tp.slice(); } else { f.tag = L.tag; const u = L.dur ? f.t / L.dur : 1; e.p = [L.a[0] + (L.b[0] - L.a[0]) * u, L.a[1] + (L.b[1] - L.a[1]) * u]; if (Math.abs(L.b[0] - L.a[0]) > 1) f.facing = L.b[0] > L.a[0] ? 1 : -1; if (L.a[0] !== L.b[0] || L.a[1] !== L.b[1]) { e.walk += dt * 7; e.du = (e.du || 0) - dt; if (e.du <= 0) { e.du = 0.2; sim.parts.push({ p: [e.p[0], e.p[1] - 2], v: [(Math.random() - 0.5) * 12, -14], life: 0.5, max: 0.5, s: PX, air: 1, c: sim.d && (sim.d.pressure >= sim.d.maxPressure || sim.d.freeMb < sim.d.minFreeMb) ? "#6a5a45" : "#d9c9a0" }); } }
       if (f.kind === "plant" && (f.i === 3 || f.i === 4 || f.i === 5)) { e.sp = (e.sp || 0) - dt; if (e.sp <= 0) { e.sp = f.i === 3 ? 0.22 : 0.08; const fc = f.facing < 0 ? -1 : 1; sim.parts.push({ p: [e.p[0] + fc * (f.i === 5 ? 20 : 10), e.p[1] - (f.i === 5 ? 20 : 14)], v: [fc * 18, f.i === 5 ? 10 : -10], life: 0.6, max: 0.6, s: PX, c: f.i === 5 ? "#6fb7ff" : f.i === 3 ? "#a9825a" : "#e8d9a8" }); } } }
     } else { const dx = e.tp[0] - e.p[0], dy = e.tp[1] - e.p[1], dd = Math.hypot(dx, dy); if (dd > 0.5) { const s = Math.min(dd, 150 * dt); e.p[0] += (dx / dd) * s; e.p[1] += (dy / dd) * s; } }
     e.a += Math.max(-1, Math.min(1, e.ta - e.a)) * Math.min(1, dt * 6); if (e.ta <= 0 && e.a < 0.02 && !e.flow) sim.ents.delete(k);
   }
-  npcStep(dt, g); for (const c of sim.carts) c.x -= 42 * dt; sim.carts = sim.carts.filter((c) => c.x > -160); sim.pops = sim.pops.filter((q) => now - q.t0 < 2.4);
+  const dd0 = sim.d, heat0 = dd0 ? clamp01(dd0.load / Math.max(1, dd0.maxLoad)) : 0, mud = dd0 && (dd0.pressure >= dd0.maxPressure || dd0.freeMb < dd0.minFreeMb);
+  sim.clock += dt; sim.mud = !!mud; sim.wind = Math.sin(sim.clock * 0.13) * 14 + Math.sin(sim.clock * 0.47) * 8 + (mud ? -30 : 0); // gió giật theo hai nhịp chồng nhau, mưa thì gió mạnh hơn
+  { const m = sim.mill; m.w += ((0.4 + heat0 * 3) * (1 + sim.wind / 120) - m.w) * Math.min(1, dt * 0.7); m.ang += m.w * dt; } // cánh quay có quán tính: CPU đổi thì tăng hoặc giảm tốc dần
+  npcStep(dt, g, mud ? 0.8 : 1); horseStep(dt, g); npcTalk(sim.clock, g);
+  for (const c of sim.carts) { c.v = Math.min(42, c.v + 30 * dt); c.x -= c.v * dt; c.du = (c.du || 0) - dt; if (c.v > 8 && c.du <= 0 && sim.parts.length < 300) { c.du = 0.25; sim.parts.push({ p: [c.x + 10, g.skyH + 14], v: [8, -10], life: 0.7, max: 0.7, s: PX, c: "#d9c9a0", air: 1 }); } } // xe nhấc bánh khỏi chỗ đứng yên từ từ, bánh kéo bụi
+  sim.carts = sim.carts.filter((c) => c.x > -160); sim.pops = sim.pops.filter((q) => now - q.t0 < 2.4);
   const home = [g.shed.x + 30, g.feet + 40]; if (!sim.dog) sim.dog = { p: home.slice(), face: 1, walk: 0, sleep: true };
   let tgt = null; for (const e of sim.ents.values()) if (e.flow && e.a > 0.5 && !tgt) tgt = [e.p[0] - 34, e.p[1] + 2];
   { const dg = sim.dog; if (!tgt && (!dg.roamT || now > dg.roamT)) { dg.roamT = now + 5 + Math.random() * 6; dg.roam = [g.mx + 30 + Math.random() * (g.W * 0.55), g.feet + 30 + Math.random() * 60]; }
     const to = tgt || (NIGHT > 0.6 ? home : dg.roam || home), dx = to[0] - dg.p[0], dy = to[1] - dg.p[1], dd = Math.hypot(dx, dy); if (dd > 6) { const sp = Math.min(dd, (tgt ? 120 : 60) * dt); dg.p[0] += (dx / dd) * sp; dg.p[1] += (dy / dd) * sp; dg.face = dx >= 0 ? 1 : -1; dg.walk += dt * 9; dg.sleep = false; } else dg.sleep = !tgt && NIGHT > 0.6; }
-  for (const q of sim.parts) { q.p[0] += q.v[0] * dt; q.p[1] += q.v[1] * dt; q.v[1] += 80 * dt; q.life -= dt; } sim.parts = sim.parts.filter((q) => q.life > 0);
+  for (const q of sim.parts) {
+    if (q.air) q.v[0] += (sim.wind - q.v[0]) * Math.min(1, dt * 1.5); // bụi nhẹ trôi theo gió
+    q.p[0] += q.v[0] * dt; q.p[1] += q.v[1] * dt; q.v[1] += (q.air ? 20 : 80) * dt; q.life -= dt;
+    if (q.floor != null && q.p[1] > q.floor) { q.p[1] = q.floor; q.v[1] = Math.abs(q.v[1]) < 14 ? 0 : -q.v[1] * q.bounce; q.v[0] *= 0.7; } // chạm đất thì nảy mất bớt năng lượng và trượt chậm dần
+  } sim.parts = sim.parts.filter((q) => q.life > 0);
   const wet = sim.d && (sim.d.pressure >= sim.d.maxPressure || sim.d.freeMb < sim.d.minFreeMb);
   const fall = wet ? 90 : SEA.snow ? 70 : SEA.leaf ? 14 : 0, sp = wet ? 360 : SEA.snow ? 38 : 24;
-  if (fall) { while (sim.rain.length < fall) sim.rain.push([Math.random() * sim.W, Math.random() * sim.H]); sim.rain.length = fall; for (const r of sim.rain) { r[1] += sp * dt; r[0] += (wet ? -40 : Math.sin(r[1] * 0.05) * 14) * dt; if (r[1] > sim.H) { r[1] = -8; r[0] = Math.random() * sim.W; } } } else sim.rain.length = 0;
+  if (fall) { while (sim.rain.length < fall) sim.rain.push([Math.random() * sim.W, Math.random() * sim.H]); sim.rain.length = fall; for (const r of sim.rain) { r[1] += sp * dt; r[0] += (wet ? -40 + sim.wind * 0.6 : Math.sin(r[1] * 0.05) * 14 + sim.wind) * dt; if (r[2] == null) r[2] = g.yard + Math.random() * (sim.H - g.yard - 10); /* mỗi giọt rơi xuống một độ sâu mặt đất riêng */ if (r[1] > (wet ? r[2] : sim.H)) { if (wet && sim.parts.length < 300) for (let k = 0; k < 2; k++) sim.parts.push({ p: [r[0], r[2]], v: [(k ? 1 : -1) * (8 + Math.random() * 10), -22 - Math.random() * 14], life: 0.3, max: 0.3, s: PX, c: "#cfe6ff" }); r[1] = -8; r[0] = Math.random() * sim.W; r[2] = null; } } } else sim.rain.length = 0;
   void now; void t;
 }
 
