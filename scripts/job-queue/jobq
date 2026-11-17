@@ -111,6 +111,11 @@ estimate() { # $1 key
     printf "%d %d\n", (C<25?25:C), (M<100?100:M)}' "$HIST"
 }
 
+oversize() { # $1 key: in "giây_trung_bình RAM_lớn_nhất số_lần" của tối đa 3 lần chạy gần nhất của đúng lệnh này
+  [ -f "$HIST" ] || { echo "0 0 0"; return; }
+  awk -F'\t' -v k="$1" '$1==k{t[++n]=$4;m[n]=$3} END{for(i=(n>3?n-2:1);i<=n;i++){s+=t[i]; if(m[i]>M)M=m[i]; c++} printf "%d %d %d\n", c?s/c:0, M, n}' "$HIST"
+}
+
 sample() { # $1 pgid $2 tệp ra: mỗi 2s ghi "mem_mb centi_cpu" của cả nhóm tiến trình; làm mới trang web mỗi 5s
   local lastw=0
   while kill -0 "$1" 2>/dev/null; do
@@ -369,6 +374,14 @@ cmd_run() {
   ticket="$Q_DIR/queue/$(printf '%012d' "$(now)")-$$"; got=""; pid=""; wd=""; sp=""; samples=""; runid=""; fifo=""; teepid=""; run_start=0; run_cwd=""; run_cmd=""; local i
   flag=$(mktemp "${TMPDIR:-/tmp}/jobq.XXXXXX"); rm -f "$flag"
   key=$(printf '%s\n%s' "$PWD" "$*" | cksum | cut -d' ' -f1)
+  # Ép chia nhỏ trước khi chạy: lệnh giống hệt vừa chạy quá nửa hạn (hoặc ăn hơn một phần tư RAM máy) thì từ chối; thật sự cần chạy cả cục thì thêm JOBQ_WHOLE=1
+  if [ -z "${JOBQ_WHOLE:-}" ]; then
+    local o_secs o_mem o_n; read -r o_secs o_mem o_n <<< "$(oversize "$key")"
+    if [ "${o_n:-0}" -gt 0 ] && { [ $(( o_secs * 2 )) -ge "$TIMEOUT" ] || [ $(( o_mem * 4 )) -ge "$TOTAL_MB" ]; }; then
+      echo "jobq: TỪ CHỐI, lệnh này lần trước chạy trung bình ${o_secs}s (hạn ${TIMEOUT}s), RAM tối đa ${o_mem}MB (máy ${TOTAL_MB}MB). CHIA NHỎ trước: jobq split N -- <file...> hoặc --shard=i/N của công cụ, rồi đẩy từng lô vào jobq. Thật sự cần chạy cả cục thì thêm JOBQ_WHOLE=1 trước lệnh." >&2
+      exit 125
+    fi
+  fi
   read -r W_CPU W_MEM <<< "$(estimate "$key")"
   case "$COST" in *cpu=*) W_CPU=$(cc "$(echo "$COST" | sed -E 's/.*cpu=([0-9.]+).*/\1/')") ;; esac
   case "$COST" in *mem=*) W_MEM=$(echo "$COST" | sed -E 's/.*mem=([0-9]+).*/\1/') ;; esac
@@ -443,7 +456,7 @@ cmd_run() {
     : > "$flag"; kids=$(tree_pids "$pid"); kill -TERM -- "-$pid" $kids 2>/dev/null; sleep 5; kill -KILL -- "-$pid" $kids 2>/dev/null ) & wd=$!
   disown "$wd"; { wait "$pid"; } 2>/dev/null; local rc=$?
   kill -- "-$sp" 2>/dev/null; sp=""
-  if [ "$rc" -ne 124 ] && [ "$rc" -lt 128 ]; then # chỉ ghi lần chạy kết thúc bình thường
+  if { [ "$rc" -ne 124 ] && [ "$rc" -lt 128 ]; } || [ -e "$flag" ]; then # ghi lần chạy kết thúc bình thường và cả lần quá hạn, để lần sau biết lệnh này quá to
     read -r mm cp <<< "$(awk '{if($1>m)m=$1; c+=$2; n++} END{printf "%d %d", m, n?c/n:0}' "$samples")"
     printf '%s\t%s\t%s\t%s\t%s\n' "$key" "${cp:-0}" "${mm:-0}" "$(( $(now) - started ))" "$*" >> "$HIST"
     [ "$(wc -l < "$HIST")" -gt 4000 ] && { tail -n 2000 "$HIST" > "$HIST.tmp" && mv "$HIST.tmp" "$HIST"; }

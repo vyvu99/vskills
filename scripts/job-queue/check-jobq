@@ -29,6 +29,13 @@ echo "$msg" | grep -q "Output cuối" && echo "$msg" | grep -q "da-chay-toi-buoc
 "$HERE/jobq" logs 1 | grep -q "CHIA NHỎ" || fail "lịch sử không ghi lời nhắc chia nhỏ khi quá hạn"
 sleep 1; pgrep -f 'sleep 30( |&|$)' >/dev/null && fail "sleep 30 còn sống sau timeout"
 
+# 3b) ép chia nhỏ: lệnh vừa quá hạn thì lần chạy lại bị từ chối ngay (125), JOBQ_WHOLE=1 cho chạy tiếp, lệnh nhanh không bị đụng
+"$HERE/jobq" run -t 2 -- bash -c 'sleep 20 & wait' >/dev/null 2>&1; [ $? -eq 124 ] || fail "lệnh quá hạn lần đầu phải trả 124"
+msg=$("$HERE/jobq" run -t 2 -- bash -c 'sleep 20 & wait' 2>&1 >/dev/null); [ $? -eq 125 ] || fail "lệnh vừa quá hạn phải bị từ chối (125)"
+echo "$msg" | grep -q "CHIA NHỎ" && echo "$msg" | grep -q "JOBQ_WHOLE=1" || fail "lời từ chối thiếu hướng dẫn chia nhỏ hoặc cách bỏ qua"
+JOBQ_WHOLE=1 "$HERE/jobq" run -t 2 -- bash -c 'sleep 20 & wait' >/dev/null 2>&1; [ $? -eq 124 ] || fail "JOBQ_WHOLE=1 phải cho chạy lại"
+"$HERE/jobq" run -- true && "$HERE/jobq" run -- true || fail "lệnh nhanh không được bị từ chối"
+
 # 4) lồng nhau không kẹt
 "$HERE/jobq" run -- "$HERE/jobq" run -- true || fail "lồng nhau"
 
@@ -161,6 +168,26 @@ pass|rsync -a a/ b/
 pass|grep -rn "check-types" .
 pass|ls scripts/check-x.sh
 CASES
+
+# 16b) jobq-guard ép chia lô: công cụ chạy cả cục bị chặn kèm lời nhắc, có shard/filter/tệp thì qua, JOBQ_WHOLE=1 cho qua
+gw() { local exp=$1 out r; out=$(printf '{"tool_input":{"command":%s}}' "$(jq -Rn --arg c "$2" '$c')" | "$HERE/jobq-guard" 2>&1 >/dev/null); r=$?
+  if [ "$exp" = block ]; then [ "$r" -eq 2 ] && echo "$out" | grep -q "CHIA LÔ" || fail "jobq-guard phải ép chia lô: $2"; else [ "$r" -eq 0 ] || fail "jobq-guard không được chặn lệnh đã chia lô: $2"; fi; }
+while IFS='|' read -r exp c; do gw "$exp" "$c"; done <<'WHOLE'
+block|JOBQ_FG=1 jobq run -- npx vitest run
+block|JOBQ_FG=1 jobq run -- pnpm exec jest
+block|JOBQ_FG=1 jobq run -- npx playwright test
+block|JOBQ_FG=1 jobq run -- turbo run build
+block|JOBQ_FG=1 jobq run -- sh -c "cd apps/api && npx vitest run --maxWorkers=2"
+pass|JOBQ_FG=1 jobq run -- npx vitest run --shard=1/4
+pass|JOBQ_FG=1 jobq run -- npx vitest run src/a.test.ts
+pass|JOBQ_FG=1 jobq run -- jest --shard=2/5
+pass|JOBQ_FG=1 jobq run -- npx playwright test e2e/login.spec.ts
+pass|JOBQ_FG=1 jobq run -- turbo run build --filter=api
+pass|JOBQ_FG=1 jobq run -- turbo run test --affected
+pass|JOBQ_WHOLE=1 JOBQ_FG=1 jobq run -- npx vitest run
+pass|JOBQ_FG=1 jobq run -- tsc --noEmit
+pass|JOBQ_FG=1 jobq run -- sh -c "cd apps/api && npx vitest run --shard=3/6 --maxWorkers=2 > out.txt 2>&1"
+WHOLE
 
 # 18) dừng bất thường: TERM không để lại file mồ côi; kill -9 jobq thì lệnh con cũng bị dừng; reap dọn file mồ côi
 ( export JOBQ_DIR="$T/q9"

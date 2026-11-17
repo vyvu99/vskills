@@ -37,7 +37,7 @@ jobq web                                  # mở trang theo dõi (xem dạng dan
 jobq clean                                # dọn chỗ của tiến trình đã chết, cắt lịch sử còn 2000 dòng
 ```
 
-Mã thoát: của chính lệnh, trừ `124` (quá hạn, đã dừng cả cây tiến trình và báo phải chia nhỏ lệnh), `75` (chờ trong hàng quá lâu) và `130` (bị ngắt bằng Ctrl-C).
+Mã thoát: của chính lệnh, trừ `124` (quá hạn, đã dừng cả cây tiến trình và báo phải chia nhỏ lệnh), `125` (từ chối vì lần trước lệnh này chạy quá to, xem mục Lỗi hay gặp), `75` (chờ trong hàng quá lâu) và `130` (bị ngắt bằng Ctrl-C).
 
 ## Cách hoạt động
 
@@ -87,6 +87,8 @@ Chặn lệnh nặng khi không đi qua `jobq run`, kể cả dạng bọc: `tim
 - **Hệ thống và media:** `make`, `just test`, `docker build`, `ffmpeg`, `magick`, `sips`, `lighthouse`, `k6`.
 - **Script tự viết:** tên `check-*`, `test-*`, `e2e-*`, `bench-*` gọi bằng interpreter hoặc đường dẫn.
 
+**Ép chia lô:** `vitest`, `jest`, `playwright`, `turbo` đi qua `jobq run` mà chạy cả cục (không có `--shard`, `--filter`, `--affected`, `--grep`, cũng không có tệp nào để chọn; `turbo` chỉ chấp nhận cờ lọc) cũng bị chặn kèm lời nhắc chia lô. Thật sự cần chạy cả cục thì thêm `JOBQ_WHOLE=1` trước lệnh. Lệnh bọc trong script npm (`pnpm test`) hook không nhìn thấy runner bên trong nên không ép được.
+
 Hàng đợi không bao giờ "đầy": Claude cứ đẩy mọi lệnh độc lập vào, `jobq` tự xếp theo tải và RAM; khi Claude xem `jobq status` hoặc `jobq stats`, hook nhắc đừng dựa vào đó để ngừng đẩy lệnh. Lệnh đã có `jobq run` hoặc `stepper` thì bắt buộc chạy nền (`run_in_background: true`), nếu không hook chặn kèm lời nhắc làm việc khác trong lúc chờ; cần kết quả ngay thì thêm `JOBQ_FG=1` trước lệnh. Cho qua: `pnpm install`, `npm ci`, `pnpm dev`, `wrangler dev`, `git`, `echo`, `grep`, `tar`, `rsync` và mọi lệnh đã có `jobq run`. Chữ nằm trong dấu nháy và nội dung heredoc được bỏ qua; nháy lẻ không đóng thì dùng nguyên văn, thà chặn thừa còn hơn để lọt.
 
 Thêm lệnh nặng mới: sửa `NAMES`, `SCRIPTS` hoặc `SCRIPTFILES` trong `jobq-guard`, rồi thêm một dòng vào bảng ca thử trong `check-jobq`. Gỡ hook: xoá mục cuối của `hooks.PreToolUse`.
@@ -115,6 +117,7 @@ Bước nào lỗi thì dừng tại đó; sửa xong chạy lại cùng lệnh 
 
 - **Exit `75`:** chờ quá `JOBQ_WAIT`. Chạy `jobq status`; nếu có chỗ treo mà tiến trình đã chết thì `jobq clean`.
 - **Exit `124`:** lệnh quá hạn. `jobq` in "QUÁ HẠN ... hãy CHIA NHỎ lệnh" và ghi dòng đó vào lịch sử, kèm tên lệnh và 20 dòng output cuối để biết lệnh chạy tới đâu. Chia lệnh thành các lô ngắn hơn (`jobq split N -- <file...>` hoặc `--shard=i/N`) rồi đẩy từng lô, đừng tăng `-t`.
+- **Exit `125`:** `jobq` từ chối chạy vì 3 lần chạy gần nhất của đúng lệnh này trung bình quá nửa hạn thời gian (kể cả các lần bị quá hạn, được ghi vào lịch sử) hoặc RAM tối đa vượt một phần tư RAM máy. Chia lệnh thành lô nhỏ rồi chạy từng lô; thật sự cần chạy cả cục thì thêm `JOBQ_WHOLE=1` trước lệnh.
 - **Chỉ một lệnh chạy dù giới hạn cao hơn:** máy đang quá tải, thiếu RAM, swap tăng nhanh, hoặc lệnh vừa được nhận còn trong 3 giây chờ khởi động. `jobq status` hiện CPU đang dùng, RAM trống và số lệnh còn nhận thêm được ngay lúc này (tính sống từ CPU, RAM trống và độ nặng của lệnh chờ tiếp theo nên đổi theo máy).
 - **Lệnh con tự sinh nhiều worker:** `jobq` không giới hạn được, vẫn phải truyền `--concurrency=2`, `--maxWorkers=2`, `--workers=2` cho turbo/vitest/jest/playwright.
 - **Số đo CPU/RAM chỉ gần đúng:** lấy từ `ps` mỗi 2 giây, RAM cộng dồn nên có thể thừa với tiến trình dùng chung bộ nhớ, và tiến trình tự tách nhóm (như Chrome) có thể không được tính.

@@ -37,7 +37,7 @@ jobq web                                  # open the monitoring page (list view,
 jobq clean                                # clean up slots of dead processes, trim history to 2000 lines
 ```
 
-Exit codes: the command's own, except `124` (timed out, the whole process tree was stopped and you are told to split the command), `75` (waited in the queue too long) and `130` (interrupted with Ctrl-C).
+Exit codes: the command's own, except `124` (timed out, the whole process tree was stopped and you are told to split the command), `125` (refused because the previous runs of this command were too big, see Common problems), `75` (waited in the queue too long) and `130` (interrupted with Ctrl-C).
 
 ## How it works
 
@@ -87,6 +87,8 @@ Blocks heavy commands that do not go through `jobq run`, including wrapped forms
 - **System and media:** `make`, `just test`, `docker build`, `ffmpeg`, `magick`, `sips`, `lighthouse`, `k6`.
 - **Custom scripts:** names `check-*`, `test-*`, `e2e-*`, `bench-*` invoked via an interpreter or a path.
 
+**Forced batching:** `vitest`, `jest`, `playwright` and `turbo` that go through `jobq run` but run as one big chunk (no `--shard`, `--filter`, `--affected`, `--grep`, and no file to select; `turbo` only accepts the filter flags) are also blocked with a reminder to split into batches. If you really need the whole run, put `JOBQ_WHOLE=1` before the command. Commands wrapped in a package script (`pnpm test`) hide the runner from the hook, so those cannot be enforced.
+
 The queue is never "full": Claude just pushes every independent command in and `jobq` orders them by load and RAM; when Claude looks at `jobq status` or `jobq stats`, the hook reminds it not to use them as a reason to stop pushing commands. A command that already has `jobq run` or `stepper` must run in the background (`run_in_background: true`); otherwise the hook blocks it with a reminder to do other work while waiting; if you need the result right away, put `JOBQ_FG=1` before the command. Allowed through: `pnpm install`, `npm ci`, `pnpm dev`, `wrangler dev`, `git`, `echo`, `grep`, `tar`, `rsync` and every command already wrapped in `jobq run`. Text inside quotes and heredoc bodies is ignored; an unclosed single quote is taken literally, since a false block beats a miss.
 
 To add a new heavy command: edit `NAMES`, `SCRIPTS` or `SCRIPTFILES` in `jobq-guard`, then add a line to the test-case table in `check-jobq`. To remove the hook: delete the last entry of `hooks.PreToolUse`.
@@ -115,6 +117,7 @@ A failing step stops there; after fixing, rerun the same command to resume from 
 
 - **Exit `75`:** waited longer than `JOBQ_WAIT`. Run `jobq status`; if a slot is stuck but its process is dead, run `jobq clean`.
 - **Exit `124`:** the command timed out. `jobq` prints "QUÁ HẠN ... hãy CHIA NHỎ lệnh" (timed out ... split the command) and records that line in the history, along with the command name and the last 20 output lines so you can see how far it got. Split the command into shorter batches (`jobq split N -- <file...>` or `--shard=i/N`) and push each batch; do not raise `-t`.
+- **Exit `125`:** `jobq` refused to run because the last 3 runs of this exact command averaged more than half the time limit (timed-out runs are recorded in the history too) or peaked above a quarter of the machine's RAM. Split the command into smaller batches and run each one; if you really need the whole run, put `JOBQ_WHOLE=1` before the command.
 - **Only one command runs even though the limit is higher:** the machine is overloaded, low on RAM, swap is growing fast, or the command just admitted is still in its 3-second startup cooldown. `jobq status` shows CPU use, free RAM and how many more commands it can take right now (computed live from free CPU and RAM and the weight of the next waiting command, so it changes with the machine).
 - **A child command spawns many workers on its own:** `jobq` cannot limit that, so you must still pass `--concurrency=2`, `--maxWorkers=2`, `--workers=2` to turbo/vitest/jest/playwright.
 - **CPU/RAM measurements are only approximate:** they come from `ps` every 2 seconds, RAM is summed so it may overcount for processes sharing memory, and processes that detach into their own group (like Chrome) may not be counted.
