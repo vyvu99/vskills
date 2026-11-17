@@ -33,6 +33,7 @@ DEF_M=$(( TOTAL_MB / 6 )); [ "$DEF_M" -lt 300 ] && DEF_M=300; [ "$DEF_M" -gt 200
 COOLDOWN=${JOBQ_COOLDOWN_SEC:-3}                        # sau khi nhận một lệnh, đợi ngần này giây cho nó dùng đủ tài nguyên rồi mới nhận lệnh tiếp
 WARM_SEC=10                                             # lệnh chạy quá ngần này giây thì tính theo số đo thật thay vì ước lượng
 SWAP_GROWTH_MB=${JOBQ_SWAP_GROWTH_MB:-256}              # swap tăng từ ngần này MB giữa hai lần đo thì phanh
+SWAP_MAX_MB=${JOBQ_SWAP_MAX_MB:-$(( TOTAL_MB / 3 ))}        # swap đang dùng từ ngần này MB (mặc định 33% RAM) thì ngừng nhận lệnh thứ 2 trở đi: máy đã phải đẩy RAM ra đĩa, nhận thêm chỉ làm giật hơn
 SWAP_BRAKE_SEC=${JOBQ_SWAP_BRAKE_SEC:-30}               # thời gian phanh khi swap tăng nhanh
 BACKFILL=120                                            # lệnh nhẹ chỉ được chạy lách khi lệnh đầu hàng chờ chưa quá ngần này giây
 NODE_MB=3072                                            # trần heap cho node con
@@ -47,7 +48,7 @@ now() { date +%s; }
 
 free_mb() {
   if [ -r /proc/meminfo ]; then awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo; return; fi
-  vm_stat | awk '/page size of/{ps=$8} /Pages (free|inactive|speculative)/{gsub(/\./,"",$3); n+=$3} END{print int(n*ps/1048576)}'
+  vm_stat | awk '/page size of/{ps=$8} /Pages (free|speculative)/{gsub(/\./,"",$3); n+=$3} /Pages inactive/{gsub(/\./,"",$3); n+=$3/2} END{print int(n*ps/1048576)}'
 }
 
 reap() { # xoá slot/ticket của tiến trình đã chết
@@ -128,13 +129,18 @@ sample() { # $1 pgid $2 tệp ra: mỗi 2s ghi "mem_mb centi_cpu" của cả nh�
 pressure() { sysctl -n kern.memorystatus_vm_pressure_level 2>/dev/null || echo 1; } # Linux không có: coi như bình thường
 
 pageouts() { vm_stat 2>/dev/null | awk '/^Pageouts/{gsub(/\./,"",$2); print $2+0}'; }
+sample_machine() { # đo thật: % CPU (user+sys, lấy mẫu 1s), số trang bị đẩy ra đĩa trong lúc đo, giây không đụng bàn phím/chuột
+  local p1 p2 c idle; p1=$(pageouts); c=$(top -l 2 -n 0 -s 1 2>/dev/null | awk '/CPU usage/{u=$3+0; s=$5+0} END{printf "%d", u+s}'); p2=$(pageouts)
+  idle=$(ioreg -c IOHIDSystem 2>/dev/null | awk '/HIDIdleTime/{print int($NF/1000000000); exit}')
+  echo "${c:-0} $(( ${p2:-0} - ${p1:-0} )) ${idle:-0}"
+}
 measure_machine() { # in "cpu_% pageouts giây_không_đụng_máy" từ số đo mới nhất; chỉ một tiến trình đo mỗi 3 giây, các lệnh đang chờ đọc kết quả đó nên hàng chờ dài không gọi top liên tục; JOBQ_FAKE_MACHINE dùng cho kiểm thử
   [ -n "${JOBQ_FAKE_MACHINE:-}" ] && { echo "$JOBQ_FAKE_MACHINE"; return; }
   local f="$Q_DIR/machine" ts=0 cpu=0 po=0 idle=0 t; t=$(now)
   read -r ts cpu po idle 2>/dev/null < "$f" || true
   if [ $(( t - ${ts:-0} )) -ge 3 ]; then
     if mkdir "$Q_DIR/machine.lock" 2>/dev/null; then
-      read -r cpu po idle <<< "$(measure_machine)"; echo "$(now) ${cpu:-0} ${po:-0} ${idle:-0}" > "$f.tmp" && mv "$f.tmp" "$f"; rmdir "$Q_DIR/machine.lock" 2>/dev/null
+      read -r cpu po idle <<< "$(sample_machine)"; echo "$(now) ${cpu:-0} ${po:-0} ${idle:-0}" > "$f.tmp" && mv "$f.tmp" "$f"; rmdir "$Q_DIR/machine.lock" 2>/dev/null
     elif [ -n "$(find "$Q_DIR/machine.lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
       rm -rf "$Q_DIR/machine.lock" # khoá mồ côi do tiến trình đo bị giết giữa chừng: quá một phút mà chưa ai trả
     fi
@@ -156,23 +162,14 @@ limits() { # in "cpu_tối_đa% ram_trống_tối_thiểu_MB giây_không_đụn
   local pf; pf=$(power_factor)
   if [ "${idle:-0}" -ge "$IDLE_SEC" ]; then echo "$(( MAX_CPU_IDLE * pf / 100 )) $(( MIN_FREE_MB / 2 )) $idle"; else echo "$(( MAX_CPU * pf / 100 )) $MIN_FREE_MB ${idle:-0}"; fi
 }
-machine() { # in "cpu_% pageouts" từ số đo mới nhất; chỉ một tiến trình đo mỗi 3 giây, các lệnh đang chờ đọc kết quả đó nên hàng chờ dài không gọi top liên tục
-  local f="$Q_DIR/machine" ts=0 cpu=0 po=0 t; t=$(now)
-  read -r ts cpu po 2>/dev/null < "$f" || true
-  if [ $(( t - ${ts:-0} )) -ge 3 ]; then
-    [ -d "$Q_DIR/machine.lock" ] && [ $(( t - ${ts:-0} )) -ge 20 ] && rm -rf "$Q_DIR/machine.lock" # khoá mồ côi do tiến trình đo bị giết giữa chừng
-    if mkdir "$Q_DIR/machine.lock" 2>/dev/null; then
-      read -r cpu po <<< "$(measure_machine)"; echo "$(now) ${cpu:-0} ${po:-0}" > "$f.tmp" && mv "$f.tmp" "$f"; rmdir "$Q_DIR/machine.lock"
-    fi
-  fi
-  echo "${cpu:-0} ${po:-0}"
-}
+machine() { measure_machine; } # cùng một số đo (cpu, pageouts, giây không đụng máy) cho mọi nơi đọc, không ghi đè tệp đo bằng bản thiếu cột
 # Luôn cho phép ít nhất 1 lệnh chạy để máy bận việc khác không làm hàng đợi kẹt vĩnh viễn.
 swap_used_mb() { # MB swap đang dùng; JOBQ_FAKE_SWAP_FILE dùng cho kiểm thử; hệ không có swapusage (Linux) coi như 0 nên không phanh
   if [ -n "${JOBQ_FAKE_SWAP_FILE:-}" ]; then cat "$JOBQ_FAKE_SWAP_FILE" 2>/dev/null || echo 0; return 0; fi
   sysctl -n vm.swapusage 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="used"){v=$(i+2); sub(/M$/,"",v); print int(v); exit}}' | grep . || echo 0
 }
 swap_ok() { # swap tăng từ SWAP_GROWTH_MB trở lên giữa hai lần đo cách nhau 5-60 giây thì ngừng nhận lệnh SWAP_BRAKE_SEC giây
+  [ "$(swap_used_mb)" -lt "$SWAP_MAX_MB" ] || return 1
   local t cur pe=0 pu pb=0; t=$(now); cur=$(swap_used_mb); pu=$cur
   read -r pe pu pb 2>/dev/null < "$Q_DIR/swap" || true
   [ "$t" -lt "${pb:-0}" ] && return 1
@@ -405,6 +402,7 @@ cmd_run() {
   while :; do
     reap
     first=$(ls "$Q_DIR/queue" | sort | head -1)
+    machine >/dev/null # đo ngoài khoá: một lần đo mất cả giây khi máy nghẹt, giữ khoá lâu hơn 10s thì lệnh khác cướp khoá và nhận lệnh trùng
     lock
     read -r hn hc hm <<< "$(held)"
     ok=0
