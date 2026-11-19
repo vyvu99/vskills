@@ -5,6 +5,7 @@
 #   jobq run [-t TIMEOUT_S] [-w WAIT_S] [--cost cpu=N,mem=MB] -- <lệnh...>
 #   jobq split N -- file...   # chia danh sách file thành N lô đều nhau, mỗi dòng một lô (đã escape, dán thẳng vào jobq run)
 #   jobq logs [N|id]   # lịch sử 50 lệnh gần nhất kèm output (N=1 là lệnh mới nhất)
+#   jobq watch [-n GIÂY]   # màn hình sống trong terminal: lệnh đang chạy/chờ + 8 lệnh gần nhất, tự làm mới, bấm q để thoát
 #   jobq status | stats | clean | web [--no-open]   # web: trang theo dõi tĩnh, xem dạng danh sách hoặc mô phỏng (không server)
 set -u
 
@@ -288,6 +289,43 @@ cmd_status() {
   return 0
 }
 
+draw_watch() { # một khung: thanh đo CPU/RAM/slot, thanh thời gian từng lệnh đang chạy, hàng chờ gom nhóm, lịch sử có ✓/✗
+  snapshot_tsv | awk -F'\t' -v now="$(now)" -v w="${COLUMNS:-110}" "$AWK_GROUP"'
+    function rep(c,n,  o){ while(n-- > 0) o=o c; return o }
+    function bar(v,mx,len,  n,f,col){ f=mx>0?v/mx:0; if(f>1)f=1; n=int(f*len+0.5); col=f>0.9?"\033[31m":(f>0.7?"\033[33m":"\033[32m"); return col rep("█",n) "\033[2m" rep("░",len-n) "\033[0m" }
+    $1=="META"{ cap=$14; load=$5; maxl=$6; fr=$7; tot=$13; to=$12 }
+    $1=="RUN"{ ++nr; rp[nr]=$2; rc[nr]=$3; rm[nr]=$4; rs[nr]=$5; rcmd[nr]=norm($6) }
+    $1=="WAIT"{ k=norm($6); if(!(k in n)){ order[++ng]=k; first[k]=$5 } n[k]++; if($5<first[k]) first[k]=$5; nw++ }
+    $1=="HIST"{ ++nh; hid[nh]=$2; hrc[nh]=$5; hs[nh]=$6; hc[nh]=$8 }
+    END{
+      printf "\033[1mCPU \033[0m %s %3d%%/%d%%   ", bar(load,maxl,16), load, maxl
+      printf "\033[1mRAM \033[0m %s %s trống   ", bar(tot-fr,tot,16), sz(fr)
+      printf "\033[1mSlot\033[0m %s %d/%d\n\n", bar(nr,cap,8), nr, cap
+      printf "\033[1;36mĐANG CHẠY (%d)\033[0m\n", nr
+      if(!nr) print "  \033[2m(không có)\033[0m"
+      for(i=1;i<=nr;i++){ el=now-rs[i]; printf "  \033[32m●\033[0m %s %s  cpu=%.1f mem=%s  %s\n", bar(el,to,10), mmss(el), rc[i]/100, sz(rm[i]), substr(rcmd[i],1,w-48) }
+      printf "\n\033[1;33mĐANG CHỜ (%d)\033[0m\n", nw
+      if(!nw) print "  \033[2m(không có)\033[0m"
+      for(i=1;i<=ng;i++){ k=order[i]; printf "  \033[33m○\033[0m %s %s  %s\n", cnt(n[k]), mmss(now-first[k]), substr(k,1,w-16) }
+      print "\n\033[1mGẦN ĐÂY\033[0m"
+      for(i=1;i<=nh && i<=8;i++){ ok=(hrc[i]=="0"); run=(hrc[i]=="-"); printf "  %s %6s  %s\n", run?"\033[36m●\033[0m":(ok?"\033[32m✓\033[0m":"\033[31m✗ " hrc[i] "\033[0m"), (hs[i]=="-"?"":hs[i] "s"), substr(hc[i],1,w-14) }
+    }'
+}
+cmd_watch() { # jobq watch [-n GIÂY]: dùng màn hình phụ để thoát ra terminal không bị bẩn; vẽ đè lên khung cũ nên không nhấp nháy
+  local every=2 key; [ "${1:-}" = "-n" ] && every=${2:-2}
+  case "$every" in ''|*[!0-9]*|0) echo "jobq: -n cần số giây nguyên dương" >&2; exit 2 ;; esac
+  [ -t 1 ] || { echo "jobq: watch cần chạy trong terminal (dùng 'jobq status' khi ghi ra tệp)" >&2; exit 2; }
+  mkdir -p "$Q_DIR/slots" "$Q_DIR/queue"
+  trap 'printf "\033[?25h\033[?1049l"; exit 0' INT TERM EXIT
+  printf '\033[?1049h\033[?25l'
+  while :; do
+    reap
+    local frame; frame=$(printf '\033[1mjobq watch\033[0m \033[2m· làm mới mỗi %ss · bấm q để thoát\033[0m\n\n' "$every"; draw_watch)
+    printf '\033[H%s\033[J' "$(printf '%s\n' "$frame" | sed $'s/$/\\\033[K/')"
+    key=""; read -rs -t "$every" -n1 key 2>/dev/null || true
+    [ "$key" = q ] && exit 0
+  done
+}
 cmd_stats() { # lệnh nào nặng: số lần chạy, CPU/RAM lớn nhất, thời gian trung bình
   [ -f "$HIST" ] || { echo "chưa có lịch sử"; return 0; }
   awk -F'\t' '{n[$1]++; if($2>c[$1])c[$1]=$2; if($3>m[$1])m[$1]=$3; t[$1]+=$4; cmd[$1]=$5}
@@ -352,6 +390,33 @@ cmd_logs() { # jobq logs [N|id]: không đối số thì liệt kê, có thì in
   [ -z "$sel" ] || { echo "jobq: không tìm thấy lệnh '$sel' (dùng 'jobq logs' để xem danh sách)" >&2; return 1; }
 }
 
+shard_count() { # $@ = lệnh: in số lô nếu là vitest/jest/playwright chạy cả cục (không cờ chia/lọc, không chọn tệp, không watch/ui), ngược lại trả 1
+  local w i=0 r=""
+  for w in "$@"; do
+    i=$((i+1)); [ "$i" -gt 4 ] && [ -z "$r" ] && return 1
+    if [ -z "$r" ]; then case "${w##*/}" in vitest|jest|playwright) r=1 ;; esac; continue; fi
+    case "$w" in
+      --shard*|--filter*|--grep*|--project*|--changed*|--onlyChanged|--testNamePattern*|-t|-g|-F|--watch*|--ui|--browser*|watch|ui|--) return 1 ;;
+      -*|run|test|[0-9]*) ;;
+      *) return 1 ;;
+    esac
+  done
+  [ -n "$r" ] || return 1
+  local n=$(( NCPU / 2 )); [ "$n" -lt 2 ] && n=2; [ "$n" -gt 6 ] && n=6; echo "$n"
+}
+
+autoshard() { # $1 = số lô, còn lại là lệnh: đẩy MỖI LÔ một lần jobq run (chưa giữ slot nên không tự kẹt), gộp output theo lô, mã thoát là mã lớn nhất
+  local n=$1 i rc=0 c d pids=(); shift
+  d=$(mktemp -d "${TMPDIR:-/tmp}/jobq-shard.XXXXXX"); trap 'rm -rf "$d"' RETURN
+  echo "jobq: tự chia $n lô (--shard=i/$n); không muốn thì thêm JOBQ_WHOLE=1 trước lệnh" >&2
+  for i in $(seq 1 "$n"); do "$0" run -- "$@" "--shard=$i/$n" > "$d/$i.log" 2>&1 & pids+=($!); done
+  for i in $(seq 1 "$n"); do
+    c=0; wait "${pids[$((i-1))]}" || c=$?
+    echo "== lô $i/$n (exit $c) =="; cat "$d/$i.log"; [ "$c" -gt "$rc" ] && rc=$c
+  done
+  return "$rc"
+}
+
 cmd_run() {
   COST=""
   while [ $# -gt 0 ]; do
@@ -365,6 +430,7 @@ cmd_run() {
   [ $# -gt 0 ] || { echo "jobq: thiếu lệnh sau --" >&2; exit 2; }
   # Lệnh con gọi jobq lần nữa: đã giữ slot rồi, xếp hàng tiếp sẽ tự kẹt.
   [ -n "${JOBQ_ACTIVE:-}" ] && exec "$@"
+  if [ -z "${JOBQ_WHOLE:-}" ] && n=$(shard_count "$@"); then autoshard "$n" "$@"; exit $?; fi
 
   mkdir -p "$Q_DIR/slots" "$Q_DIR/queue"
   # biến toàn cục có chủ đích: trap EXIT chạy sau khi hàm đã return
@@ -415,8 +481,8 @@ cmd_run() {
       age=$(( $(now) - 10#${first%%-*} ))
       if ! fits "$hw_c" "$hw_m" && fits "$W_CPU" "$W_MEM" && [ "$age" -lt "$BACKFILL" ]; then ok=1; fi
     fi
-    # chờ khởi động: lệnh vừa nhận cần vài giây mới dùng đủ CPU/RAM, nhận tiếp ngay thì số đo còn thấp và dễ nhận quá tay
-    if [ "$ok" = 1 ] && [ "$hn" -gt 0 ]; then la=$(cat "$Q_DIR/last_admit" 2>/dev/null || echo 0); [ $(( $(now) - la )) -ge "$COOLDOWN" ] || ok=0; fi
+    # chờ khởi động (máy còn rảnh, CPU dưới 1/3 trần, thì nghỉ 1s là đủ): lệnh vừa nhận cần vài giây mới dùng đủ CPU/RAM, nhận tiếp ngay thì số đo còn thấp và dễ nhận quá tay
+    if [ "$ok" = 1 ] && [ "$hn" -gt 0 ]; then la=$(cat "$Q_DIR/last_admit" 2>/dev/null || echo 0); read -r mc _ _ <<< "$(machine)"; cdn=$COOLDOWN; [ "${mc:-0}" -lt $(( MAX_CPU / 3 )) ] && cdn=1; [ $(( $(now) - la )) -ge "$cdn" ] || ok=0; fi
     if [ "$ok" = 1 ] && gate_ok "$W_CPU" "$W_MEM"; then
       for i in $(seq 1 "$MAX_JOBS"); do
         ln -s "$$" "$Q_DIR/slots/$i" 2>/dev/null && { got=$i; echo "$W_CPU $W_MEM $(now)" > "$Q_DIR/slots/$i.w"; now > "$Q_DIR/last_admit"; wk=$(( MAX_CPU * NCPU / 100 / (hn + 1) )); [ "$wk" -lt 1 ] && wk=1; [ "$wk" -gt "$NCPU" ] && wk=$NCPU; break; }
@@ -483,6 +549,7 @@ case "${1:-}" in
   run) shift; cmd_run "$@"; exit $? ;;
   status) cmd_status ;;
   stats) cmd_stats ;;
+  watch) shift; cmd_watch "$@" ;;
   split) shift; cmd_split "$@" ;;
   logs) shift; cmd_logs "$@" ;;
   web) shift; cmd_web "$@" ;;

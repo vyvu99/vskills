@@ -31,6 +31,7 @@ Cần `~/.local/bin` có trong `PATH`. Bước cuối chưa tự động (vì s�
 jobq run -- pnpm --filter api test        # xếp hàng rồi chạy
 jobq run -t 1800 -- pnpm test:e2e         # nới timeout lên 30 phút
 jobq run --cost cpu=3,mem=2000 -- <lệnh>  # khai sẵn mức nặng cho lệnh chưa có lịch sử
+jobq watch [-n GIÂY]                      # màn hình sống trong terminal: thanh CPU/RAM/slot, thanh thời gian lệnh đang chạy, hàng chờ, 8 lệnh gần nhất; bấm q để thoát
 jobq status                               # lệnh đang chạy và đang chờ (lệnh chờ giống nhau gộp một dòng), giới hạn đang áp dụng, tải máy
 jobq stats                                # lệnh nào nặng nhất: số lần, CPU/RAM lớn nhất, thời gian
 jobq web                                  # mở trang theo dõi (xem dạng danh sách hoặc mô phỏng nông trại trung cổ nhìn phẳng 2D: lệnh chờ là đơn hàng (bao hạt có dán tờ đơn) xếp hàng trên đường kho, lệnh đang chạy là cây mọc trên một luống đất (mỗi lệnh có loại riêng ổn định theo tên lệnh: tám loại cây là xà lách, cà rốt, bí ngô, lúa mì, ngô, cà chua, bắp cải, hướng dương, và khoảng một phần tư lệnh là chăn nuôi gà, cừu, lợn, bê trong chuồng có hàng rào; ruộng có số luống cố định bằng số chỗ chạy tối đa của jobq, luống mở theo hạn mức động còn luống chưa mở là ruộng bỏ hoang; hạt nhẹ, vừa, nặng cho rau, cà rốt, bí ngô), nông dân gánh hạt đi gieo rồi gánh thùng về chuồng khi cây chín; lệnh xong là thùng quả, lỗi là thùng rau héo có dấu X, quá hạn là thùng có đồng hồ và kho hạt báo chia nhỏ; cối xay gió quay theo CPU, nắng gắt khi CPU nóng, mưa và mực nước giếng xuống khi RAM căng, kho hạt đóng cửa khi cổng của jobq chặn; cây héo dần khi lệnh gần quá hạn; sổ thu chi cộng doanh thu, chi phí và lãi hay lỗ của 50 lệnh gần nhất (đơn xong thu theo độ nặng, đơn lỗi không thu mà bị phạt), mỗi đơn xong thì xe bò chở thùng hàng đi giao, tiền nổi lên và đồng xu bay; dân làng luân phiên nhiều việc khác nhau, xong việc nào là bốc việc khác chứ không làm mãi một việc, chú chó tuần tra khắp sân; cảnh tự thu nhỏ để vừa chiều cao cửa sổ, không có thanh cuộn dọc; bên dưới ruộng có ao vịt, bò, vườn táo, đàn gà và khói bếp cho cảnh đời thường; cảnh đổi theo tháng và giờ thật (hoa xuân, lá vàng thu, tuyết đông, đèn sáng và đom đóm ban đêm), quạ đậu hàng rào bay đi khi có người lại gần, xe bò chạy trên đường phía sau, núi xa có tuyết, đồi rừng thông, lâu đài và làng nhỏ, suối có cầu gỗ chảy qua bãi chăn, chú chó chạy theo nông dân đang làm việc rồi về ngủ cạnh kho hạt, mèo ngủ trên mái, bò đi lại gặm cỏ, dân làng gánh nước, chẻ củi và chăn cừu, sương mù buổi sáng, đống lửa trại ban đêm; bấm vào bao hạt, cây hoặc thùng để mở hộp thoại nổi xem lệnh đầy đủ, thời gian, lý do chờ và kết quả, không che khung game)
@@ -87,7 +88,9 @@ Chặn lệnh nặng khi không đi qua `jobq run`, kể cả dạng bọc: `tim
 - **Hệ thống và media:** `make`, `just test`, `docker build`, `ffmpeg`, `magick`, `sips`, `lighthouse`, `k6`.
 - **Script tự viết:** tên `check-*`, `test-*`, `e2e-*`, `bench-*` gọi bằng interpreter hoặc đường dẫn.
 
-**Ép chia lô:** `vitest`, `jest`, `playwright`, `turbo` đi qua `jobq run` mà chạy cả cục (không có `--shard`, `--filter`, `--affected`, `--grep`, cũng không có tệp nào để chọn; `turbo` chỉ chấp nhận cờ lọc) cũng bị chặn kèm lời nhắc chia lô. Thật sự cần chạy cả cục thì thêm `JOBQ_WHOLE=1` trước lệnh. Lệnh bọc trong script npm (`pnpm test`) hook không nhìn thấy runner bên trong nên không ép được.
+**Tự chia lô:** `jobq run -- vitest run` (cũng `jest`, `playwright`, có thể đứng sau `npx`/`pnpm exec`) mà không có cờ chia/lọc/grep và không chọn tệp thì `jobq` tự chia thành `NCPU/2` lô (2-6), mỗi lô là một lần `jobq run -- ... --shard=i/N`; output gộp theo lô, mã thoát là mã lớn nhất. Muốn chạy cả cục thì thêm `JOBQ_WHOLE=1` trước lệnh. `turbo` thiếu `--filter`/`--affected` vẫn bị hook chặn kèm lời nhắc chia lô. Lệnh bọc trong script npm (`pnpm test`) giấu runner nên không tự chia cũng không bị chặn.
+
+**Mỗi lệnh một lần `jobq run`:** nối 2+ lệnh nặng bằng `;` hoặc `&&` trong một lần `jobq run -- sh -c "tsc; node test"` cũng bị chặn: hàng đợi chỉ thấy 1 lệnh nên chúng chạy tuần tự và `jobq status` luôn hiện "chạy 1". Đẩy mỗi lệnh một lần `jobq run` chạy nền (phụ thuộc nhau thì dùng `stepper`); thật sự cần nối thì thêm `JOBQ_WHOLE=1`.
 
 Hàng đợi không bao giờ "đầy": Claude cứ đẩy mọi lệnh độc lập vào, `jobq` tự xếp theo tải và RAM; khi Claude xem `jobq status` hoặc `jobq stats`, hook nhắc đừng dựa vào đó để ngừng đẩy lệnh. Lệnh đã có `jobq run` hoặc `stepper` thì bắt buộc chạy nền (`run_in_background: true`), nếu không hook chặn kèm lời nhắc làm việc khác trong lúc chờ; cần kết quả ngay thì thêm `JOBQ_FG=1` trước lệnh. Cho qua: `pnpm install`, `npm ci`, `pnpm dev`, `wrangler dev`, `git`, `echo`, `grep`, `tar`, `rsync` và mọi lệnh đã có `jobq run`. Chữ nằm trong dấu nháy và nội dung heredoc được bỏ qua; nháy lẻ không đóng thì dùng nguyên văn, thà chặn thừa còn hơn để lọt.
 
@@ -106,7 +109,7 @@ Khuôn bắt buộc: shebang `#!/usr/bin/env bash`, dòng 2 có `Usage:`, `set -
 Script nặng (quá 120 dòng, chạy quá 2 phút, hoặc nhiều pha) tách thành thư mục `NN-tên.sh` rồi chạy bằng `stepper`:
 
 ```bash
-stepper plans/scripts/x/steps             # chạy lần lượt, mỗi bước qua jobq
+stepper scripts/x/steps                   # chạy lần lượt, mỗi bước qua jobq
 stepper <dir> --from 03                   # bắt đầu từ bước 03
 stepper <dir> --reset                     # xoá trạng thái, chạy lại từ đầu
 ```

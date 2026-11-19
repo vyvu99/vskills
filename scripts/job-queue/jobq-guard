@@ -47,12 +47,12 @@ stripped=$(printf '%s\n' "$body" | awk '
   END { if (q != "") print "\001UNBALANCED" }')
 case "$stripped" in *$'\001UNBALANCED'*) stripped=$body ;; esac
 
-# Ép chia lô: công cụ chia được (vitest, jest, playwright, turbo) chạy cả cục mà không có dấu hiệu chia nhỏ thì in tên công cụ và trả 0, ngược lại trả 1.
+# Ép chia lô: turbo (vitest/jest/playwright thì jobq tự chia lô) chạy cả cục mà không có dấu hiệu chia nhỏ thì in tên công cụ và trả 0, ngược lại trả 1.
 # Dấu hiệu chia nhỏ: --shard/--filter/--affected/--grep..., hoặc có đối số chọn tệp (không phải cờ, số, hay lệnh con run/test/watch); turbo chỉ chấp nhận cờ lọc.
 whole_run() {
   local inner tail r
   inner=$(printf '%s\n' "$stripped" | sed -E 's/^.*(jobq[[:space:]]+run|stepper)[[:space:]]+//')
-  for r in vitest jest playwright turbo; do
+  for r in turbo; do
     printf '%s\n' "$inner" | grep -qE "(^|[[:space:]/])$r([[:space:]]|\$)" || continue
     tail=$(printf '%s\n' "$inner" | sed -E "s/^.*[[:space:]\/]$r([[:space:]]|\$)//; s/(&&|;|\\||>).*//" | tr -d "\"'")
     printf '%s' "$tail" | grep -qE -- '(--shard|--filter|--affected|--changed|--onlyChanged|--grep|--project|--testNamePattern|-F[[:space:]=]|-g[[:space:]]|-t[[:space:]])' && continue
@@ -78,7 +78,13 @@ if printf '%s\n' "$stripped" | grep -qE "${START}([^[:space:]]*/)?(jobq[[:space:
   fi
   # Chạy cả cục mà không chia lô: chặn trước khi chạy. Thật sự cần chạy cả cục thì thêm JOBQ_WHOLE=1 trước lệnh.
   if ! printf '%s' "$cmd" | grep -q 'JOBQ_WHOLE=1' && whole=$(whole_run); then
-    echo "BLOCKED: $whole đang chạy cả cục. CHIA LÔ trước rồi đẩy MỖI LÔ một lần jobq run chạy nền: vitest/jest/playwright thêm --shard=i/N (hoặc liệt kê tệp, dùng jobq split N -- <file...>), turbo thêm --filter hoặc --affected. Thật sự cần chạy cả cục thì thêm JOBQ_WHOLE=1 trước lệnh." >&2
+    echo "BLOCKED: $whole đang chạy cả cục. CHIA LÔ trước rồi đẩy MỖI LÔ một lần jobq run chạy nền: turbo thêm --filter hoặc --affected. Thật sự cần chạy cả cục thì thêm JOBQ_WHOLE=1 trước lệnh." >&2
+    exit 2
+  fi
+  # Nối 2+ lệnh nặng bằng ; hoặc && trong một lần jobq run: hàng đợi chỉ thấy 1 lệnh nên chúng chạy tuần tự, không song song.
+  inner=$(printf '%s\n' "$stripped" | sed -E 's/^.*(jobq[[:space:]]+run|stepper)[[:space:]]+//')
+  if ! printf '%s' "$cmd" | grep -q 'JOBQ_WHOLE=1' && [ "$(printf '%s\n' "$inner" | grep -oE "$HEAVY" | wc -l)" -ge 2 ]; then
+    echo "BLOCKED: một lần jobq run đang nối nhiều lệnh nặng bằng ; hoặc &&, hàng đợi chỉ thấy 1 lệnh nên chúng chạy tuần tự. Đẩy MỖI lệnh một lần jobq run chạy nền (độc lập thì song song; phụ thuộc nhau thì dùng stepper). Thật sự cần nối thì thêm JOBQ_WHOLE=1 trước lệnh." >&2
     exit 2
   fi
   # chạy nền hợp lệ: nhắc ngay để Claude làm việc khác thay vì đứng chờ
