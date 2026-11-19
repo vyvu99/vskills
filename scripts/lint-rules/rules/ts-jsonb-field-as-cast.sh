@@ -8,7 +8,7 @@ RULE_ID="ts-jsonb-field-as-cast"
 for file in "$@"; do
   [[ "$file" =~ \.(ts|tsx)$ ]] || continue
   [[ -f "$file" ]] || continue
-  # Known JSONB field names in eTARO schema
+  # Known JSONB field names in the project schema
   grep -nE "\.(academicData|healthData|familyData|aspirationData|answers|scores|recommendations|settings|content|metadata|resultData|quizData)\s+as\s+[A-Z]" "$file" 2>/dev/null \
     | grep -vE "^\s*//" \
     | grep -vE "(schema|schemas?|Schema)\.(ts|tsx)$" \
