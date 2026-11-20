@@ -54,6 +54,7 @@ Flags and edge cases are in `skills/<name>/SKILL.md`.
 ```bash
 ./install.sh --with-scripts        # links jobq, stepper, lint-script into ~/.local/bin
 jobq run -- pnpm --filter api test # queue a command
+jobq watch                         # live view in the terminal (q to quit)
 jobq web                           # live dashboard
 ```
 

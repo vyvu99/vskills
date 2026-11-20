@@ -100,4 +100,6 @@ Lấy lại danh sách sub-issue của epic (lệnh ở Bước 3) và so với 
 
 Lượt chạy bị gián đoạn phục hồi bằng cách chạy lại `/vtickets <plan-path>`, vì việc tìm và link tự dựng lại trạng thái từ GitHub và `issues.md`.
 
-Làm theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
+Theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

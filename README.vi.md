@@ -54,6 +54,7 @@ Cờ và trường hợp biên nằm trong `skills/<name>/SKILL.md`.
 ```bash
 ./install.sh --with-scripts        # liên kết jobq, stepper, lint-script vào ~/.local/bin
 jobq run -- pnpm --filter api test # đưa một lệnh vào hàng đợi
+jobq watch                         # màn hình sống ngay trong terminal (bấm q để thoát)
 jobq web                           # dashboard trực tiếp
 ```
 

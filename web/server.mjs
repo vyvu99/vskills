@@ -30,44 +30,44 @@ function isNonEmptyString(value) {
 
 function validateSelectField(field, prefix, errors) {
   if (!Array.isArray(field.options) || field.options.length === 0) {
-    errors.push(`${prefix}.options phải là 1 mảng không rỗng`);
+    errors.push(`${prefix}.options must be a non-empty array`);
     return;
   }
   field.options.forEach((option, i) => {
     const p = `${prefix}.options[${i}]`;
-    if (!isNonEmptyString(option?.label)) errors.push(`${p}.label phải là string không rỗng`);
-    if (!isNonEmptyString(option?.value)) errors.push(`${p}.value phải là string không rỗng`);
+    if (!isNonEmptyString(option?.label)) errors.push(`${p}.label must be a non-empty string`);
+    if (!isNonEmptyString(option?.value)) errors.push(`${p}.value must be a non-empty string`);
     if (option?.renderHint !== undefined && !RENDER_HINTS.includes(option.renderHint)) {
-      errors.push(`${p}.renderHint phải là 1 trong ${RENDER_HINTS.join('/')}, nhận "${option.renderHint}"`);
+      errors.push(`${p}.renderHint must be one of ${RENDER_HINTS.join('/')}, got "${option.renderHint}"`);
     }
     if (option?.renderHint === 'swatch' && isNonEmptyString(option.value) && !CSS_COLOR_RE.test(option.value)) {
-      errors.push(`${p}.value phải là màu CSS thật (hex/rgb/hsl) khi renderHint là "swatch", nhận "${option.value}"`);
+      errors.push(`${p}.value must be a real CSS color (hex/rgb/hsl) when renderHint is "swatch", got "${option.value}"`);
     }
   });
 }
 
 function validateDiffReviewListField(field, prefix, errors) {
   if (!Array.isArray(field.items) || field.items.length === 0) {
-    errors.push(`${prefix}.items phải là 1 mảng không rỗng`);
+    errors.push(`${prefix}.items must be a non-empty array`);
     return;
   }
   field.items.forEach((item, i) => {
     const p = `${prefix}.items[${i}]`;
-    if (!isNonEmptyString(item?.id)) errors.push(`${p}.id phải là string không rỗng`);
-    if (typeof item?.before !== 'string') errors.push(`${p}.before phải là string`);
-    if (typeof item?.after !== 'string') errors.push(`${p}.after phải là string`);
-    if (!Array.isArray(item?.actions) || item.actions.length === 0) errors.push(`${p}.actions phải là 1 mảng không rỗng`);
+    if (!isNonEmptyString(item?.id)) errors.push(`${p}.id must be a non-empty string`);
+    if (typeof item?.before !== 'string') errors.push(`${p}.before must be a string`);
+    if (typeof item?.after !== 'string') errors.push(`${p}.after must be a string`);
+    if (!Array.isArray(item?.actions) || item.actions.length === 0) errors.push(`${p}.actions must be a non-empty array`);
   });
 }
 
 function validateTemplate(template) {
   const errors = [];
   if (typeof template !== 'object' || template === null) {
-    return ['template phải là 1 object'];
+    return ['template must be an object'];
   }
-  if (!isNonEmptyString(template.title)) errors.push('title phải là string không rỗng');
+  if (!isNonEmptyString(template.title)) errors.push('title must be a non-empty string');
   if (!Array.isArray(template.fields) || template.fields.length === 0) {
-    errors.push('fields phải là 1 mảng không rỗng');
+    errors.push('fields must be a non-empty array');
     return errors;
   }
 
@@ -75,15 +75,15 @@ function validateTemplate(template) {
   template.fields.forEach((field, i) => {
     const prefix = `fields[${i}]`;
     if (!isNonEmptyString(field?.id)) {
-      errors.push(`${prefix}.id phải là string không rỗng`);
+      errors.push(`${prefix}.id must be a non-empty string`);
     } else if (seenIds.has(field.id)) {
-      errors.push(`${prefix}.id "${field.id}" bị trùng với 1 field khác`);
+      errors.push(`${prefix}.id "${field.id}" duplicates another field`);
     } else {
       seenIds.add(field.id);
     }
-    if (!isNonEmptyString(field?.label)) errors.push(`${prefix}.label phải là string không rỗng`);
+    if (!isNonEmptyString(field?.label)) errors.push(`${prefix}.label must be a non-empty string`);
     if (!FIELD_TYPES.includes(field?.type)) {
-      errors.push(`${prefix}.type phải là 1 trong ${FIELD_TYPES.join('/')}, nhận "${field?.type}"`);
+      errors.push(`${prefix}.type must be one of ${FIELD_TYPES.join('/')}, got "${field?.type}"`);
       return;
     }
     if (field.type === 'select') validateSelectField(field, prefix, errors);

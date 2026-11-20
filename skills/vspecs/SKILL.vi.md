@@ -160,4 +160,6 @@ Cột `ID` dùng lại sơ đồ Type-Number của Edge Cases (`UI-1`, `FLOW-3`)
 
 ## Next steps
 
-Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
+Theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

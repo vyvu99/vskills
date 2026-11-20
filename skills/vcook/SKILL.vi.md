@@ -94,4 +94,6 @@ Xác định VCS profile trước (`repo-profile.md` §2; nếu thiếu file th�
 
 ## Next steps
 
-Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
+Theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

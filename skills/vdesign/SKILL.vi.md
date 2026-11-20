@@ -186,4 +186,6 @@ Thứ tự resolve nằm ở Phase 0. Profile là bảng ngắn các ràng buộ
 
 ## Bước tiếp theo
 
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
 Theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

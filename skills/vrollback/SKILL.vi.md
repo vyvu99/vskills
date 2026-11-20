@@ -65,4 +65,6 @@ Sau đó hỏi có xóa luôn file migration trên đĩa không; nếu file còn
 
 Chạy lệnh status của framework (hoặc query schema) và một `SELECT` trên bảng tracking. Báo rằng thay đổi schema đã mất và dòng tracking không còn, kèm output. Check nào không chạy được thì nói rõ là check nào.
 
-Làm theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+
+Theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.
