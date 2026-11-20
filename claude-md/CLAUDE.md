@@ -1,6 +1,6 @@
 # General Engineering Rules
 
-A generic starter `CLAUDE.md` — the rule set that `vreview` and `vcook` read from and write to. Installed only with `--with-claude-md`, and only if you don't already have one (see `install.sh`). Edit this freely once installed; it is copied, not symlinked, so changes here are yours and won't be overwritten by future `vskills` updates.
+A generic starter `CLAUDE.md` — the rule set that `vreview` and `vcook` read from and write to. Used by `--with-rules` only when you have no `~/.claude/CLAUDE.md` of your own (see `install.sh`). Edit this freely once installed; it is copied, not symlinked, so changes here are yours and won't be overwritten by future `vskills` updates.
 
 ## Principles
 

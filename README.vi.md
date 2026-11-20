@@ -24,7 +24,7 @@ git clone git@github.com:vyvu99/vskills.git && cd vskills
 | `--lang=vi` | Cài bản tiếng Việt của mọi skill |
 | `--target=<danh sách>` | Danh sách cách nhau bằng dấu phẩy: `claude` (mặc định), `codex`, `gemini`, `copilot`, `opencode`, `kiro`, `commandcode`, `agents`, hoặc `all`. Đặt symlink skill vào thư mục skill của từng CLI |
 | `--with-scripts` | Cài thêm lint rule và hàng đợi lệnh `jobq` |
-| `--with-claude-md` | Chép quy tắc khởi tạo vào tệp chỉ dẫn của từng đích (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`…); bỏ qua nếu đã có |
+| `--with-rules` | Thay tệp chỉ dẫn của từng đích (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`…) bằng `~/.claude/CLAUDE.md` của bạn (chưa có thì dùng quy tắc khởi tạo của repo); tệp cũ được giữ lại thành `.bak.<giờ>` |
 | `--dry-run` | In ra việc sẽ làm, không đổi gì |
 
 Skill là symlink nên sửa trong repo là sửa skill đã cài. Tệp thật có sẵn ở đích được đổi tên thành `<path>.bak.<timestamp>`, không bao giờ bị xóa. Chạy lại sẽ gỡ các skill đã bị xóa khỏi repo.
@@ -67,7 +67,7 @@ jobq web                           # dashboard trực tiếp
 |---|---|
 | `skills/<name>/SKILL.md`, `SKILL.vi.md` | Một skill, bản Anh và bản Việt có cùng số dòng |
 | `skills/_vskills-shared/` | Tài liệu tham chiếu dùng chung |
-| `claude-md/CLAUDE.md` | Quy tắc khởi tạo cho `--with-claude-md` |
+| `claude-md/CLAUDE.md` | Quy tắc khởi tạo cho `--with-rules` |
 | `evals/` | Eval kích hoạt và hành vi (`scripts/run-evals.sh`, gọi `claude -p`, có tính phí) |
 | `web/` | Webapp cục bộ mà `vspecs` và `vreview --fix` dùng |
 | `scripts/` | Công cụ tùy chọn: `lint-rules`, `job-queue` |

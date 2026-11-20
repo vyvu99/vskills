@@ -24,7 +24,7 @@ git clone git@github.com:vyvu99/vskills.git && cd vskills
 | `--lang=vi` | Install the Vietnamese variant of every skill |
 | `--target=<list>` | Comma list of `claude` (default), `codex`, `gemini`, `copilot`, `opencode`, `kiro`, `commandcode`, `agents`, or `all`. Links skills into each CLI's skills folder |
 | `--with-scripts` | Also install lint rules and the `jobq` job queue |
-| `--with-claude-md` | Also copy the starter rules into each target's instruction file (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`…); skipped if one exists |
+| `--with-rules` | Replace each target's instruction file (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`…) with your `~/.claude/CLAUDE.md` (the repo starter if you have none); the old file is kept as `.bak.<timestamp>` |
 | `--dry-run` | Print what would happen, change nothing |
 
 Skills are symlinks, so editing the repo edits the installed skill. A real file already at a destination is moved to `<path>.bak.<timestamp>`, never deleted. Re-running removes skills that were deleted from the repo.
@@ -67,7 +67,7 @@ To make Claude use it, copy the `jobq-guard` hook into `~/.claude/settings.json`
 |---|---|
 | `skills/<name>/SKILL.md`, `SKILL.vi.md` | One skill, English and Vietnamese with the same line count |
 | `skills/_vskills-shared/` | Reference docs shared by skills |
-| `claude-md/CLAUDE.md` | Starter rules for `--with-claude-md` |
+| `claude-md/CLAUDE.md` | Starter rules for `--with-rules` |
 | `evals/` | Trigger and behavior evals (`scripts/run-evals.sh`, calls `claude -p`, billable) |
 | `web/` | Local webapp used by `vspecs` and `vreview --fix` |
 | `scripts/` | Opt-in tools: `lint-rules`, `job-queue` |

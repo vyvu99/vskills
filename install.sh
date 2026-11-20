@@ -1,11 +1,11 @@
 #!/bin/bash
-# Symlink skills (+ optionally scripts, CLAUDE.md starter) into ~/.claude,
+# Symlink skills (+ optionally scripts, starter rules) into ~/.claude,
 # and remove any previously-installed skill symlinks whose source was since
 # deleted from this repo.
-# Usage: ./install.sh [--dry-run] [--with-scripts] [--with-claude-md] [--lang=en|vi] [--target=<list>] [--help]
+# Usage: ./install.sh [--dry-run] [--with-scripts] [--with-rules] [--lang=en|vi] [--target=<list>] [--help]
 # --target: comma list of claude (default), codex, gemini, copilot, opencode, kiro, commandcode, agents, all.
-#   Each links the skills into that CLI's skills folder; --with-claude-md copies the starter rules into
-#   that CLI's instruction file (CLAUDE.md / AGENTS.md / GEMINI.md / copilot-instructions.md).
+#   Each links the skills into that CLI's skills folder; --with-rules replaces that CLI's instruction file
+#   (CLAUDE.md / AGENTS.md / GEMINI.md / copilot-instructions.md) with your ~/.claude/CLAUDE.md (the repo starter if you have none), keeping a .bak copy.
 #   codex and agents both use ~/.agents/skills, the shared folder several other CLIs also read.
 
 set -euo pipefail
@@ -13,14 +13,14 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DRY_RUN=false
 WITH_SCRIPTS=false
-WITH_CLAUDE_MD=false
+WITH_RULES=false
 LANG_CHOICE=en
 TARGET=claude
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
     --with-scripts) WITH_SCRIPTS=true ;;
-    --with-claude-md) WITH_CLAUDE_MD=true ;;
+    --with-rules) WITH_RULES=true ;;
     --lang=*) LANG_CHOICE="${arg#--lang=}" ;;
     --target=*) TARGET="${arg#--target=}" ;;
     -h|--help) sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -186,25 +186,34 @@ else
   log "skipped scripts/ (lint rules) — pass --with-scripts to install"
 fi
 
-# ── CLAUDE.md starter (opt-in, never overwrites an existing one) ───────────
+# ── Rules (opt-in; replaces each target's instruction file after backing it up) ──
+# Source is your own ~/.claude/CLAUDE.md so every CLI follows the same rules; the repo's
+# starter is only the fallback for a user who has none yet.
 # Copied, not symlinked: this is a personal file you're meant to edit right
 # away, not something that should silently change when the repo updates.
-if $WITH_CLAUDE_MD; then
-  CLAUDE_MD_SRC="$REPO_DIR/claude-md/CLAUDE.md"
+if $WITH_RULES; then
+  STARTER_SRC="$REPO_DIR/claude-md/CLAUDE.md"
+  RULES_SRC="$HOME/.claude/CLAUDE.md"
+  [[ -f "$RULES_SRC" ]] || RULES_SRC="$STARTER_SRC"
   for t in "${TARGETS[@]}"; do
     target_info "$t"
-    [[ -n "$MD" ]] || { log "no instruction file for target $t — skipping its starter rules"; continue; }
+    [[ -n "$MD" ]] || { log "no instruction file for target $t — skipping its rules"; continue; }
+    # The source can be the target itself (claude); moving it aside would delete the rules we copy from.
+    [[ "$MD" -ef "$RULES_SRC" ]] && { log "up to date: $MD is the rules source"; continue; }
+    # Passing --with-rules is the explicit choice to replace; the old file is moved aside, not deleted.
     if [[ -e "$MD" ]]; then
-      log "WARNING: $MD already exists — not touching it."
-    elif [[ -f "$CLAUDE_MD_SRC" ]]; then
-      run "mkdir -p '$(dirname "$MD")'"
-      run "cp '$CLAUDE_MD_SRC' '$MD'"
-      log "copied starter rules → $MD (edit freely, not synced with this repo)"
+      run "mv '$MD' '$MD.bak.$(date +%Y%m%d%H%M%S)'"
+      log "backed up existing $MD"
     fi
+    run "mkdir -p '$(dirname "$MD")'"
+    run "cp '$RULES_SRC' '$MD'"
+    log "copied $RULES_SRC → $MD (edit freely, not synced)"
   done
-  $WITH_SCRIPTS || log "NOTE: the starter rules tell the agent to use jobq; also pass --with-scripts (and, on Claude Code, add the jobq-guard hook), or delete those rules"
+  if [[ "$RULES_SRC" == "$STARTER_SRC" ]] && ! $WITH_SCRIPTS; then
+    log "NOTE: the starter rules tell the agent to use jobq; also pass --with-scripts (and, on Claude Code, add the jobq-guard hook), or delete those rules"
+  fi
 else
-  log "skipped CLAUDE.md starter — pass --with-claude-md to install (only applies if you don't already have one)"
+  log "skipped starter rules — pass --with-rules to install (replaces your existing instruction file, keeping a .bak copy)"
 fi
 
 if ! $DRY_RUN; then
