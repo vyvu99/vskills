@@ -116,7 +116,7 @@ Structure of one guide:
 4. **Cold read.** Give the finished guide to a fresh reader (a subagent with no context) in the role of a person who knows nothing about the product, and have it list every place where the answer to "why", "what is this word", "what happens next" or "who does this" is missing, every jump between steps, every contradiction. Fix and read again until the list is empty or only contains items the user must decide.
 5. **Roles.** Check that every working role has its own short block, every step names who does it inside its sentences, and each product fact is told apart from each proposed agreement.
 6. **Documents.** Count the files delivered: one per audience (plus the internal note, if any). A guide that needs a second file to be understood is not finished.
-7. Open the files for the user and give the paths. Report what was checked, what was not (for example pictures taken under a different role, claims read only from code), and which points still wait for the customer.
+7. Open the files for the user and give the paths. Report what was checked, what was not (for example pictures taken under a different role, claims read only from code), and which points still wait for the customer. Print this report as described in `_vskills-shared/result-format.md`.
 
 ## Lessons from rewriting one guide five times
 

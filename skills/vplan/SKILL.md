@@ -24,7 +24,7 @@ If `$ARGUMENTS` is empty, ask with `AskUserQuestion` for the specs path (suggest
 ## Step 1 - Read the specs and scout the code
 
 1. Read the whole specs file: Decisions, Edge Cases, Experience Specs.
-2. Scout the code for the feature before judging anything: routes, services, schemas, UI components, seed data, existing migrations. Delegate the scouting to a subagent only when it spans many areas; a few files you read yourself. A subagent's brief states the feature, the areas to cover, that it is read-only, and the report file it writes under `plans/reports/` (`_vskills-shared/repo-profile.md` §6); read that file back.
+2. Scout the code for the feature before judging anything: routes, services, schemas, UI components, seed data, existing migrations. Delegate the scouting to parallel subagents (one per independent area, same message) when it spans many areas; a few files you read yourself. A subagent's brief states the feature, the areas to cover, that it is read-only, and the report file it writes under `plans/reports/` (`_vskills-shared/repo-profile.md` §6); read that file back.
 3. Read the other files in `plans/specs/` to avoid conflicting with related features.
 4. Derive `[feature-slug]` (kebab-case) from the file name or feature name.
 

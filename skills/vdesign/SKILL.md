@@ -186,4 +186,6 @@ Resolution order is in Phase 0. A profile is a short table of constraints; a typ
 
 ## Next steps
 
+Print the final result as described in `_vskills-shared/result-format.md`.
+
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

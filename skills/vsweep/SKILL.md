@@ -49,7 +49,7 @@ If it is unclear which area is highest value, run one cheap subagent just to com
 
 ## Phase 2 — Dispatch
 
-Default to one subagent in flight. Independent read-only items with no shared live resource may run in parallel, up to 3 at once (more makes triage the bottleneck and raises load), each with its own report file and a non-overlapping topic. A fresh agent knows nothing of this conversation, so every brief contains:
+Default to parallel: dispatch every independent item with no shared live resource at once, up to 3 in flight (more makes triage the bottleneck and raises load); fall back to one in flight only when items depend on each other or share a live resource. Each with its own report file and a non-overlapping topic. A fresh agent knows nothing of this conversation, so every brief contains:
 - The objective and the single area.
 - Credentials or reference material it needs, and a short "already confirmed, do not rediscover" list from earlier iterations.
 - The standing rules above, verbatim, and: stop rather than retry blindly if a service crashes.

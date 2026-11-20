@@ -65,4 +65,6 @@ Then ask whether to delete the migration file on disk too; if it stays, the next
 
 Run the framework's status command (or a schema query) and a `SELECT` on the tracking table. Report that the schema change is gone and the row is absent, with the output. If a check cannot run, say which.
 
+Print the final result as described in `_vskills-shared/result-format.md`.
+
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

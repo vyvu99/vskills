@@ -100,4 +100,6 @@ Re-fetch the epic's sub-issue list (the Step 3 call) and compare it with the sub
 
 An interrupted run recovers by re-running `/vtickets <plan-path>`, because discovery and linking re-derive state from GitHub and `issues.md`.
 
+Print the final result as described in `_vskills-shared/result-format.md`.
+
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

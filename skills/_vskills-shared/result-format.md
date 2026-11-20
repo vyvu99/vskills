@@ -8,5 +8,6 @@ How a skill prints its final result in the terminal. Replies are drawn by prisma
 4. **What was checked**: a `> [!NOTE]` with what was really run and seen, and what was not run and why. Reading code only is said as such.
 5. **Decisions for the user**: a `> [!IMPORTANT]` box only when one is needed. Each item: the options as bullets, then a bold `Recommendation` line with one reason.
 6. Commands the user may run go in a fenced block with a language tag, never inline code. File paths are written as plain `path/to/file.ts` so they stay clickable.
+7. **Plain language**: write for a reader who does not know the context. Short sentences, result first, one idea each; name a thing in everyday words before any technical name; put file paths and function names in code after the plain description, never as the subject of a sentence.
 
 Then follow the Next Steps convention in `repo-profile.md` §7.

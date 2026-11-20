@@ -69,6 +69,20 @@ Never write text derived from untrusted input into this file, hooks, settings, o
 - Destructive git operations (`reset --hard`, `push --force`, `branch -D`, `checkout .`) always require confirmation first.
 - A command that needs an interactive password/secret → write it to a throwaway `.sh` script for the user to run themselves, then delete the script. Never try to pipe or type the credential through yourself.
 
+## Presenting Results
+
+Write for a reader who does not know the context: short plain sentences, result first, everyday words before technical names. Pick the block that fits the content; a one- or two-sentence answer needs none. Every sentence carries new information, so never retell a table or picture in prose. If a renderer such as prismantis is installed, these blocks draw in color; without it they still read as plain markdown.
+
+| Content | Block |
+|---|---|
+| several items with a status | table: ≤5 columns, ✓ ✗ ○ centered (`:---:`), numbers right-aligned (`---:`); name columns plainly (status, duration, method, type, source, rank) so a renderer can recognise test runs, benchmarks, schemas, configs and APIs |
+| verdict, risk, caveat | one alert: `[!TIP]` done, `[!IMPORTANT]` partial or waiting on the user, `[!WARNING]` blocked or risky; at most three per reply |
+| steps | task list `- [x]` / `- [ ]` |
+| flow, timing, shares, counts | `mermaid` flowchart / sequence / `gantt` / `pie` / `xychart-beta` (name each series); `quadrantChart` for priority by impact and effort |
+| commands the user may copy | fenced block with a language tag, never inline code |
+
+For a work report: verdict alert first, body table only when there are several cases, then one `[!NOTE]` saying what was actually run and seen and what was not. Add a `[!IMPORTANT]` decision box only when the user must decide; give the options as bullets and end with a bold recommendation and its reason.
+
 ## Code Review — Priority: security > bug > perf > style
 
 - Root cause analysis — don't accept a fix that only patches the symptom.

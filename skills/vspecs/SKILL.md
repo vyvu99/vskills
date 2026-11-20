@@ -160,4 +160,6 @@ The `ID` column reuses the Type-Number scheme of Edge Cases (`UI-1`, `FLOW-3`); 
 
 ## Next steps
 
+Print the final result as described in `_vskills-shared/result-format.md`.
+
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.

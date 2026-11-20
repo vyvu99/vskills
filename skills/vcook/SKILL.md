@@ -20,7 +20,7 @@ After an interruption, rebuild progress from `git status`, `git diff` against th
 
 ## Step 1 - Delegate read-only work
 
-Delegate to subagents when read-only work is independent and broad: reading a plan plus many code areas, researching library docs, or reviewing many separate files against CLAUDE.md. Do the work yourself for a lookup of one or two files, because a subagent starts with no context and costs a brief and a summary.
+Prefer parallel: split independent work and delegate to subagents when read-only work is broad: reading a plan plus many code areas, researching library docs, or reviewing many separate files against CLAUDE.md. Do the work yourself for a lookup of one or two files, because a subagent starts with no context and costs a brief and a summary.
 
 - Independent subagents go in the same message so they run in parallel; batch them per `_vskills-shared/repo-profile.md` §10.
 - The brief states the objective, the files or areas in scope, that the agent is read-only, and the report file `{work_context}/plans/reports/<agent-type>-<HHMMSS>-<slug>.md` it writes before replying (§6). Read that file back instead of relying on the reply.
@@ -93,5 +93,7 @@ Resolve the VCS profile first (`repo-profile.md` §2; if the file is absent assu
 - Linked issue (from the plan or `--issue`): put `Closes #<issue>` at the top of the PR body; in full gh mode also append the PR link to the issue body with `gh issue edit`, otherwise tell the user to add it by hand.
 
 ## Next steps
+
+Print the final result as described in `_vskills-shared/result-format.md`.
 
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.
