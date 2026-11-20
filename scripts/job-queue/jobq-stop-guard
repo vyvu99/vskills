@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # jobq-stop-guard: hook Stop gồm 2 chốt chặn, mỗi lần dừng chặn tối đa 1 lần. Usage: gắn vào settings.json, đọc JSON từ stdin
-# (1) còn job jobq nền trong thư mục phiên → bắt làm việc độc lập; (2) dừng hẳn (không còn job) sau lượt làm nhiều việc mà tin nhắn cuối thiếu tóm tắt và không đang chờ user quyết (hộp IMPORTANT) → bắt thêm danh sách ngắn: còn mở, bước tiếp.
+# (1) còn job jobq nền trong thư mục phiên → bắt làm việc độc lập; (2) dừng hẳn (không còn job) sau lượt làm nhiều việc mà tin nhắn cuối thiếu tóm tắt và không đang chờ user quyết (hộp IMPORTANT) → bắt thêm dải phiên (task list) và dòng việc user cần làm.
 set -euo pipefail
 input=$(cat)
 [ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" = true ] && exit 0
@@ -43,5 +43,5 @@ if [ "${pending:-0}" -gt 0 ] && ! printf '%s' "$text" | grep -qiE 'kết luận|
 fi
 [ "$(printf '%s' "$turn" | jq -r .tools)" -ge "$MIN_TOOLS" ] || exit 0
 # tin nhắn cuối đã nêu bước tiếp theo / việc còn lại / kết luận thì thôi
-printf '%s' "$turn" | jq -r .text | grep -qiE 'kết luận|còn lại|còn mở|tiếp theo|bước tiếp|còn tồn|cần bạn quyết|\[!important\]|nhắn `|recap|next steps' && exit 0
-jq -n '{decision:"block",reason:"Before stopping, add a short > [!NOTE] box, in the language of the conversation only: a bold line for what is still open followed by one task-list item (- [ ]) per open thing, then one bold line for the next step with a single sentence. Do not repeat what is done. Put the box before the closing English-learning block, which stays last."}'
+printf '%s' "$turn" | jq -r .text | grep -qiE 'kết luận|còn lại|còn mở|tiếp theo|bước tiếp|còn tồn|cần bạn quyết|bạn cần làm|bạn không cần làm|^[[:space:]>]*- \[[ xX]\]|\[!important\]|nhắn `|recap|next steps' && exit 0
+jq -n '{decision:"block",reason:"Before stopping, add the missing ending, in the language of the conversation only: a short task list for this session (- [x] done, - [ ] open, one short line each, mark ones waiting on the user), then one bold line saying what the user must do next, or that nothing is needed. Do not retell what is done in prose. Put it before the closing English-learning block, which stays last."}'

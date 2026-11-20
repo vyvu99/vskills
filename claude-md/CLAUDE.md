@@ -81,7 +81,7 @@ Write for a reader who does not know the context: short plain sentences, result 
 | flow, timing, shares, counts | `mermaid` flowchart / sequence / `gantt` / `pie` / `xychart-beta` (name each series); `quadrantChart` for priority by impact and effort |
 | commands the user may copy | fenced block with a language tag, never inline code |
 
-For a work report: verdict alert first, body table only when there are several cases, then one `[!NOTE]` saying what was actually run and seen and what was not. Add a `[!IMPORTANT]` decision box only when the user must decide; give the options as bullets and end with a bold recommendation and its reason.
+For a work report, scale the frame to the work: one or two sentences need none. Otherwise, in this order and skipping empty blocks: a session strip (task list that adds up over the session, only when there are two or more tasks or one is open), the verdict alert (say in the same sentence what was run and seen, and what was not), one line of what the user needs to do ("You need to do nothing." if so), a body table only when there are several cases, a `[!NOTE]` only when the result is long or something unrun is worth worrying about. Add a `[!IMPORTANT]` decision box only when the user must decide; give the options as bullets and end with a bold recommendation, its reason and "say `go` to take it"; silence is not consent, so wait.
 
 ## Code Review — Priority: security > bug > perf > style
 
