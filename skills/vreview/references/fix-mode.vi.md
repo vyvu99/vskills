@@ -47,7 +47,7 @@ Mỗi cross-group issue là một batch riêng. Check stop-gate, fix, verify fil
 
 ### Bước 5 — SUGGESTION issues
 Suggestion là cải tiến tùy chọn nên mỗi cái cần user quyết; không bao giờ áp hàng loạt.
-1. Hỏi một lần bằng `AskUserQuestion` dùng mode review nào (wording theo `~/.claude/skills/_vskills-shared/webapp-templates.md` §(c)): webapp, hoặc từng cái một.
+1. Hỏi một lần bằng `AskUserQuestion` dùng mode review nào (wording theo `../_vskills-shared/webapp-templates.md` §(c)): webapp, hoặc từng cái một.
    - Từng cái một: với mỗi suggestion, trình bày issue và fix đề xuất bằng `AskUserQuestion` và hỏi apply hay skip.
    - Webapp: dựng một field `diff-review-list` chứa mọi suggestion theo webapp-templates §(a): `id` = `SUGGESTION-{n}`, `before` = text `Issue:` cộng code hiện tại đọc mới từ `File:line`, `after` = `Fix:`, `actions: ["apply","skip"]`, `allowFreeText: true`. Health-check và start webapp theo §(b), `POST /api/step` (Bash `run_in_background: true`), rồi duyệt các decision trả về theo thứ tự.
 2. Apply: check stop-gate, fix, verify, ghi `Status: FIXED (pending commit)`. Skip: ghi `Status: REJECTED (<one-line reason>)` và không hỏi lại.

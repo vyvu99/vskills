@@ -8,6 +8,7 @@ metadata:
   author: vyvu
   version: "2.0.0"
 ---
+> **Other CLIs:** tool names here are Claude Code's. Read `AskUserQuestion` as "ask the user directly", `TodoWrite` as your task list, `Skill tool` as loading another installed skill, `subagent` as your CLI's delegation feature (or do it inline), `CLAUDE.md` as `AGENTS.md` / `GEMINI.md`, and `$ARGUMENTS` as the text given after the skill name. `_vskills-shared/` is the sibling folder of this skill's folder.
 
 # vsweep
 
@@ -35,7 +36,7 @@ $ARGUMENTS
 3. Note which services are already running and their ports, how to verify a change safely (read-only query, build, preview, dry run), and that destructive operations are off-limits unless the user says otherwise. Collect credentials or reference docs the work needs from seed scripts, fixtures or specs, and never invent them.
 4. Pull prior progress from project memory and past reports, so finished work is not rediscovered.
 5. Create the state file `{reports}/vsweep-<slug>-state.md` (`{reports}` is the project's reports directory, e.g. `plans/reports/`) before dispatching. It holds the start time and `DEADLINE` (from `date`, never estimated), the coverage map (a checkbox per area), the three decisions from step 2, a **User decisions (sticky)** section quoting the user verbatim (never reversed without asking), and the settled findings. Re-read it after any context compaction, and point dispatch prompts at it instead of retyping context.
-6. Arm the stop guard: `printf '%s\n%s\n' "<state file path>" "$(( $(date +%s) + <seconds> ))" > ~/.claude/vsweep-active`. This is harmless if the hook is not installed, because it is only a file. `stop-guard.sh` reads exactly these two lines (state path, deadline epoch).
+6. Arm the stop guard: `mkdir -p ~/.claude && printf '%s\n%s\n' "<state file path>" "$(( $(date +%s) + <seconds> ))" > ~/.claude/vsweep-active`. This is harmless if the hook is not installed, because it is only a file. `stop-guard.sh` reads exactly these two lines (state path, deadline epoch).
 
 ## Phase 1 — Pick the next area
 

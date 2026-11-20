@@ -25,7 +25,7 @@ If `.code-review/REPORT.md` exists, read its header for `REVIEWED_COMMIT:`.
 
 ## 1.1 Determine the changes
 
-Repo profile: read `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (host and `gh` availability) and §3 (language/framework tally, used from Phase 2 on). If the file is absent, assume GitHub + `gh` + TypeScript. A CLAUDE.md rule that names a language or framework applies only to files of that language in the diff, so a `.py` file is never flagged against a TypeScript rule. Security checks (secrets, injection, authz) apply to every file. When no rule fits a file's language, review it on general principles (naming, error handling, security, dead code) rather than skipping it.
+Repo profile: read `../_vskills-shared/repo-profile.md` §2 (host and `gh` availability) and §3 (language/framework tally, used from Phase 2 on). If the file is absent, assume GitHub + `gh` + TypeScript. A CLAUDE.md rule that names a language or framework applies only to files of that language in the diff, so a `.py` file is never flagged against a TypeScript rule. Security checks (secrets, injection, authz) apply to every file. When no rule fits a file's language, review it on general principles (naming, error handling, security, dead code) rather than skipping it.
 
 ### Flags
 - `--path dir1 dir2 ...`: review all files in those directories, no git diff. For a whole domain or feature area.

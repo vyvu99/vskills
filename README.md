@@ -2,7 +2,7 @@
 
 🌐 English | [Tiếng Việt](README.vi.md)
 
-Claude Code skills for the full life of a coding task: spec, plan, build, review, fix. Each skill is a plain `SKILL.md` symlinked into `~/.claude/skills`. No plugin layer, no config file.
+Skills for the full life of a coding task: spec, plan, build, review, fix. Each skill is a plain `SKILL.md` symlinked into `~/.claude/skills` (Claude Code) and, with `--target`, the skills folders of Codex, Gemini CLI, Copilot CLI, OpenCode, Kiro and Command Code. No plugin layer, no config file.
 
 ```mermaid
 flowchart LR
@@ -12,7 +12,7 @@ flowchart LR
 
 ## Install
 
-Requires the Claude Code CLI, `git` and `bash`. Optional: `gh` (GitHub skills), Node.js (webapp, lint rules, `check-skills`), `jq` (evals, `jobq` hook and dashboard).
+Requires a CLI that loads `SKILL.md` skills (Claude Code, Codex, Gemini CLI…), `git` and `bash`. Optional: `gh` (GitHub skills), Node.js (webapp, lint rules, `check-skills`), `jq` (evals, `jobq` hook and dashboard).
 
 ```bash
 git clone git@github.com:vyvu99/vskills.git && cd vskills
@@ -22,8 +22,9 @@ git clone git@github.com:vyvu99/vskills.git && cd vskills
 | Flag | Effect |
 |---|---|
 | `--lang=vi` | Install the Vietnamese variant of every skill |
+| `--target=<list>` | Comma list of `claude` (default), `codex`, `gemini`, `copilot`, `opencode`, `kiro`, `commandcode`, `agents`, or `all`. Links skills into each CLI's skills folder |
 | `--with-scripts` | Also install lint rules and the `jobq` job queue |
-| `--with-claude-md` | Also copy a starter `~/.claude/CLAUDE.md` (skipped if one exists) |
+| `--with-claude-md` | Also copy the starter rules into each target's instruction file (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`…); skipped if one exists |
 | `--dry-run` | Print what would happen, change nothing |
 
 Skills are symlinks, so editing the repo edits the installed skill. A real file already at a destination is moved to `<path>.bak.<timestamp>`, never deleted. Re-running removes skills that were deleted from the repo.

@@ -9,6 +9,7 @@ metadata:
   author: vyvu
   version: "2.0.0"
 ---
+> **Other CLIs:** tool names here are Claude Code's. Read `AskUserQuestion` as "ask the user directly", `TodoWrite` as your task list, `Skill tool` as loading another installed skill, `subagent` as your CLI's delegation feature (or do it inline), `CLAUDE.md` as `AGENTS.md` / `GEMINI.md`, and `$ARGUMENTS` as the text given after the skill name. `_vskills-shared/` is the sibling folder of this skill's folder.
 
 You are a senior engineer implementing the task end to end in the 9 steps below. Track the steps in a checklist (TodoWrite or the session's task tool) and mark a step done only when its work is done; Step 1 is a standing rule, so keep it open until Step 9 ends.
 

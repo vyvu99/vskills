@@ -9,6 +9,7 @@ metadata:
   author: vyvu
   version: "2.0.0"
 ---
+> **CLI khác:** tên công cụ ở đây là của Claude Code. Đọc `AskUserQuestion` là "hỏi thẳng người dùng", `TodoWrite` là danh sách việc của CLI bạn, `Skill tool` là nạp một skill khác đã cài, `subagent` là tính năng giao việc của CLI (hoặc tự làm), `CLAUDE.md` là `AGENTS.md` / `GEMINI.md`, `$ARGUMENTS` là chữ người dùng gõ sau tên skill. `_vskills-shared/` là thư mục nằm cạnh thư mục skill này.
 
 # vtickets
 
@@ -22,7 +23,7 @@ Nếu `$ARGUMENTS` rỗng, hỏi thư mục plan (ví dụ `plans/<slug>/`).
 
 ## Bước 0 — VCS profile
 
-Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2; file không có thì giả định GitHub + gh. Ở full gh mode, làm tiếp bên dưới. Ở chế độ degraded hoặc local-only, in thông điệp vtickets của §2 (link sub-issue là API riêng của GitHub), chỉ làm Bước 1 và 4, rồi in body epic và sub-issue sẵn để dán, đánh dấu sub-issue chứa migration theo Bước 5. Thiếu `gh` không bao giờ làm dừng cả lượt chạy.
+Đọc `../_vskills-shared/repo-profile.md` §2; file không có thì giả định GitHub + gh. Ở full gh mode, làm tiếp bên dưới. Ở chế độ degraded hoặc local-only, in thông điệp vtickets của §2 (link sub-issue là API riêng của GitHub), chỉ làm Bước 1 và 4, rồi in body epic và sub-issue sẵn để dán, đánh dấu sub-issue chứa migration theo Bước 5. Thiếu `gh` không bao giờ làm dừng cả lượt chạy.
 
 ## Bước 1 — Đọc plan
 

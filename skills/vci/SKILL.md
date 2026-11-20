@@ -9,6 +9,7 @@ metadata:
   author: vyvu
   version: "2.0.0"
 ---
+> **Other CLIs:** tool names here are Claude Code's. Read `AskUserQuestion` as "ask the user directly", `TodoWrite` as your task list, `Skill tool` as loading another installed skill, `subagent` as your CLI's delegation feature (or do it inline), `CLAUDE.md` as `AGENTS.md` / `GEMINI.md`, and `$ARGUMENTS` as the text given after the skill name. `_vskills-shared/` is the sibling folder of this skill's folder.
 
 # vci
 
@@ -20,7 +21,7 @@ $ARGUMENTS
 
 ## 1. Resolve the profile and the package list
 
-Read `~/.claude/skills/_vskills-shared/repo-profile.md` §1 for the package manager (`pm`), the workspace shape and the script names. If the file is missing, assume pnpm with a workspace. If §1 says this is not a JS/TS project, stop and say so.
+Read `../_vskills-shared/repo-profile.md` §1 for the package manager (`pm`), the workspace shape and the script names. If the file is missing, assume pnpm with a workspace. If §1 says this is not a JS/TS project, stop and say so.
 
 Package list, first match wins:
 - Names in `$ARGUMENTS` (after stripping `--test` and `--changed`): use exactly those.

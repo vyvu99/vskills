@@ -25,7 +25,7 @@ Nếu `.code-review/REPORT.md` tồn tại, đọc header tìm `REVIEWED_COMMIT:
 
 ## 1.1 Determine the changes
 
-Repo profile: đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (host và việc có `gh`) và §3 (tally ngôn ngữ/framework, dùng từ Phase 2). Nếu file không có, giả định GitHub + `gh` + TypeScript. Rule CLAUDE.md nêu tên một ngôn ngữ hoặc framework chỉ áp dụng cho file thuộc ngôn ngữ đó trong diff, nên file `.py` không bao giờ bị flag theo rule TypeScript. Check bảo mật (secrets, injection, authz) áp dụng cho mọi file. Khi không có rule nào khớp ngôn ngữ của file, review theo nguyên tắc chung (đặt tên, xử lý lỗi, bảo mật, dead code) thay vì bỏ qua.
+Repo profile: đọc `../_vskills-shared/repo-profile.md` §2 (host và việc có `gh`) và §3 (tally ngôn ngữ/framework, dùng từ Phase 2). Nếu file không có, giả định GitHub + `gh` + TypeScript. Rule CLAUDE.md nêu tên một ngôn ngữ hoặc framework chỉ áp dụng cho file thuộc ngôn ngữ đó trong diff, nên file `.py` không bao giờ bị flag theo rule TypeScript. Check bảo mật (secrets, injection, authz) áp dụng cho mọi file. Khi không có rule nào khớp ngôn ngữ của file, review theo nguyên tắc chung (đặt tên, xử lý lỗi, bảo mật, dead code) thay vì bỏ qua.
 
 ### Flags
 - `--path dir1 dir2 ...`: review mọi file trong các directory đó, không dùng git diff. Dành cho cả một domain hoặc feature area.

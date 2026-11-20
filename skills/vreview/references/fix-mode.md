@@ -47,7 +47,7 @@ Each cross-group issue is its own batch. Check the stop-gate, fix, verify files 
 
 ### Step 5 — SUGGESTION issues
 Suggestions are optional improvements, so each needs the user's decision; never apply them in bulk.
-1. Ask once with `AskUserQuestion` which review mode to use (wording per `~/.claude/skills/_vskills-shared/webapp-templates.md` §(c)): webapp, or one at a time.
+1. Ask once with `AskUserQuestion` which review mode to use (wording per `../_vskills-shared/webapp-templates.md` §(c)): webapp, or one at a time.
    - One at a time: for each suggestion, present the issue and proposed fix with `AskUserQuestion` and ask apply or skip.
    - Webapp: build one `diff-review-list` field with every suggestion per webapp-templates §(a): `id` = `SUGGESTION-{n}`, `before` = the `Issue:` text plus the current code read fresh from `File:line`, `after` = the `Fix:`, `actions: ["apply","skip"]`, `allowFreeText: true`. Health-check and start the webapp per §(b), `POST /api/step` (Bash `run_in_background: true`), then walk the returned decisions in order.
 2. Apply: check the stop-gate, fix, verify, write `Status: FIXED (pending commit)`. Skip: write `Status: REJECTED (<one-line reason>)` and never ask again.

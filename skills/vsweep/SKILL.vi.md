@@ -8,6 +8,7 @@ metadata:
   author: vyvu
   version: "2.0.0"
 ---
+> **CLI khác:** tên công cụ ở đây là của Claude Code. Đọc `AskUserQuestion` là "hỏi thẳng người dùng", `TodoWrite` là danh sách việc của CLI bạn, `Skill tool` là nạp một skill khác đã cài, `subagent` là tính năng giao việc của CLI (hoặc tự làm), `CLAUDE.md` là `AGENTS.md` / `GEMINI.md`, `$ARGUMENTS` là chữ người dùng gõ sau tên skill. `_vskills-shared/` là thư mục nằm cạnh thư mục skill này.
 
 # vsweep
 
@@ -35,7 +36,7 @@ $ARGUMENTS
 3. Ghi lại service nào đang chạy và port của chúng, cách kiểm chứng một thay đổi an toàn (query chỉ đọc, build, preview, chạy thử), và rằng thao tác phá hủy bị cấm trừ khi user nói khác. Lấy credential hay tài liệu tham chiếu cần cho việc từ seed script, fixture hoặc spec, không bao giờ tự bịa.
 4. Lấy tiến độ trước đó từ project memory và các báo cáo cũ, để không khám phá lại việc đã xong.
 5. Tạo state file `{reports}/vsweep-<slug>-state.md` (`{reports}` là thư mục reports của project, ví dụ `plans/reports/`) trước khi giao việc. Nó chứa giờ bắt đầu và `DEADLINE` (lấy từ `date`, không bao giờ ước lượng), coverage map (một checkbox mỗi vùng), ba quyết định ở bước 2, mục **User decisions (sticky)** trích nguyên văn lời user (không đảo ngược nếu chưa hỏi), và các phát hiện đã chốt. Đọc lại sau mỗi lần context bị nén, và trỏ prompt giao việc vào nó thay vì gõ lại ngữ cảnh.
-6. Bật stop guard: `printf '%s\n%s\n' "<state file path>" "$(( $(date +%s) + <seconds> ))" > ~/.claude/vsweep-active`. Việc này vô hại nếu hook chưa được cài, vì nó chỉ là một file. `stop-guard.sh` đọc đúng hai dòng này (đường dẫn state, epoch của deadline).
+6. Bật stop guard: `mkdir -p ~/.claude && printf '%s\n%s\n' "<state file path>" "$(( $(date +%s) + <seconds> ))" > ~/.claude/vsweep-active`. Việc này vô hại nếu hook chưa được cài, vì nó chỉ là một file. `stop-guard.sh` đọc đúng hai dòng này (đường dẫn state, epoch của deadline).
 
 ## Giai đoạn 1 — Chọn vùng tiếp theo
 

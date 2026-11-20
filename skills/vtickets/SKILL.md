@@ -9,6 +9,7 @@ metadata:
   author: vyvu
   version: "2.0.0"
 ---
+> **Other CLIs:** tool names here are Claude Code's. Read `AskUserQuestion` as "ask the user directly", `TodoWrite` as your task list, `Skill tool` as loading another installed skill, `subagent` as your CLI's delegation feature (or do it inline), `CLAUDE.md` as `AGENTS.md` / `GEMINI.md`, and `$ARGUMENTS` as the text given after the skill name. `_vskills-shared/` is the sibling folder of this skill's folder.
 
 # vtickets
 
@@ -22,7 +23,7 @@ If `$ARGUMENTS` is empty, ask for the plan directory (e.g. `plans/<slug>/`).
 
 ## Step 0 — VCS profile
 
-Read `~/.claude/skills/_vskills-shared/repo-profile.md` §2; if it is missing, assume GitHub + gh. In full gh mode, continue below. In degraded or local-only mode, print the §2 vtickets message (sub-issue linking is GitHub's own API), do Steps 1 and 4 only, and print the epic and sub-issue bodies ready to paste, marking the migration sub-issue per Step 5. A missing `gh` never aborts the run.
+Read `../_vskills-shared/repo-profile.md` §2; if it is missing, assume GitHub + gh. In full gh mode, continue below. In degraded or local-only mode, print the §2 vtickets message (sub-issue linking is GitHub's own API), do Steps 1 and 4 only, and print the epic and sub-issue bodies ready to paste, marking the migration sub-issue per Step 5. A missing `gh` never aborts the run.
 
 ## Step 1 — Read the plan
 

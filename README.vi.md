@@ -2,7 +2,7 @@
 
 🌐 [English](README.md) | Tiếng Việt
 
-Bộ skill Claude Code cho toàn bộ vòng đời một task lập trình: specs, plan, code, review, sửa. Mỗi skill là một tệp `SKILL.md` thuần, được symlink vào `~/.claude/skills`. Không có lớp plugin, không có tệp cấu hình.
+Bộ skill cho toàn bộ vòng đời một task lập trình: specs, plan, code, review, sửa. Mỗi skill là một tệp `SKILL.md` thuần, được symlink vào `~/.claude/skills` (Claude Code) và, với `--target`, thư mục skill của Codex, Gemini CLI, Copilot CLI, OpenCode, Kiro, Command Code. Không có lớp plugin, không có tệp cấu hình.
 
 ```mermaid
 flowchart LR
@@ -22,8 +22,9 @@ git clone git@github.com:vyvu99/vskills.git && cd vskills
 | Cờ | Tác dụng |
 |---|---|
 | `--lang=vi` | Cài bản tiếng Việt của mọi skill |
+| `--target=<danh sách>` | Danh sách cách nhau bằng dấu phẩy: `claude` (mặc định), `codex`, `gemini`, `copilot`, `opencode`, `kiro`, `commandcode`, `agents`, hoặc `all`. Đặt symlink skill vào thư mục skill của từng CLI |
 | `--with-scripts` | Cài thêm lint rule và hàng đợi lệnh `jobq` |
-| `--with-claude-md` | Chép thêm `~/.claude/CLAUDE.md` khởi tạo (bỏ qua nếu đã có) |
+| `--with-claude-md` | Chép quy tắc khởi tạo vào tệp chỉ dẫn của từng đích (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`…); bỏ qua nếu đã có |
 | `--dry-run` | In ra việc sẽ làm, không đổi gì |
 
 Skill là symlink nên sửa trong repo là sửa skill đã cài. Tệp thật có sẵn ở đích được đổi tên thành `<path>.bak.<timestamp>`, không bao giờ bị xóa. Chạy lại sẽ gỡ các skill đã bị xóa khỏi repo.

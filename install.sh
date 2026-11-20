@@ -2,7 +2,11 @@
 # Symlink skills (+ optionally scripts, CLAUDE.md starter) into ~/.claude,
 # and remove any previously-installed skill symlinks whose source was since
 # deleted from this repo.
-# Usage: ./install.sh [--dry-run] [--with-scripts] [--with-claude-md] [--lang=en|vi] [--help]
+# Usage: ./install.sh [--dry-run] [--with-scripts] [--with-claude-md] [--lang=en|vi] [--target=<list>] [--help]
+# --target: comma list of claude (default), codex, gemini, copilot, opencode, kiro, commandcode, agents, all.
+#   Each links the skills into that CLI's skills folder; --with-claude-md copies the starter rules into
+#   that CLI's instruction file (CLAUDE.md / AGENTS.md / GEMINI.md / copilot-instructions.md).
+#   codex and agents both use ~/.agents/skills, the shared folder several other CLIs also read.
 
 set -euo pipefail
 
@@ -11,12 +15,14 @@ DRY_RUN=false
 WITH_SCRIPTS=false
 WITH_CLAUDE_MD=false
 LANG_CHOICE=en
+TARGET=claude
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
     --with-scripts) WITH_SCRIPTS=true ;;
     --with-claude-md) WITH_CLAUDE_MD=true ;;
     --lang=*) LANG_CHOICE="${arg#--lang=}" ;;
+    --target=*) TARGET="${arg#--target=}" ;;
     -h|--help) sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "[install] unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
@@ -27,6 +33,25 @@ case "$LANG_CHOICE" in
   *) echo "[install] unsupported --lang=$LANG_CHOICE (use en or vi)" >&2; exit 2 ;;
 esac
 
+# target_info <name> — sets SK (skills folder) and MD (instruction file, empty if none)
+target_info() {
+  case "$1" in
+    claude)      SK="$HOME/.claude/skills";          MD="$HOME/.claude/CLAUDE.md" ;;
+    codex)       SK="$HOME/.agents/skills";          MD="$HOME/.codex/AGENTS.md" ;;
+    gemini)      SK="$HOME/.gemini/skills";          MD="$HOME/.gemini/GEMINI.md" ;;
+    copilot)     SK="$HOME/.copilot/skills";         MD="$HOME/.copilot/copilot-instructions.md" ;;
+    opencode)    SK="$HOME/.config/opencode/skills"; MD="$HOME/.config/opencode/AGENTS.md" ;;
+    kiro)        SK="$HOME/.kiro/skills";            MD="" ;;
+    commandcode) SK="$HOME/.commandcode/skills";     MD="$HOME/.commandcode/AGENTS.md" ;;
+    agents)      SK="$HOME/.agents/skills";          MD="" ;;
+    *) return 1 ;;
+  esac
+}
+[[ "$TARGET" == all ]] && TARGET="claude,codex,gemini,copilot,opencode,kiro,commandcode"
+IFS=',' read -ra TARGETS <<< "$TARGET"
+for t in "${TARGETS[@]}"; do
+  target_info "$t" || { echo "[install] unsupported --target=$t (use claude, codex, gemini, copilot, opencode, kiro, commandcode, agents or all)" >&2; exit 2; }
+done
 log() { echo "[install] $*"; }
 run() { $DRY_RUN && echo "[dry-run] $*" || eval "$*"; }
 
@@ -52,66 +77,68 @@ link() {
 # SKILL.md (English, default) or SKILL.<lang>.md (e.g. SKILL.vi.md) as the source
 # while the destination filename stays exactly "SKILL.md", as Claude Code requires.
 SKILLS_SRC="$REPO_DIR/skills"
-SKILLS_DST="$HOME/.claude/skills"
+install_skills() {
+  local SKILLS_DST="$1"
 
-if [[ -d "$SKILLS_SRC" ]]; then
-  for skill_dir in "$SKILLS_SRC"/*/; do
-    skill_name="$(basename "$skill_dir")"
-    # shared reference dirs (e.g. _shared/) are not skills — linked whole, below
-    [[ "$skill_name" == _* ]] && continue
-    src_file="${skill_dir}SKILL.md"
-    if [[ "$LANG_CHOICE" != "en" && -f "${skill_dir}SKILL.$LANG_CHOICE.md" ]]; then
-      src_file="${skill_dir}SKILL.$LANG_CHOICE.md"
-    fi
-    dst_dir="$SKILLS_DST/$skill_name"
-    # clean up an older dir-level symlink from a previous install.sh version
-    [[ -L "$dst_dir" ]] && run "rm '$dst_dir'"
-    link "$src_file" "$dst_dir/SKILL.md"
-    # references/ (if the skill has one) is symlinked whole — unlike SKILL.md,
-    # it isn't subject to --lang per-file selection, so any skill with a
-    # references/ dir gets it (generic, not hardcoded to a specific skill).
-    [[ -d "${skill_dir}references" ]] && link "${skill_dir}references" "$dst_dir/references"
-    # scripts/ (if the skill has one) is symlinked whole, same as references/ —
-    # e.g. a bundled helper script the skill shells out to.
-    [[ -d "${skill_dir}scripts" ]] && link "${skill_dir}scripts" "$dst_dir/scripts"
-    # Root-level helper shell scripts (e.g. vsweep/stop-guard.sh, referenced by
-    # SKILL.md as ~/.claude/skills/<skill>/<file>.sh) are symlinked per-file.
-    for sh_file in "${skill_dir}"*.sh; do
-      [[ -f "$sh_file" ]] && link "$sh_file" "$dst_dir/$(basename "$sh_file")"
+  if [[ -d "$SKILLS_SRC" ]]; then
+    for skill_dir in "$SKILLS_SRC"/*/; do
+      skill_name="$(basename "$skill_dir")"
+      # shared reference dirs (e.g. _shared/) are not skills — linked whole, below
+      [[ "$skill_name" == _* ]] && continue
+      src_file="${skill_dir}SKILL.md"
+      if [[ "$LANG_CHOICE" != "en" && -f "${skill_dir}SKILL.$LANG_CHOICE.md" ]]; then
+        src_file="${skill_dir}SKILL.$LANG_CHOICE.md"
+      fi
+      dst_dir="$SKILLS_DST/$skill_name"
+      # clean up an older dir-level symlink from a previous install.sh version
+      [[ -L "$dst_dir" ]] && run "rm '$dst_dir'"
+      link "$src_file" "$dst_dir/SKILL.md"
+      # references/ (if the skill has one) is symlinked whole — unlike SKILL.md,
+      # it isn't subject to --lang per-file selection, so any skill with a
+      # references/ dir gets it (generic, not hardcoded to a specific skill).
+      [[ -d "${skill_dir}references" ]] && link "${skill_dir}references" "$dst_dir/references"
+      # scripts/ (if the skill has one) is symlinked whole, same as references/ —
+      # e.g. a bundled helper script the skill shells out to.
+      [[ -d "${skill_dir}scripts" ]] && link "${skill_dir}scripts" "$dst_dir/scripts"
+      # Root-level helper shell scripts (e.g. vsweep/stop-guard.sh, referenced by
+      # SKILL.md as ~/.claude/skills/<skill>/<file>.sh) are symlinked per-file.
+      for sh_file in "${skill_dir}"*.sh; do
+        [[ -f "$sh_file" ]] && link "$sh_file" "$dst_dir/$(basename "$sh_file")"
+      done
     done
-  done
-fi
+  fi
 
-# ── Orphaned skills (removed from this repo since the last install) ────────
-# A destination whose symlink still points into this repo's skills/ dir, but
-# whose source skill dir no longer exists, was deleted upstream — clean it up
-# so it doesn't linger as a dangling symlink. Only touches entries this script
-# itself created (target resolves under $SKILLS_SRC); anything else is left alone.
-if [[ -d "$SKILLS_DST" ]]; then
-  for dst_skill_dir in "$SKILLS_DST"/*/; do
-    dst_skill_dir="${dst_skill_dir%/}"
-    skill_name="$(basename "$dst_skill_dir")"
-    [[ "$skill_name" == _* || "$skill_name" == *.bak.* ]] && continue
-    if [[ -L "$dst_skill_dir" ]]; then
-      target="$(readlink "$dst_skill_dir")"
-    elif [[ -L "$dst_skill_dir/SKILL.md" ]]; then
-      target="$(readlink "$dst_skill_dir/SKILL.md")"
-    else
-      continue
-    fi
-    case "$target" in
-      "$SKILLS_SRC"/*) ;;
-      *) continue ;;
-    esac
-    [[ -d "$SKILLS_SRC/$skill_name" ]] && continue
-    run "rm -rf '$dst_skill_dir'"
-    log "removed orphaned skill: $skill_name (no longer in this repo)"
-  done
-fi
+  # ── Orphaned skills (removed from this repo since the last install) ────────
+  # A destination whose symlink still points into this repo's skills/ dir, but
+  # whose source skill dir no longer exists, was deleted upstream — clean it up
+  # so it doesn't linger as a dangling symlink. Only touches entries this script
+  # itself created (target resolves under $SKILLS_SRC); anything else is left alone.
+  if [[ -d "$SKILLS_DST" ]]; then
+    for dst_skill_dir in "$SKILLS_DST"/*/; do
+      dst_skill_dir="${dst_skill_dir%/}"
+      skill_name="$(basename "$dst_skill_dir")"
+      [[ "$skill_name" == _* || "$skill_name" == *.bak.* ]] && continue
+      if [[ -L "$dst_skill_dir" ]]; then
+        target="$(readlink "$dst_skill_dir")"
+      elif [[ -L "$dst_skill_dir/SKILL.md" ]]; then
+        target="$(readlink "$dst_skill_dir/SKILL.md")"
+      else
+        continue
+      fi
+      case "$target" in
+        "$SKILLS_SRC"/*) ;;
+        *) continue ;;
+      esac
+      [[ -d "$SKILLS_SRC/$skill_name" ]] && continue
+      run "rm -rf '$dst_skill_dir'"
+      log "removed orphaned skill: $skill_name (no longer in this repo)"
+    done
+  fi
 
-# ── Shared reference docs (always installed — skills read these at runtime) ──
-[[ -d "$SKILLS_SRC/_vskills-shared" ]] && link "$SKILLS_SRC/_vskills-shared" "$SKILLS_DST/_vskills-shared"
-
+  # ── Shared reference docs (always installed — skills read these at runtime) ──
+  [[ -d "$SKILLS_SRC/_vskills-shared" ]] && link "$SKILLS_SRC/_vskills-shared" "$SKILLS_DST/_vskills-shared"
+}
+for t in "${TARGETS[@]}"; do target_info "$t"; install_skills "$SK"; done
 # ── Webapp (always installed — vspecs and vreview --fix start it from here) ──
 [[ -d "$REPO_DIR/web" ]] && link "$REPO_DIR/web" "$HOME/.claude/vskills-web"
 
@@ -119,7 +146,8 @@ fi
 # Quick sanity table over what actually landed in ~/.claude/skills — no lint,
 # just surfaces anything obviously oversized or missing at a glance.
 print_health_check() {
-  [[ -d "$SKILLS_DST" ]] || return
+  local SKILLS_DST="$1"
+  [[ -d "$SKILLS_DST" ]] || return 0
   log "post-install health check:"
   printf '  %-30s %10s %10s %12s\n' "skill" "desc-chars" "body-lines" "references"
   for skill_dir in "$SKILLS_DST"/*/; do
@@ -163,19 +191,24 @@ fi
 # away, not something that should silently change when the repo updates.
 if $WITH_CLAUDE_MD; then
   CLAUDE_MD_SRC="$REPO_DIR/claude-md/CLAUDE.md"
-  CLAUDE_MD_DST="$HOME/.claude/CLAUDE.md"
-
-  if [[ -e "$CLAUDE_MD_DST" ]]; then
-    log "WARNING: $CLAUDE_MD_DST already exists — not touching it. Skipping --with-claude-md."
-  elif [[ -f "$CLAUDE_MD_SRC" ]]; then
-    run "cp '$CLAUDE_MD_SRC' '$CLAUDE_MD_DST'"
-    $WITH_SCRIPTS || log "NOTE: the starter CLAUDE.md tells Claude to use jobq; also pass --with-scripts and add the jobq-guard hook, or delete those rules"
-    log "copied starter CLAUDE.md → $CLAUDE_MD_DST (edit freely, not synced with this repo)"
-  fi
+  for t in "${TARGETS[@]}"; do
+    target_info "$t"
+    [[ -n "$MD" ]] || { log "no instruction file for target $t — skipping its starter rules"; continue; }
+    if [[ -e "$MD" ]]; then
+      log "WARNING: $MD already exists — not touching it."
+    elif [[ -f "$CLAUDE_MD_SRC" ]]; then
+      run "mkdir -p '$(dirname "$MD")'"
+      run "cp '$CLAUDE_MD_SRC' '$MD'"
+      log "copied starter rules → $MD (edit freely, not synced with this repo)"
+    fi
+  done
+  $WITH_SCRIPTS || log "NOTE: the starter rules tell the agent to use jobq; also pass --with-scripts (and, on Claude Code, add the jobq-guard hook), or delete those rules"
 else
   log "skipped CLAUDE.md starter — pass --with-claude-md to install (only applies if you don't already have one)"
 fi
 
-$DRY_RUN || print_health_check
+if ! $DRY_RUN; then
+  for t in "${TARGETS[@]}"; do target_info "$t"; print_health_check "$SK"; done
+fi
 
 log "Done. (lang: $LANG_CHOICE)"

@@ -8,6 +8,7 @@ metadata:
   author: vyvu
   version: "10.0.0"
 ---
+> **Other CLIs:** tool names here are Claude Code's. Read `AskUserQuestion` as "ask the user directly", `TodoWrite` as your task list, `Skill tool` as loading another installed skill, `subagent` as your CLI's delegation feature (or do it inline), `CLAUDE.md` as `AGENTS.md` / `GEMINI.md`, and `$ARGUMENTS` as the text given after the skill name. `_vskills-shared/` is the sibling folder of this skill's folder.
 
 # vdesign — UI/UX Redesign
 
@@ -57,7 +58,7 @@ The Design Brief is the contract. Do not make the result bolder or more conserva
 ### Phase 0: Scope and read
 
 1. Parse the input mode. For a URL or localhost target, screenshot immediately with whatever browser tool exists; none available means ask the user to paste one.
-2. `--pr`: resolve the VCS profile per `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (absent: assume full gh mode). Degraded mode: print the §2 message, then ask for a branch name or fall back to `--diff`.
+2. `--pr`: resolve the VCS profile per `../_vskills-shared/repo-profile.md` §2 (absent: assume full gh mode). Degraded mode: print the §2 message, then ask for a branch name or fall back to `--diff`.
 3. Project Profile: use `.vdesign/profile.md` at the git root (`git rev-parse --show-toplevel`) if present. Otherwise infer the UI library and design tokens from `package.json`, `tailwind.config.*`, and the components folder. Still ambiguous: ask one question and offer to save the answer to `.vdesign/profile.md`.
 4. **Real User & Purpose read.** Read the real data shape feeding the target: prop types, the query/hook/server action it calls, and the response type or Zod schema (read the type; rendered output hides unused fields). When the DB schema file is reachable, note fields that are never fetched; Phase 2's sparse check uses them. Then take the persona's view (role, task goal, time pressure, device, skill level) inferred from the route name and the profile context. State which field or action must stand out, what is noise, and whether the current structure (table, card grid, kanban, timeline, master-detail, bento, calendar, comparison matrix, tree, feed, or whatever the data and task call for) fits that persona.
 5. This read is the only gate on structural freedom: restructure whenever it serves the real task, and trace every restructure to a concrete reason stated here. Record the persona, the task, and 2-3 information-architecture decisions in `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md`.

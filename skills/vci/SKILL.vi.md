@@ -9,6 +9,7 @@ metadata:
   author: vyvu
   version: "2.0.0"
 ---
+> **CLI khác:** tên công cụ ở đây là của Claude Code. Đọc `AskUserQuestion` là "hỏi thẳng người dùng", `TodoWrite` là danh sách việc của CLI bạn, `Skill tool` là nạp một skill khác đã cài, `subagent` là tính năng giao việc của CLI (hoặc tự làm), `CLAUDE.md` là `AGENTS.md` / `GEMINI.md`, `$ARGUMENTS` là chữ người dùng gõ sau tên skill. `_vskills-shared/` là thư mục nằm cạnh thư mục skill này.
 
 # vci
 
@@ -20,7 +21,7 @@ $ARGUMENTS
 
 ## 1. Xác định profile và danh sách package
 
-Đọc `~/.claude/skills/_vskills-shared/repo-profile.md` §1 để biết package manager (`pm`), workspace shape và tên script. File không có thì giả định pnpm + workspace. Nếu §1 báo đây không phải project JS/TS, dừng và nói rõ.
+Đọc `../_vskills-shared/repo-profile.md` §1 để biết package manager (`pm`), workspace shape và tên script. File không có thì giả định pnpm + workspace. Nếu §1 báo đây không phải project JS/TS, dừng và nói rõ.
 
 Danh sách package, khớp trường hợp đầu tiên:
 - Có tên trong `$ARGUMENTS` (sau khi bỏ `--test` và `--changed`): dùng đúng các tên đó.

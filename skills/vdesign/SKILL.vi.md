@@ -8,6 +8,7 @@ metadata:
   author: vyvu
   version: "10.0.0"
 ---
+> **CLI khác:** tên công cụ ở đây là của Claude Code. Đọc `AskUserQuestion` là "hỏi thẳng người dùng", `TodoWrite` là danh sách việc của CLI bạn, `Skill tool` là nạp một skill khác đã cài, `subagent` là tính năng giao việc của CLI (hoặc tự làm), `CLAUDE.md` là `AGENTS.md` / `GEMINI.md`, `$ARGUMENTS` là chữ người dùng gõ sau tên skill. `_vskills-shared/` là thư mục nằm cạnh thư mục skill này.
 
 # vdesign — Redesign UI/UX
 
@@ -57,7 +58,7 @@ Design Brief là hợp đồng. Đừng làm kết quả táo bạo hơn hay b�
 ### Phase 0: Scope và đọc
 
 1. Parse input mode. Target là URL hoặc localhost thì screenshot ngay bằng công cụ browser sẵn có; không có công cụ nào thì nhờ user dán screenshot.
-2. `--pr`: resolve VCS profile theo `~/.claude/skills/_vskills-shared/repo-profile.md` §2 (không có file: coi như full gh mode). Degraded mode: in thông báo §2, rồi hỏi tên branch hoặc fallback `--diff`.
+2. `--pr`: resolve VCS profile theo `../_vskills-shared/repo-profile.md` §2 (không có file: coi như full gh mode). Degraded mode: in thông báo §2, rồi hỏi tên branch hoặc fallback `--diff`.
 3. Project Profile: dùng `.vdesign/profile.md` ở git root (`git rev-parse --show-toplevel`) nếu có. Không có thì suy ra UI library và design token từ `package.json`, `tailwind.config.*` và thư mục components. Vẫn mơ hồ: hỏi 1 câu và đề nghị lưu đáp án vào `.vdesign/profile.md`.
 4. **Đọc Real User & Purpose.** Đọc data shape thật cấp cho target: prop type, query/hook/server action nó gọi, và response type hoặc Zod schema (đọc type; output đã render che mất field không dùng). Khi file DB schema với tới được, ghi lại field chưa từng được fetch; sparse check ở Phase 2 dùng chúng. Rồi đứng vào góc nhìn persona (vai trò, mục tiêu task, áp lực thời gian, thiết bị, trình độ) suy từ tên route và context trong profile. Nêu rõ field hay action nào phải nổi bật, cái gì là nhiễu, và cấu trúc hiện tại (table, card grid, kanban, timeline, master-detail, bento, calendar, comparison matrix, tree, feed, hay gì mà data và task đòi hỏi) có hợp persona đó không.
 5. Lần đọc này là cổng duy nhất của structural freedom: restructure bất cứ khi nào nó phục vụ task thật, và mỗi restructure phải truy được về một lý do cụ thể nêu ở đây. Ghi persona, task và 2-3 quyết định information architecture vào `plans/reports/vdesign-brief-<slug>-<HHMMSS>.md`.

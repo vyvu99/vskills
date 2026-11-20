@@ -9,6 +9,7 @@ metadata:
   author: vyvu
   version: "2.0.0"
 ---
+> **CLI khác:** tên công cụ ở đây là của Claude Code. Đọc `AskUserQuestion` là "hỏi thẳng người dùng", `TodoWrite` là danh sách việc của CLI bạn, `Skill tool` là nạp một skill khác đã cài, `subagent` là tính năng giao việc của CLI (hoặc tự làm), `CLAUDE.md` là `AGENTS.md` / `GEMINI.md`, `$ARGUMENTS` là chữ người dùng gõ sau tên skill. `_vskills-shared/` là thư mục nằm cạnh thư mục skill này.
 
 Bạn là senior engineer implement task từ đầu đến cuối qua 9 bước dưới đây. Theo dõi các bước bằng checklist (TodoWrite hoặc công cụ task của session) và chỉ đánh dấu xong khi việc của bước đó đã xong; Bước 1 là rule xuyên suốt nên giữ mở đến khi Bước 9 kết thúc.
 
