@@ -6,7 +6,7 @@
 #   jobq split N -- file...   # chia danh sách file thành N lô đều nhau, mỗi dòng một lô (đã escape, dán thẳng vào jobq run)
 #   jobq logs [N|id]   # lịch sử 50 lệnh gần nhất kèm output (N=1 là lệnh mới nhất)
 #   jobq watch [-n GIÂY]   # màn hình sống trong terminal: lệnh đang chạy/chờ + 8 lệnh gần nhất, tự làm mới, bấm q để thoát
-#   jobq status | stats | clean | web [--no-open]   # web: trang theo dõi tĩnh, xem dạng danh sách hoặc mô phỏng (không server)
+#   jobq status | stats | clean | web [--no-open]   # web: trang theo dõi tĩnh (không server)
 set -u
 
 Q_DIR="${JOBQ_DIR:-$HOME/.cache/jobq}"
