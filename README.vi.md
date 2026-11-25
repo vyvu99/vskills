@@ -12,12 +12,15 @@ flowchart LR
 
 ## Cài đặt
 
-Cần Claude Code CLI, `git` và `bash`. Tùy chọn: `gh` (skill GitHub), Node.js (webapp, lint rule, `check-skills`), `jq` (eval, hook và dashboard của `jobq`).
+Cần một CLI đọc được skill `SKILL.md` (Claude Code, Codex, Gemini CLI…), `git` và `bash`. Tùy chọn: `gh` (skill GitHub), Node.js (webapp, lint rule, `check-skills`), `jq` (eval, hook và dashboard của `jobq`).
 
 ```bash
 git clone git@github.com:vyvu99/vskills.git && cd vskills
 ./install.sh
 ```
+
+> [!NOTE]
+> Skill được viết cho Claude Code, và eval hành vi chỉ chạy ở đó. Với CLI khác, bộ cài đã đặt symlink và mỗi skill có ghi chú đổi tên công cụ, nhưng chưa ai kiểm chứng các quy trình chạy giống nhau.
 
 | Cờ | Tác dụng |
 |---|---|
@@ -75,7 +78,8 @@ jobq web                           # dashboard trực tiếp
 ```bash
 mkdir skills/<name>              # thêm SKILL.md và SKILL.vi.md
 ./install.sh
-node scripts/check-skills.js     # frontmatter, độ dài mô tả, cân bằng Anh-Việt
+node scripts/check-skills.js     # frontmatter, độ dài mô tả, cân bằng Anh-Việt, tham chiếu tệp chung và §
+./scripts/test-install.sh        # thử bộ cài trong HOME tạm
 ```
 
 Muốn gỡ skill: xóa thư mục, grep các tham chiếu chéo rồi chạy lại `./install.sh`.

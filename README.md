@@ -19,6 +19,9 @@ git clone git@github.com:vyvu99/vskills.git && cd vskills
 ./install.sh
 ```
 
+> [!NOTE]
+> Skills are written for Claude Code, and the behaviour evals run only there. On other CLIs the installer links the files and each skill carries a tool-name note, but nobody has verified that the workflows behave the same.
+
 | Flag | Effect |
 |---|---|
 | `--lang=vi` | Install the Vietnamese variant of every skill |
@@ -75,7 +78,8 @@ To make Claude use it, copy the `jobq-guard` hook into `~/.claude/settings.json`
 ```bash
 mkdir skills/<name>              # add SKILL.md and SKILL.vi.md
 ./install.sh
-node scripts/check-skills.js     # frontmatter, description length, EN/VI parity
+node scripts/check-skills.js     # frontmatter, description length, EN/VI parity, shared-file and § pointers
+./scripts/test-install.sh        # installer, against a throwaway HOME
 ```
 
 To remove a skill, delete its folder, grep for cross-references, and re-run `./install.sh`.

@@ -79,6 +79,7 @@ Việc thuần UI (chỉ style hoặc layout, không có business logic) đượ
 - Fail thì sửa root cause và chạy lại đến khi pass hết. Không skip, làm yếu hay mock test để ra xanh.
 - Nếu thay đổi gọi được qua HTTP hoặc CLI, gọi thật một lần và đưa output thật vào báo cáo. Nếu cần server chưa chạy thì không tự start; nhờ user start hoặc báo "chưa chạy thử" kèm lý do.
 - Nếu không chạy được test, typecheck hay lệnh run nào ở đây, nói rõ trong báo cáo và đánh dấu thay đổi là chưa verify.
+- Mode A: mỗi case trong bảng Case Summary của `plan.md` phải có một kết quả kèm bằng chứng: PASS (test hoặc lần chạy thật thấy được trong phiên này; case plan đã ghi PASS thì giữ file:line đã kiểm lại), FAIL (thấy chạy sai) hoặc UNVERIFIED (không có bằng chứng, dù code đã viết).
 
 ## Bước 9 - Commit và mở PR
 
@@ -95,6 +96,6 @@ Xác định VCS profile trước (`repo-profile.md` §2; nếu thiếu file th�
 
 ## Next steps
 
-In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`.
+In kết quả cuối ra terminal theo `_vskills-shared/result-format.md`. Ở Mode A phần thân là mỗi case một dòng (ID, file đã sửa, bằng chứng, kết quả); còn dòng nào FAIL hoặc UNVERIFIED thì báo là xong một phần, không bao giờ báo xong, và nêu các case đó trong mô tả PR nếu có mở PR.
 
 Theo quy ước Next Steps trong `_vskills-shared/repo-profile.md` §7.

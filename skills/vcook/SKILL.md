@@ -79,6 +79,7 @@ Pure UI work (style or layout only, no business logic) may skip test-first; stat
 - On failure fix the root cause and re-run until everything passes. Do not skip, weaken or mock tests to get green.
 - If the change is reachable over HTTP or CLI, call it once for real and include the actual output in the report. If that needs a server that is not running, do not start one; ask the user to start it or report "not exercised" with the reason.
 - If no test, typecheck or run command can be executed here, say so in the report and mark the change unverified.
+- Mode A: give every case in `plan.md`'s Case Summary a result with its evidence: PASS (a test or real run observed in this session; a case the plan already marked PASS keeps its re-checked file:line), FAIL (observed to misbehave) or UNVERIFIED (no evidence, even if the code is written).
 
 ## Step 9 - Commit and open the PR
 
@@ -95,6 +96,6 @@ Resolve the VCS profile first (`repo-profile.md` §2; if the file is absent assu
 
 ## Next steps
 
-Print the final result as described in `_vskills-shared/result-format.md`.
+Print the final result as described in `_vskills-shared/result-format.md`. In Mode A the body is one row per case (ID, changed file, evidence, result); while any row is FAIL or UNVERIFIED, report the work as partial, never done, and list those cases in the PR body when a PR is opened.
 
 Follow the Next Steps convention in `_vskills-shared/repo-profile.md` §7.
