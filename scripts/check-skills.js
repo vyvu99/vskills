@@ -143,6 +143,37 @@ function checkSkill(skillName, skillDir) {
   }
 }
 
+// Skills depend on each other through shared files and `§N` section numbers; renaming
+// either one breaks the others silently, so every pointer must resolve.
+function checkReferences(skillName, skillDir) {
+  const profilePath = path.join(SKILLS_DIR, '_vskills-shared', 'repo-profile.md');
+  const profile = fs.existsSync(profilePath) ? fs.readFileSync(profilePath, 'utf8') : '';
+  const sections = new Set([...profile.matchAll(/^## (§\d+)/gm)].map((m) => m[1]));
+  const refsDir = path.join(skillDir, 'references');
+  const files = ['SKILL.md', 'SKILL.vi.md'].map((f) => path.join(skillDir, f));
+  if (fs.existsSync(refsDir)) files.push(...fs.readdirSync(refsDir).map((f) => path.join(refsDir, f)));
+
+  for (const file of files.filter((f) => f.endsWith('.md') && fs.existsSync(f))) {
+    const text = fs.readFileSync(file, 'utf8');
+    const where = path.relative(skillDir, file);
+    // A path prefixed with another skill's name resolves inside that skill.
+    for (const [, other, ref] of text.matchAll(/(?:\b(v[a-z]+)\/)?\b((?:_vskills-shared|references)\/[\w-]+\.md)/g)) {
+      const base = ref.startsWith('_') ? SKILLS_DIR : other ? path.join(SKILLS_DIR, other) : skillDir;
+      if (!fs.existsSync(path.join(base, ref))) {
+        addViolation(skillName, 'broken-reference', `${where} trỏ tới "${ref}" không tồn tại`);
+      }
+    }
+    // Only `repo-profile.md §N` style pointers: a bare §N may mean a section of another file.
+    for (const [, list] of text.matchAll(/repo-profile(?:\.md)?`? ((?:§\d+(?:, | and | và )?)+)/g)) {
+      for (const section of list.match(/§\d+/g)) {
+        if (!sections.has(section)) {
+          addViolation(skillName, 'broken-section', `${where} trỏ tới repo-profile ${section} không tồn tại`);
+        }
+      }
+    }
+  }
+}
+
 function checkLintRules() {
   const rulesDir = path.join(ROOT, 'scripts', 'lint-rules', 'rules');
   const registryPath = path.join(ROOT, 'scripts', 'lint-rules', 'config', 'rule-registry.json');
@@ -181,6 +212,7 @@ function main() {
 
   for (const name of skillNames) {
     checkSkill(name, path.join(SKILLS_DIR, name));
+    checkReferences(name, path.join(SKILLS_DIR, name));
   }
   checkLintRules();
 
