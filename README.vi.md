@@ -1,5 +1,8 @@
 # vskills
 
+[![CI](https://github.com/vyvu99/vskills/actions/workflows/ci.yml/badge.svg)](https://github.com/vyvu99/vskills/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+
 🌐 [English](README.md) | Tiếng Việt
 
 Bộ skill cho toàn bộ vòng đời một task lập trình: specs, plan, code, review, sửa. Mỗi skill là một tệp `SKILL.md` thuần, được symlink vào `~/.claude/skills` (Claude Code) và, với `--target`, thư mục skill của Codex, Gemini CLI, Copilot CLI, OpenCode, Kiro, Command Code. Không có lớp plugin, không có tệp cấu hình.
@@ -66,23 +69,7 @@ jobq web                           # dashboard trực tiếp
 
 ## Đóng góp
 
-| Đường dẫn | Mục đích |
-|---|---|
-| `skills/<name>/SKILL.md`, `SKILL.vi.md` | Một skill, bản Anh và bản Việt có cùng số dòng |
-| `skills/_vskills-shared/` | Tài liệu tham chiếu dùng chung |
-| `claude-md/CLAUDE.md` | Quy tắc khởi tạo cho `--with-rules` |
-| `evals/` | Eval kích hoạt và hành vi (`scripts/run-evals.sh`, gọi `claude -p`, có tính phí) |
-| `web/` | Webapp cục bộ mà `vspecs` và `vreview --fix` dùng |
-| `scripts/` | Công cụ tùy chọn: `lint-rules`, `job-queue` |
-
-```bash
-mkdir skills/<name>              # thêm SKILL.md và SKILL.vi.md
-./install.sh
-node scripts/check-skills.js     # frontmatter, độ dài mô tả, cân bằng Anh-Việt, tham chiếu tệp chung và §
-./scripts/test-install.sh        # thử bộ cài trong HOME tạm
-```
-
-Muốn gỡ skill: xóa thư mục, grep các tham chiếu chéo rồi chạy lại `./install.sh`.
+Hoan nghênh báo lỗi và pull request. Xem [CONTRIBUTING.md](CONTRIBUTING.md) (tiếng Anh) để biết cấu trúc repo và các bước kiểm tra. Lỗi bảo mật báo riêng theo [SECURITY.md](SECURITY.md).
 
 ## License
 

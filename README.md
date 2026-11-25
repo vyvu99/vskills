@@ -1,5 +1,8 @@
 # vskills
 
+[![CI](https://github.com/vyvu99/vskills/actions/workflows/ci.yml/badge.svg)](https://github.com/vyvu99/vskills/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+
 🌐 English | [Tiếng Việt](README.vi.md)
 
 Skills for the full life of a coding task: spec, plan, build, review, fix. Each skill is a plain `SKILL.md` symlinked into `~/.claude/skills` (Claude Code) and, with `--target`, the skills folders of Codex, Gemini CLI, Copilot CLI, OpenCode, Kiro and Command Code. No plugin layer, no config file.
@@ -66,23 +69,7 @@ To make Claude use it, copy the `jobq-guard` hook into `~/.claude/settings.json`
 
 ## Contributing
 
-| Path | Purpose |
-|---|---|
-| `skills/<name>/SKILL.md`, `SKILL.vi.md` | One skill, English and Vietnamese with the same line count |
-| `skills/_vskills-shared/` | Reference docs shared by skills |
-| `claude-md/CLAUDE.md` | Starter rules for `--with-rules` |
-| `evals/` | Trigger and behavior evals (`scripts/run-evals.sh`, calls `claude -p`, billable) |
-| `web/` | Local webapp used by `vspecs` and `vreview --fix` |
-| `scripts/` | Opt-in tools: `lint-rules`, `job-queue` |
-
-```bash
-mkdir skills/<name>              # add SKILL.md and SKILL.vi.md
-./install.sh
-node scripts/check-skills.js     # frontmatter, description length, EN/VI parity, shared-file and § pointers
-./scripts/test-install.sh        # installer, against a throwaway HOME
-```
-
-To remove a skill, delete its folder, grep for cross-references, and re-run `./install.sh`.
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the repo layout and checks. Report security problems privately, as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

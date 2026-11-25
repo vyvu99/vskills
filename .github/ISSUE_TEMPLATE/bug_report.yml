@@ -1,0 +1,32 @@
+name: Bug report
+description: A skill, the installer or a script behaves wrongly
+labels: [bug]
+body:
+  - type: input
+    id: part
+    attributes:
+      label: Skill or script
+      placeholder: vreview, install.sh, jobq…
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: Agent CLI and version, operating system
+      placeholder: Claude Code 2.x, macOS 15
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Remove secrets and private paths from any output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
