@@ -2,7 +2,7 @@
 # jobq — hàng đợi FIFO giới hạn số lệnh nặng chạy cùng lúc (test, build, typecheck, e2e...).
 # Chỉ cần bash + công cụ có sẵn trên macOS/Linux; trạng thái nằm trong $JOBQ_DIR.
 #
-#   jobq run [-t TIMEOUT_S] [-w WAIT_S] [--cost cpu=N,mem=MB] -- <lệnh...>
+#   jobq run [-t TIMEOUT_S] [--cost cpu=N,mem=MB] -- <lệnh...>
 #   jobq split N -- file...   # chia danh sách file thành N lô đều nhau, mỗi dòng một lô (đã escape, dán thẳng vào jobq run)
 #   jobq logs [N|id]   # lịch sử 50 lệnh gần nhất kèm output (N=1 là lệnh mới nhất)
 #   jobq watch [-n GIÂY]   # màn hình sống trong terminal: lệnh đang chạy/chờ + 8 lệnh gần nhất, tự làm mới, bấm q để thoát
@@ -11,7 +11,6 @@ set -u
 
 Q_DIR="${JOBQ_DIR:-$HOME/.cache/jobq}"
 TIMEOUT="${JOBQ_TIMEOUT:-900}"           # giết lệnh chạy quá lâu
-WAIT="${JOBQ_WAIT:-7200}"                # bỏ cuộc nếu xếp hàng quá lâu (2 giờ: Claude đẩy nhiều lệnh một lúc nên hàng có thể dài)
 HIST="$Q_DIR/history.tsv"
 
 # Không có cấu hình tay: giới hạn tự suy ra từ số nhân và RAM của máy, rồi được siết thêm bằng số đo thật (CPU, RAM, swap, áp lực RAM).
@@ -421,12 +420,12 @@ cmd_run() {
   COST=""
   while [ $# -gt 0 ]; do
     case "$1" in
-      --cost) COST=$2; shift 2 ;; -t) TIMEOUT=$2; shift 2 ;; -w) WAIT=$2; shift 2 ;;
+      --cost) COST=$2; shift 2 ;; -t) TIMEOUT=$2; shift 2 ;;
       --) shift; break ;; *) break ;;
     esac
   done
   # số không hợp lệ làm watchdog giết lệnh ngay lập tức, nên chặn từ đầu
-  case "$TIMEOUT$WAIT" in ''|*[!0-9]*) echo "jobq: -t và -w phải là số giây" >&2; exit 2 ;; esac
+  case "$TIMEOUT" in ''|*[!0-9]*) echo "jobq: -t phải là số giây" >&2; exit 2 ;; esac
   [ $# -gt 0 ] || { echo "jobq: thiếu lệnh sau --" >&2; exit 2; }
   # Lệnh con gọi jobq lần nữa: đã giữ slot rồi, xếp hàng tiếp sẽ tự kẹt.
   [ -n "${JOBQ_ACTIVE:-}" ] && exec "$@"
@@ -464,7 +463,7 @@ cmd_run() {
   trap 'release; exit 130' INT TERM
   trap release EXIT
 
-  local deadline=$(( $(now) + WAIT )) first hw_c hw_m age ok la wk=2
+  local first hw_c hw_m age ok la wk=2
   while :; do
     reap
     first=$(ls "$Q_DIR/queue" | sort | head -1)
@@ -490,7 +489,6 @@ cmd_run() {
     fi
     unlock
     [ -n "$got" ] && break
-    [ "$(now)" -ge "$deadline" ] && { echo "jobq: chờ quá ${WAIT}s, bỏ cuộc" >&2; exit 75; }
     sleep 1
   done
   rm -f "$ticket"; write_snapshot

@@ -38,7 +38,7 @@ jobq web                                  # open the monitoring page
 jobq clean                                # clean up slots of dead processes, trim history to 2000 lines
 ```
 
-Exit codes: the command's own, except `124` (timed out, the whole process tree was stopped and you are told to split the command), `125` (refused because the previous runs of this command were too big, see Common problems), `75` (waited in the queue too long) and `130` (interrupted with Ctrl-C).
+Exit codes: the command's own, except `124` (timed out, the whole process tree was stopped and you are told to split the command), `125` (refused because the previous runs of this command were too big, see Common problems) and `130` (interrupted with Ctrl-C).
 
 ## How it works
 
@@ -66,7 +66,7 @@ flowchart LR
 
 ## Configuration
 
-There is no config file or command for changing numbers: every limit is derived from the machine's core count and RAM, then tightened by real measurements. Only two things are tunable per command: `-t` (maximum seconds for the command, default 900) and `-w` (maximum seconds to wait in the queue, default 7200), plus `--cost cpu=N,mem=MB` to declare the weight in advance for a command with no history. The `JOBQ_*` variables at the top of the `jobq` file are only override points for tests.
+There is no config file or command for changing numbers: every limit is derived from the machine's core count and RAM, then tightened by real measurements. A queued command waits as long as it takes and is never dropped. Per command you can set `-t` (maximum run time in seconds, default 900), plus `--cost cpu=N,mem=MB` to declare the weight in advance for a command with no history. The `JOBQ_*` variables at the top of the `jobq` file are only override points for tests.
 
 ## Command history and output
 
@@ -118,7 +118,6 @@ A failing step stops there; after fixing, rerun the same command to resume from 
 
 ## Common problems
 
-- **Exit `75`:** waited longer than `JOBQ_WAIT`. Run `jobq status`; if a slot is stuck but its process is dead, run `jobq clean`.
 - **Exit `124`:** the command timed out. `jobq` prints "QUÁ HẠN ... hãy CHIA NHỎ lệnh" (timed out ... split the command) and records that line in the history, along with the command name and the last 20 output lines so you can see how far it got. Split the command into shorter batches (`jobq split N -- <file...>` or `--shard=i/N`) and push each batch; do not raise `-t`.
 - **Exit `125`:** `jobq` refused to run because the last 3 runs of this exact command averaged more than half the time limit (timed-out runs are recorded in the history too) or peaked above a quarter of the machine's RAM. Split the command into smaller batches and run each one; if you really need the whole run, put `JOBQ_WHOLE=1` before the command.
 - **Only one command runs even though the limit is higher:** the machine is overloaded, low on RAM, swap is growing fast, or the command just admitted is still in its 3-second startup cooldown. `jobq status` shows CPU use, free RAM and how many more commands it can take right now (computed live from free CPU and RAM and the weight of the next waiting command, so it changes with the machine).

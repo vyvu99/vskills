@@ -7,6 +7,13 @@ T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 unset JOBQ_ACTIVE
 export JOBQ_COOLDOWN_SEC=0 JOBQ_SWAP_MAX_MB=999999999 JOBQ_SWAP_GROWTH_MB=999999 JOBQ_BUDGET_CPU=4 JOBQ_MAX_PRESSURE=99 JOBQ_DIR="$T/q" JOBQ_SLOTS=2 JOBQ_MAX_CPU=999 JOBQ_MAX_PAGEOUT=999999999 JOBQ_FAKE_MACHINE="0 0 0" JOBQ_MIN_FREE_MB=0
 fail() { echo "FAIL: $1"; exit 1; }
+# jobq chờ vô hạn nên bài kiểm tra tự giới hạn: try GIÂY [cờ...] trả 75 nếu hết giờ mà lệnh vẫn chưa được vào chỗ
+try() {
+  local s=$1 j m="$T/started"; shift; rm -f "$m"; "$HERE/jobq" run "$@" -- touch "$m" >/dev/null 2>&1 & j=$!
+  for _ in $(seq $(( s * 4 ))); do [ -e "$m" ] || ! kill -0 "$j" 2>/dev/null && break; sleep 0.25; done
+  [ -e "$m" ] || ! kill -0 "$j" 2>/dev/null || { kill "$j"; wait "$j" 2>/dev/null; return 75; }
+  wait "$j"
+}
 
 bash -n "$HERE/jobq" || fail "cú pháp"
 
@@ -41,7 +48,7 @@ JOBQ_WHOLE=1 "$HERE/jobq" run -t 2 -- bash -c 'sleep 20 & wait' >/dev/null 2>&1;
 
 # 5) slot của tiến trình chết bị dọn
 ln -s 99999999 "$T/q/slots/1"; ln -s 99999999 "$T/q/slots/2"
-"$HERE/jobq" run -w 10 -- true || fail "slot chết không được dọn"
+try 10 || fail "slot chết không được dọn"
 
 # 6) lint-script: template đạt, script xấu bị chặn
 "$HERE/lint-script" "$HERE/template.sh" >/dev/null || fail "template không qua lint"
@@ -80,8 +87,8 @@ JOBQ_BIN="$HERE/jobq" "$T/self.sh" >/dev/null || fail "script mẫu chạy lỗi
 ( export JOBQ_DIR="$T/q4" JOBQ_MAX_PRESSURE=1
   "$HERE/jobq" run -- sleep 6 &
   for _ in $(seq 40); do [ -L "$T/q4/slots/1" ] && break; sleep 0.25; done # máy tải thì lệnh đầu vào chỗ chậm hơn 1s
-  "$HERE/jobq" run -w 2 -- true 2>/dev/null; rc=$?; wait
-  [ "$rc" -eq 75 ] ) || fail "áp lực RAM không chặn lệnh thứ hai"
+  "$HERE/jobq" run -- touch "$T/q4/second" & sleep 2
+  [ ! -e "$T/q4/second" ] || exit 1; wait; [ -e "$T/q4/second" ] ) || fail "áp lực RAM không giữ lệnh thứ hai chờ tới lượt"
 
 # 13) chạy lách: lệnh nhẹ vào trước lệnh nặng đang chờ
 ( unset JOBQ_SLOTS; export JOBQ_DIR="$T/q5" JOBQ_SLOTS=3; : > "$T/order"
@@ -169,15 +176,14 @@ pass|grep -rn "check-types" .
 pass|ls scripts/check-x.sh
 CASES
 
-# 16b) jobq-guard ép chia lô: công cụ chạy cả cục bị chặn kèm lời nhắc, có shard/filter/tệp thì qua, JOBQ_WHOLE=1 cho qua
+# 16b) jobq-guard ép chia lô: turbo chạy cả cục bị chặn kèm lời nhắc; vitest/jest/playwright được qua vì jobq tự chia lô
 gw() { local exp=$1 out r; out=$(printf '{"tool_input":{"command":%s}}' "$(jq -Rn --arg c "$2" '$c')" | "$HERE/jobq-guard" 2>&1 >/dev/null); r=$?
   if [ "$exp" = block ]; then [ "$r" -eq 2 ] && echo "$out" | grep -q "CHIA LÔ" || fail "jobq-guard phải ép chia lô: $2"; else [ "$r" -eq 0 ] || fail "jobq-guard không được chặn lệnh đã chia lô: $2"; fi; }
 while IFS='|' read -r exp c; do gw "$exp" "$c"; done <<'WHOLE'
-block|JOBQ_FG=1 jobq run -- npx vitest run
-block|JOBQ_FG=1 jobq run -- pnpm exec jest
-block|JOBQ_FG=1 jobq run -- npx playwright test
+pass|JOBQ_FG=1 jobq run -- npx vitest run
+pass|JOBQ_FG=1 jobq run -- pnpm exec jest
+pass|JOBQ_FG=1 jobq run -- npx playwright test
 block|JOBQ_FG=1 jobq run -- turbo run build
-block|JOBQ_FG=1 jobq run -- sh -c "cd apps/api && npx vitest run --maxWorkers=2"
 pass|JOBQ_FG=1 jobq run -- npx vitest run --shard=1/4
 pass|JOBQ_FG=1 jobq run -- npx vitest run src/a.test.ts
 pass|JOBQ_FG=1 jobq run -- jest --shard=2/5
@@ -239,7 +245,8 @@ line=$("$HERE/jobq" split 1 -- "src/(auth)/x y.test.ts" z.ts); eval "set -- $lin
   "$HERE/jobq" clean >/dev/null; grep -q "$(printf '\t')137$(printf '\t')" "$JOBQ_DIR/runs/000000000001-99999999.meta" ) || fail "lệnh dang dở của jobq đã chết không được chốt mã 137"
 
 # 27) chờ khởi động: lệnh thứ hai không được nhận ngay sau lệnh đầu mà phải đợi hết thời gian chờ
-( export JOBQ_DIR="$T/q15" JOBQ_COOLDOWN_SEC=4 JOBQ_SLOTS=3
+# máy giả phải đang bận (CPU trên 1/3 trần), vì máy rảnh thì jobq chỉ nghỉ 1s
+( export JOBQ_DIR="$T/q15" JOBQ_COOLDOWN_SEC=4 JOBQ_SLOTS=3 JOBQ_FAKE_MACHINE="400 0 0"
   "$HERE/jobq" run -- bash -c "date +%s > $T/a.t; sleep 8" & sleep 1.2
   "$HERE/jobq" run -- bash -c "date +%s > $T/b.t" & wait
   [ $(( $(cat "$T/b.t") - $(cat "$T/a.t") )) -ge 3 ] ) || fail "chờ khởi động không có tác dụng"
@@ -248,9 +255,9 @@ line=$("$HERE/jobq" split 1 -- "src/(auth)/x y.test.ts" z.ts); eval "set -- $lin
 ( export JOBQ_DIR="$T/q16" JOBQ_FAKE_SWAP_FILE="$T/swap.mb" JOBQ_SWAP_GROWTH_MB=100 JOBQ_SWAP_BRAKE_SEC=20
   echo 1000 > "$T/swap.mb"
   "$HERE/jobq" run -- sleep 16 & A=$!; sleep 1.5
-  "$HERE/jobq" run -w 4 -- true 2>/dev/null; ok_rc=$?
+  try 4; ok_rc=$?
   sleep 5.5; echo 1300 > "$T/swap.mb"
-  "$HERE/jobq" run -w 4 -- true 2>/dev/null; brake_rc=$?
+  try 4; brake_rc=$?
   kill $A 2>/dev/null; wait 2>/dev/null
   [ "$ok_rc" -eq 0 ] && [ "$brake_rc" -eq 75 ] ) || fail "phanh theo swap sai (swap đứng yên phải chạy, swap tăng nhanh phải bị giữ)"
 
@@ -259,9 +266,9 @@ line=$("$HERE/jobq" split 1 -- "src/(auth)/x y.test.ts" z.ts); eval "set -- $lin
   sleep 30 & P=$!
   ln -s "$P" "$JOBQ_DIR/slots/1"; echo "200 2000 $(( $(date +%s) - 60 ))" > "$JOBQ_DIR/slots/1.w"
   printf '100 700\n' > "$JOBQ_DIR/sample.$P"
-  "$HERE/jobq" run --cost cpu=2,mem=100 -w 3 -- true 2>/dev/null; heavy_rc=$?
+  try 3 --cost cpu=2,mem=100; heavy_rc=$?
   rm -f "$JOBQ_DIR/sample.$P"
-  "$HERE/jobq" run --cost cpu=2,mem=100 -w 3 -- true 2>/dev/null; est_rc=$?
+  try 3 --cost cpu=2,mem=100; est_rc=$?
   kill $P 2>/dev/null
   [ "$heavy_rc" -eq 75 ] && [ "$est_rc" -eq 0 ] ) || fail "nhận lệnh theo số đo thật sai (đo 7 nhân phải chặn, chỉ ước 2 nhân phải cho qua)"
 
@@ -269,8 +276,8 @@ line=$("$HERE/jobq" split 1 -- "src/(auth)/x y.test.ts" z.ts); eval "set -- $lin
 ( export JOBQ_DIR="$T/q18" JOBQ_SLOTS=3 JOBQ_MAX_CPU=80 JOBQ_FAKE_MACHINE="40 0 0"; mkdir -p "$JOBQ_DIR/slots" "$JOBQ_DIR/queue"
   sleep 30 & P=$!
   ln -s "$P" "$JOBQ_DIR/slots/1"; echo "100 500 $(( $(date +%s) - 60 ))" > "$JOBQ_DIR/slots/1.w"
-  JOBQ_FAKE_POWER=100 "$HERE/jobq" run --cost cpu=2,mem=100 -w 3 -- true 2>/dev/null; ok_rc=$?
-  JOBQ_FAKE_POWER=50 "$HERE/jobq" run --cost cpu=2,mem=100 -w 3 -- true 2>/dev/null; hot_rc=$?
+  JOBQ_FAKE_POWER=100 try 3 --cost cpu=2,mem=100; ok_rc=$?
+  JOBQ_FAKE_POWER=50 try 3 --cost cpu=2,mem=100; hot_rc=$?
   kill $P 2>/dev/null
   [ "$ok_rc" -eq 0 ] && [ "$hot_rc" -eq 75 ] ) || fail "trần CPU không giảm theo hạ xung hoặc pin (bình thường phải nhận, hạ xung 50% phải giữ lại)"
 

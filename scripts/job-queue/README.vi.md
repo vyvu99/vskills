@@ -38,7 +38,7 @@ jobq web                                  # mở trang theo dõi
 jobq clean                                # dọn chỗ của tiến trình đã chết, cắt lịch sử còn 2000 dòng
 ```
 
-Mã thoát: của chính lệnh, trừ `124` (quá hạn, đã dừng cả cây tiến trình và báo phải chia nhỏ lệnh), `125` (từ chối vì lần trước lệnh này chạy quá to, xem mục Lỗi hay gặp), `75` (chờ trong hàng quá lâu) và `130` (bị ngắt bằng Ctrl-C).
+Mã thoát: của chính lệnh, trừ `124` (quá hạn, đã dừng cả cây tiến trình và báo phải chia nhỏ lệnh), `125` (từ chối vì lần trước lệnh này chạy quá to, xem mục Lỗi hay gặp) và `130` (bị ngắt bằng Ctrl-C).
 
 ## Cách hoạt động
 
@@ -66,7 +66,7 @@ flowchart LR
 
 ## Cấu hình
 
-Không có tệp cấu hình hay lệnh chỉnh số: mọi giới hạn tự suy ra từ số nhân và RAM của máy rồi được siết thêm bằng số đo thật. Chỉ còn hai thứ chỉnh theo từng lệnh: `-t` (giây tối đa cho lệnh, mặc định 900) và `-w` (giây chờ tối đa trong hàng, mặc định 7200), cùng `--cost cpu=N,mem=MB` để khai trước mức nặng cho lệnh chưa có lịch sử. Các biến `JOBQ_*` trong đầu tệp `jobq` chỉ là điểm ghi đè cho kiểm thử.
+Không có tệp cấu hình hay lệnh chỉnh số: mọi giới hạn tự suy ra từ số nhân và RAM của máy rồi được siết thêm bằng số đo thật. Lệnh trong hàng chờ bao lâu cũng được, không bao giờ bị bỏ. Theo từng lệnh chỉnh được `-t` (giây chạy tối đa, mặc định 900), cùng `--cost cpu=N,mem=MB` để khai trước mức nặng cho lệnh chưa có lịch sử. Các biến `JOBQ_*` trong đầu tệp `jobq` chỉ là điểm ghi đè cho kiểm thử.
 
 ## Lịch sử lệnh và output
 
@@ -118,7 +118,6 @@ Bước nào lỗi thì dừng tại đó; sửa xong chạy lại cùng lệnh 
 
 ## Lỗi hay gặp
 
-- **Exit `75`:** chờ quá `JOBQ_WAIT`. Chạy `jobq status`; nếu có chỗ treo mà tiến trình đã chết thì `jobq clean`.
 - **Exit `124`:** lệnh quá hạn. `jobq` in "QUÁ HẠN ... hãy CHIA NHỎ lệnh" và ghi dòng đó vào lịch sử, kèm tên lệnh và 20 dòng output cuối để biết lệnh chạy tới đâu. Chia lệnh thành các lô ngắn hơn (`jobq split N -- <file...>` hoặc `--shard=i/N`) rồi đẩy từng lô, đừng tăng `-t`.
 - **Exit `125`:** `jobq` từ chối chạy vì 3 lần chạy gần nhất của đúng lệnh này trung bình quá nửa hạn thời gian (kể cả các lần bị quá hạn, được ghi vào lịch sử) hoặc RAM tối đa vượt một phần tư RAM máy. Chia lệnh thành lô nhỏ rồi chạy từng lô; thật sự cần chạy cả cục thì thêm `JOBQ_WHOLE=1` trước lệnh.
 - **Chỉ một lệnh chạy dù giới hạn cao hơn:** máy đang quá tải, thiếu RAM, swap tăng nhanh, hoặc lệnh vừa được nhận còn trong 3 giây chờ khởi động. `jobq status` hiện CPU đang dùng, RAM trống và số lệnh còn nhận thêm được ngay lúc này (tính sống từ CPU, RAM trống và độ nặng của lệnh chờ tiếp theo nên đổi theo máy).
