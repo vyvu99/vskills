@@ -53,7 +53,8 @@ for t in "${TARGETS[@]}"; do
   target_info "$t" || { echo "[install] unsupported --target=$t (use claude, codex, gemini, copilot, opencode, kiro, commandcode, agents or all)" >&2; exit 2; }
 done
 log() { echo "[install] $*"; }
-run() { $DRY_RUN && echo "[dry-run] $*" || eval "$*"; }
+# Arguments are passed through as-is (no eval), so quotes or spaces in a path stay literal.
+run() { if $DRY_RUN; then echo "[dry-run] $*"; else "$@"; fi; }
 
 # link <src> <dst> — symlinks dst → src. An existing symlink is replaced; an existing real
 # file/dir (e.g. your own ~/.claude/scripts/lint-rules with personal rules) is moved aside to
@@ -62,13 +63,13 @@ link() {
   local src="$1" dst="$2"
   if [[ -L "$dst" ]]; then
     [[ "$(readlink "$dst")" == "$src" ]] && { log "up to date: $dst"; return; }
-    run "rm '$dst'"
+    run rm "$dst"
   elif [[ -e "$dst" ]]; then
-    run "mv '$dst' '$dst.bak.$(date +%Y%m%d%H%M%S)'"
+    run mv "$dst" "$dst.bak.$(date +%Y%m%d%H%M%S)"
     log "backed up existing $dst"
   fi
-  run "mkdir -p '$(dirname "$dst")'"
-  run "ln -s '$src' '$dst'"
+  run mkdir -p "$(dirname "$dst")"
+  run ln -s "$src" "$dst"
   log "linked: $dst → $src"
 }
 
@@ -91,7 +92,7 @@ install_skills() {
       fi
       dst_dir="$SKILLS_DST/$skill_name"
       # clean up an older dir-level symlink from a previous install.sh version
-      [[ -L "$dst_dir" ]] && run "rm '$dst_dir'"
+      [[ -L "$dst_dir" ]] && run rm "$dst_dir"
       link "$src_file" "$dst_dir/SKILL.md"
       # references/ (if the skill has one) is symlinked whole — unlike SKILL.md,
       # it isn't subject to --lang per-file selection, so any skill with a
@@ -130,7 +131,13 @@ install_skills() {
         *) continue ;;
       esac
       [[ -d "$SKILLS_SRC/$skill_name" ]] && continue
-      run "rm -rf '$dst_skill_dir'"
+      # Delete only links into this repo; anything the user added to the folder stays.
+      if [[ -L "$dst_skill_dir" ]]; then
+        run rm "$dst_skill_dir"
+      else
+        run find "$dst_skill_dir" -maxdepth 1 -type l -lname "$SKILLS_SRC/*" -delete
+        $DRY_RUN || rmdir "$dst_skill_dir" 2>/dev/null || log "kept $dst_skill_dir: it still holds your own files"
+      fi
       log "removed orphaned skill: $skill_name (no longer in this repo)"
     done
   fi
@@ -202,11 +209,11 @@ if $WITH_RULES; then
     [[ "$MD" -ef "$RULES_SRC" ]] && { log "up to date: $MD is the rules source"; continue; }
     # Passing --with-rules is the explicit choice to replace; the old file is moved aside, not deleted.
     if [[ -e "$MD" ]]; then
-      run "mv '$MD' '$MD.bak.$(date +%Y%m%d%H%M%S)'"
+      run mv "$MD" "$MD.bak.$(date +%Y%m%d%H%M%S)"
       log "backed up existing $MD"
     fi
-    run "mkdir -p '$(dirname "$MD")'"
-    run "cp '$RULES_SRC' '$MD'"
+    run mkdir -p "$(dirname "$MD")"
+    run cp "$RULES_SRC" "$MD"
     log "copied $RULES_SRC → $MD (edit freely, not synced)"
   done
   if [[ "$RULES_SRC" == "$STARTER_SRC" ]] && ! $WITH_SCRIPTS; then
